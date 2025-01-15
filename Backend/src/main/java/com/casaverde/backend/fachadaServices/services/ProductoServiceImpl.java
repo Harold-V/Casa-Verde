@@ -26,6 +26,20 @@ public class ProductoServiceImpl implements IProductoService {
     @Autowired
     private ModelMapper modelMapper;
 
+    private Long obtenerNuevoId(List<Long> idsExistentes) {
+        if (idsExistentes.isEmpty()) {
+            return 1L; // Si no hay productos, el ID inicial es 1
+        }
+
+        for (long i = 1L; i <= idsExistentes.size() + 1L; i++) { // Asegúrate de usar long con sufijo 'L'
+            if (!idsExistentes.contains(i)) {
+                return i; // Devuelve el primer ID libre
+            }
+        }
+
+        return (long) idsExistentes.size() + 1L; // Asegúrate de convertir size() a Long
+    }
+
     // Método privado para convertir de Entity a DTO
     private ProductoDTO convertToDTO(ProductoEntity productoEntity) {
         return modelMapper.map(productoEntity, ProductoDTO.class);
@@ -55,9 +69,13 @@ public class ProductoServiceImpl implements IProductoService {
     @Override
     public ProductoDTO save(ProductoDTO productoDTO) {
         ProductoEntity productoEntity = convertToEntity(productoDTO);
-        productoEntity.setProdID(null); // Ignorar cualquier ID que venga en el DTO
+
+        List<Long> idsExistentes = productoRepository.findAllProductIds();
+        Long nuevoId = obtenerNuevoId(idsExistentes);
+
+        productoEntity.setProdID(nuevoId); // Asignar el menor ID libre
         ProductoEntity savedEntity = productoRepository.save(productoEntity);
-        logger.info("Saved new Producto with ID: {}", savedEntity.getProdID());
+
         return convertToDTO(savedEntity);
     }
 
