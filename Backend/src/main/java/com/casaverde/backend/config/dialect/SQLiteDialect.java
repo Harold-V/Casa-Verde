@@ -537,7 +537,6 @@ public class SQLiteDialect extends Dialect {
 
     @Override
     public boolean doesReadCommittedCauseWritersToBlockReaders() {
-        // TODO Validate (WAL mode...)
         return true;
     }
 

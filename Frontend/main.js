@@ -9,6 +9,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
     },
+    icon: path.join(__dirname, "public/greenHouse.ico"),
   });
   mainWindow.loadURL(
     url.format({
@@ -20,6 +21,7 @@ function createWindow() {
   mainWindow.on("closed", function () {
     mainWindow = null;
   });
+  mainWindow.setMenu(null);
 }
 app.on("ready", createWindow);
 app.on("window-all-closed", function () {

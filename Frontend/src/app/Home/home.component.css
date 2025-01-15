@@ -1,0 +1,25 @@
+/* Botones de la barra lateral */
+.sidebar-btn {
+  display: flex; /* Activa Flexbox */
+  align-items: center; /* Centra verticalmente */
+  justify-content: center; /* Centra horizontalmente */
+  border: none; /* Eliminar bordes */
+  background-color: transparent; /* Fondo transparente por defecto */
+  padding: 10px 15px; /* Espaciado interno */
+  font-size: 1rem; /* Tamaño de texto */
+  text-align: center; /* Asegura el centrado de texto */
+}
+.sidebar-btn:hover {
+  background-color: #198754; /* Verde Bootstrap en hover */
+  color: #fff; /* Texto blanco en hover */
+  border-radius: 0; /* Sin bordes redondeados */
+}
+
+/* Fondo oscuro para la barra lateral */
+.bg-dark {
+  background-color: #004c3f !important;
+}
+
+.text-asadero {
+  color: #5e9f34; /* Cambia este valor al color deseado */
+}
