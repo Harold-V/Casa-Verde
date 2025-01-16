@@ -14,9 +14,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 @Entity
 @Table(name = "Pedido") // Nombre de la tabla en la base de datos
 public class PedidoEntity {
@@ -40,12 +42,7 @@ public class PedidoEntity {
     @Column(nullable = false)
     private estadoPedido pedEstado;
 
-    // Constructor sin parámetros
-    public PedidoEntity() {
-    }
-
     // Getters y Setters con formato local Date para busqueda de pedidos por fecha
-
     public LocalDate getPedFechaAsLocalDate() {
         return LocalDate.parse(pedFecha, DateTimeFormatter.ISO_DATE);
     }

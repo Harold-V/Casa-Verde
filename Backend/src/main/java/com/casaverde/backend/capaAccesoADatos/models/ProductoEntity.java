@@ -6,9 +6,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 @Entity
 @Table(name = "Producto") // Nombre de la tabla en la base de datos
 public class ProductoEntity {
@@ -22,7 +24,4 @@ public class ProductoEntity {
     @Column(nullable = false) // prodPrecio no puede ser nulo
     private Double prodPrecio;
 
-    // Constructor sin parámetros (requerido por JPA)
-    public ProductoEntity() {
-    }
 }
