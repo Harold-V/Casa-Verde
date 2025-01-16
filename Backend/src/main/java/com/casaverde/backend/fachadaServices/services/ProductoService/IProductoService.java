@@ -1,4 +1,4 @@
-package com.casaverde.backend.fachadaServices.services;
+package com.casaverde.backend.fachadaServices.services.ProductoService;
 
 import java.util.List;
 
