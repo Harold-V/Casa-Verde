@@ -3,15 +3,12 @@ package com.casaverde.backend.capaAccesoADatos.models;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -42,7 +39,10 @@ public class PedidoEntity {
     @Column(nullable = false)
     private estadoPedido pedEstado;
 
-    // Getters y Setters con formato local Date para busqueda de pedidos por fecha
+    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<PedidoProductoEntity> productos = new ArrayList<>();
+
+    // Getters y Setters con formato local Date para búsqueda de pedidos por fecha
     public LocalDate getPedFechaAsLocalDate() {
         return LocalDate.parse(pedFecha, DateTimeFormatter.ISO_DATE);
     }

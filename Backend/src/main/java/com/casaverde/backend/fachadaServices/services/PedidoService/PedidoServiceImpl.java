@@ -12,8 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.casaverde.backend.capaAccesoADatos.models.PedidoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.ProductoEntity;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.DTO.PedidoDTO;
+import com.casaverde.backend.fachadaServices.DTO.PedidoProductoDTO;
 
 @Service
 public class PedidoServiceImpl implements IPedidoService {
@@ -42,7 +44,20 @@ public class PedidoServiceImpl implements IPedidoService {
 
     // Método privado para convertir de Entity a DTO
     private PedidoDTO convertToDTO(PedidoEntity pedidoEntity) {
-        return modelMapper.map(pedidoEntity, PedidoDTO.class);
+
+        PedidoDTO pedidoDTO = modelMapper.map(pedidoEntity, PedidoDTO.class);
+
+        List<PedidoProductoDTO> productos = pedidoEntity.getProductos().stream().map(pedidoProducto -> {
+            ProductoEntity producto = pedidoProducto.getProducto();
+            return new PedidoProductoDTO(
+                    producto.getProdNombre(),
+                    producto.getProdPrecio(),
+                    pedidoProducto.getPedProdCantidad());
+        }).toList();
+
+        pedidoDTO.setProductos(productos);
+
+        return pedidoDTO;
     }
 
     // Método privado para convertir de DTO a Entity

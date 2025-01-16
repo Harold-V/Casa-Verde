@@ -7,10 +7,10 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductoDTO {
+public class PedidoProductoDTO {
 
-    private Long prodID; // ID del producto
-    private String prodNombre; // Nombre del producto
-    private Double prodPrecio; // Precio del producto
+    private String prodNombre;
+    private Double prodPrecio;
+    private Integer pedProdCantidad;
 
 }

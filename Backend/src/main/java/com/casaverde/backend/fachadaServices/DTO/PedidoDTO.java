@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,4 +20,5 @@ public class PedidoDTO {
     private Double pedValorTotal;
     private estadoPedido pedEstado;
 
+    private List<PedidoProductoDTO> productos;
 }
