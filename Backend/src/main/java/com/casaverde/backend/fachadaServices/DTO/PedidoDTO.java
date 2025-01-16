@@ -1,7 +1,8 @@
 package com.casaverde.backend.fachadaServices.DTO;
 
-import java.sql.Date;
-import java.sql.Time;
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
 
 import lombok.AllArgsConstructor;
@@ -15,8 +16,8 @@ public class PedidoDTO {
 
     private Long pedID;
     private String pedNombreCliente;
-    private Date pedFecha;
-    private Time pedHora;
+    private LocalDate pedFecha;
+    private LocalTime pedHora;
     private Double pedValorTotal;
     private estadoPedido pedEstado;
 

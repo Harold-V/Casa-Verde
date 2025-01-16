@@ -1,7 +1,7 @@
 package com.casaverde.backend.capaAccesoADatos.models;
 
-import java.sql.Date;
-import java.sql.Time;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
 
@@ -25,10 +25,10 @@ public class PedidoEntity {
     private String pedNombreCliente;
 
     @Column(nullable = false)
-    private Date pedFecha;
+    private LocalDate pedFecha;
 
     @Column(nullable = false)
-    private Time pedHora;
+    private LocalTime pedHora;
 
     @Column(nullable = false)
     private Double pedValorTotal;

@@ -200,9 +200,8 @@ public class SQLiteDialect extends Dialect {
     }
 
     @Override
-    public String timestampaddPattern(TemporalUnit unit, @SuppressWarnings("deprecation") TemporalType temporalType,
+    public String timestampaddPattern(TemporalUnit unit, TemporalType temporalType,
             IntervalType intervalType) {
-        @SuppressWarnings("deprecation")
         final String function = temporalType == TemporalType.DATE ? "date" : "datetime";
         switch (unit) {
             case NANOSECOND:
@@ -667,7 +666,6 @@ public class SQLiteDialect extends Dialect {
         throw new UnsupportedOperationException("Unsupported unit: " + unit);
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public void appendDateTimeLiteral(
             SqlAppender appender,
