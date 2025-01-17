@@ -1,6 +1,6 @@
 package com.casaverde.backend.fachadaServices.DTO;
 
-import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoPedido;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,6 +16,6 @@ public class PedidoDTO {
     private String pedFecha;
     private String pedHora;
     private Double pedValorTotal;
-    private estadoPedido pedEstado;
+    private EstadoPedido pedEstado;
 
 }

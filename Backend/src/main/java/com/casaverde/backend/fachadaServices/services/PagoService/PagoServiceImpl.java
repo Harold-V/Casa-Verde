@@ -2,7 +2,7 @@ package com.casaverde.backend.fachadaServices.services.PagoService;
 
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.PagoEntity;
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
-import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoPedido;
 import com.casaverde.backend.capaAccesoADatos.repositories.PagoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.DTO.PagoDTO;
@@ -66,9 +66,9 @@ public class PagoServiceImpl implements IPagoService {
         double totalPagado = pedidoEntity.getPagos().stream().mapToDouble(PagoEntity::getPagoValor).sum()
                 + pagoEntity.getPagoValor();
         if (totalPagado >= pedidoEntity.getPedValorTotal()) {
-            pedidoEntity.setPedEstado(estadoPedido.Finalizado);
+            pedidoEntity.setPedEstado(EstadoPedido.Finalizado);
         } else {
-            pedidoEntity.setPedEstado(estadoPedido.Pendiente);
+            pedidoEntity.setPedEstado(EstadoPedido.Pendiente);
         }
 
         PagoEntity savedEntity = pagoRepository.save(pagoEntity);

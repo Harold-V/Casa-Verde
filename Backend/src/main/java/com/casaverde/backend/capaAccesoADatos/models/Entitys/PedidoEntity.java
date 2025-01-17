@@ -5,7 +5,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoPedido;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -36,7 +36,7 @@ public class PedidoEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private estadoPedido pedEstado;
+    private EstadoPedido pedEstado;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PagoEntity> pagos;

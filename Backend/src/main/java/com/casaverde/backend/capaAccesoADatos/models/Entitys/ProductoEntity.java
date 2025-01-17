@@ -1,6 +1,6 @@
 package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
-import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoProducto;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoProducto;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,6 +30,6 @@ public class ProductoEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false) //
-    private estadoProducto prodEstado;
+    private EstadoProducto prodEstado;
 
 }
