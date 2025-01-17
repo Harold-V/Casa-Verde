@@ -1,7 +1,11 @@
 package com.casaverde.backend.capaAccesoADatos.models;
 
+import com.casaverde.backend.capaAccesoADatos.models.enums.estadoProducto;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -23,5 +27,9 @@ public class ProductoEntity {
 
     @Column(nullable = false) // prodPrecio no puede ser nulo
     private Double prodPrecio;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false) //
+    private estadoProducto prodEstado;
 
 }
