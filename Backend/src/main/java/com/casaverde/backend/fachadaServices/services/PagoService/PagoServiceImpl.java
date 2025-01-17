@@ -1,16 +1,13 @@
 package com.casaverde.backend.fachadaServices.services.PagoService;
 
-import com.casaverde.backend.capaAccesoADatos.models.PagoEntity;
-import com.casaverde.backend.capaAccesoADatos.models.PedidoEntity;
-import com.casaverde.backend.capaAccesoADatos.models.ProductoEntity;
-import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PagoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoPedido;
 import com.casaverde.backend.capaAccesoADatos.repositories.PagoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.DTO.PagoDTO;
 import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +16,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class PagoServiceImpl implements IPagoService {
-
-    private static final Logger logger = LoggerFactory.getLogger(PagoServiceImpl.class);
-
     @Autowired
     private PagoRepository pagoRepository;
 
@@ -69,8 +63,8 @@ public class PagoServiceImpl implements IPagoService {
 
         pagoEntity.setPagoID(nuevoId); // Asignar el menor ID libre
 
-
-        double totalPagado = pedidoEntity.getPagos().stream().mapToDouble(PagoEntity::getPagoValor).sum() + pagoEntity.getPagoValor();
+        double totalPagado = pedidoEntity.getPagos().stream().mapToDouble(PagoEntity::getPagoValor).sum()
+                + pagoEntity.getPagoValor();
         if (totalPagado >= pedidoEntity.getPedValorTotal()) {
             pedidoEntity.setPedEstado(estadoPedido.Finalizado);
         } else {

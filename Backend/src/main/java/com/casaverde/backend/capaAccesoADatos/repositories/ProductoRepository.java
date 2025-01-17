@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
-import com.casaverde.backend.capaAccesoADatos.models.ProductoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.ProductoEntity;
 
 @Repository
 public interface ProductoRepository extends CrudRepository<ProductoEntity, Long> {

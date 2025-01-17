@@ -1,6 +1,7 @@
-package com.casaverde.backend.capaAccesoADatos.models;
+package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
-import com.casaverde.backend.capaAccesoADatos.models.enums.PagoTipo;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.PagoTipo;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

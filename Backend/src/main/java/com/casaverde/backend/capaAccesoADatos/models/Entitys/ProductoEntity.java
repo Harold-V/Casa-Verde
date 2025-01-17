@@ -1,6 +1,6 @@
-package com.casaverde.backend.capaAccesoADatos.models;
+package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
-import com.casaverde.backend.capaAccesoADatos.models.enums.estadoProducto;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoProducto;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

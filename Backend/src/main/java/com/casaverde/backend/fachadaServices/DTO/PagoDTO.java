@@ -1,6 +1,7 @@
 package com.casaverde.backend.fachadaServices.DTO;
 
-import com.casaverde.backend.capaAccesoADatos.models.enums.PagoTipo;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.PagoTipo;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

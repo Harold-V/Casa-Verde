@@ -1,11 +1,11 @@
-package com.casaverde.backend.capaAccesoADatos.models;
+package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoPedido;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

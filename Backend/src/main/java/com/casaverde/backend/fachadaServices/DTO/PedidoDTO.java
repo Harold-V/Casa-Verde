@@ -1,6 +1,6 @@
 package com.casaverde.backend.fachadaServices.DTO;
 
-import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Enums.estadoPedido;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
