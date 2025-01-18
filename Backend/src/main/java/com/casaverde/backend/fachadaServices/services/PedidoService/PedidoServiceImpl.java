@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import com.casaverde.backend.capaAccesoADatos.models.PedidoEntity;
 import com.casaverde.backend.capaAccesoADatos.models.ProductoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.DTO.PedidoDTO;
 import com.casaverde.backend.fachadaServices.DTO.PedidoProductoDTO;

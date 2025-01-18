@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.casaverde.backend.capaAccesoADatos.models.ConfiguracionEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.ConfiguracionEntity;
 import com.casaverde.backend.capaAccesoADatos.repositories.ConfiguracionRepository;
 import com.casaverde.backend.fachadaServices.DTO.ConfiguracionDTO;
 

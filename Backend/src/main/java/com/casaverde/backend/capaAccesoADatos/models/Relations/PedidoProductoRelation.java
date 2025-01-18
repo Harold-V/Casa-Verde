@@ -1,4 +1,4 @@
-package com.casaverde.backend.capaAccesoADatos.models;
+package com.casaverde.backend.capaAccesoADatos.models.Relations;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -7,12 +7,15 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.ProductoEntity;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
 @Table(name = "PedidoProducto") // Nombre de la tabla en la base de datos
-public class PedidoProductoEntity {
+public class PedidoProductoRelation {
 
     @EmbeddedId
     private PedidoProductoId id;
@@ -33,6 +36,7 @@ public class PedidoProductoEntity {
     @Embeddable
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     public static class PedidoProductoId implements Serializable {
 
         @Column(name = "prodID")
@@ -40,9 +44,5 @@ public class PedidoProductoEntity {
 
         @Column(name = "pedID")
         private Long pedID;
-
-        // Constructor sin parámetros (requerido por JPA)
-        public PedidoProductoId() {
-        }
     }
 }

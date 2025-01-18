@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
-import com.casaverde.backend.capaAccesoADatos.models.ConfiguracionEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.ConfiguracionEntity;
 
 @Repository
 public interface ConfiguracionRepository extends CrudRepository<ConfiguracionEntity, String> {

@@ -6,11 +6,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
-import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PagoEntity;
 
 @Repository
-public interface PedidoRepository extends CrudRepository<PedidoEntity, Long> {
+public interface PagoRepository extends CrudRepository<PagoEntity, Long> {
 
-    @Query("SELECT p.pedID FROM PedidoEntity p")
-    List<Long> findAllProductIds();
+    @Query("SELECT p.pagoID FROM PagoEntity p")
+    List<Long> findAllPagoIds();
 }

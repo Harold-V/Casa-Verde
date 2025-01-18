@@ -1,4 +1,4 @@
-package com.casaverde.backend.capaAccesoADatos.models;
+package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

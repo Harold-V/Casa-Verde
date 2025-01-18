@@ -1,6 +1,6 @@
-package com.casaverde.backend.capaAccesoADatos.models.enums;
+package com.casaverde.backend.capaAccesoADatos.models.Enums;
 
-public enum estadoPedido {
+public enum EstadoPedido {
     Pendiente,
     Finalizado,
     Archivado,

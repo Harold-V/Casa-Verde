@@ -1,12 +1,13 @@
-package com.casaverde.backend.capaAccesoADatos.models;
+package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 
-import com.casaverde.backend.capaAccesoADatos.models.enums.estadoPedido;
+import java.util.List;
+import java.util.ArrayList;
+
+import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoPedido;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -37,7 +38,10 @@ public class PedidoEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private estadoPedido pedEstado;
+    private EstadoPedido pedEstado;
+
+    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PagoEntity> pagos;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PedidoProductoEntity> productos = new ArrayList<>();
