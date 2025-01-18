@@ -6,10 +6,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
-import com.casaverde.backend.capaAccesoADatos.models.Entitys.ConfiguracionEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoAtributoOpcionalEntity;
 
 @Repository
-public interface ConfiguracionRepository extends CrudRepository<ConfiguracionEntity, String> {
-    @Query("SELECT p.configClave FROM ConfiguracionEntity p")
+public interface PedidoAtributoOpcionalRepository extends CrudRepository<PedidoAtributoOpcionalEntity, String> {
+
+    @Query("SELECT p.pedAtrOpcClave FROM PedidoAtributoOpcionalEntity p")
     List<Long> findAllProductIds();
 }
