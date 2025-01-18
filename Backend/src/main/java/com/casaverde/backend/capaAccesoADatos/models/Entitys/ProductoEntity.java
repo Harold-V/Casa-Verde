@@ -1,6 +1,7 @@
 package com.casaverde.backend.capaAccesoADatos.models.Entitys;
 
 import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoProducto;
+import com.casaverde.backend.capaAccesoADatos.models.Relations.PedidoProductoRelation;
 
 import jakarta.persistence.*;
 
@@ -35,7 +36,7 @@ public class ProductoEntity {
     private Double prodPrecio;
 
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PedidoProductoEntity> pedidos = new ArrayList<>();
+    private List<PedidoProductoRelation> pedidos = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false) //

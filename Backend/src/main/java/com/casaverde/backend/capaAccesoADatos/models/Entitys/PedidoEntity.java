@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoPedido;
+import com.casaverde.backend.capaAccesoADatos.models.Relations.PedidoProductoRelation;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -44,7 +45,7 @@ public class PedidoEntity {
     private List<PagoEntity> pagos;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PedidoProductoEntity> productos = new ArrayList<>();
+    private List<PedidoProductoRelation> productos = new ArrayList<>();
 
     // Getters y Setters con formato local Date para búsqueda de pedidos por fecha
     public LocalDate getPedFechaAsLocalDate() {
