@@ -61,8 +61,8 @@ public class ProductoRestController {
         return objRespuesta;
     }
 
-    @PutMapping("/producto/eliminar")
-    public ResponseEntity<Boolean> eliminarProducto(@RequestParam Long id) {
+    @PutMapping("/producto/eliminar/{id}")
+    public ResponseEntity<Boolean> eliminarProducto(@PathVariable Long id) {
         Boolean bandera = productoService.updateEstado(id);
         ResponseEntity<Boolean> objRespuesta = new ResponseEntity<Boolean>(bandera, HttpStatus.NO_CONTENT);
         return objRespuesta;
