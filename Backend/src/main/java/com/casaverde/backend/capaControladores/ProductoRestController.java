@@ -1,6 +1,8 @@
 package com.casaverde.backend.capaControladores;
 
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -60,11 +62,33 @@ public class ProductoRestController {
         return objRespuesta;
     }
 
-    @DeleteMapping("/producto")
+    @PutMapping("/producto/eliminar")
     public ResponseEntity<Boolean> eliminarProducto(@RequestParam Long id) {
-        Boolean bandera = productoService.delete(id);
+        Boolean bandera = productoService.updateEstado(id);
         ResponseEntity<Boolean> objRespuesta = new ResponseEntity<Boolean>(bandera, HttpStatus.NO_CONTENT);
         return objRespuesta;
+    }
+
+    @GetMapping("/producto/validarParaGuardar")
+    public ResponseEntity<?> validarProductoParaGuardar(@RequestBody ProductoDTO producto) {
+        Optional<Long> productoId = productoService.validarProductoParaGuardar(producto);
+
+        if (productoId.isPresent()) {
+            return ResponseEntity.badRequest().body("Ya existe un producto con el ID: " + productoId.get());
+        } else {
+            return ResponseEntity.ok("El producto puede ser guardado");
+        }
+    }
+
+    @GetMapping("/producto/validarParaActualizar/{id}")
+    public ResponseEntity<?> validarProductoParaActualizar(@RequestParam Long id, @RequestBody ProductoDTO producto) {
+        Optional<Long> productoId = productoService.validarProductoParaActualizar(id, producto);
+
+        if (productoId.isPresent()) {
+            return ResponseEntity.badRequest().body("Ya existe un producto con el ID: " + productoId.get());
+        } else {
+            return ResponseEntity.ok("El producto puede ser actualizado");
+        }
     }
 
 }

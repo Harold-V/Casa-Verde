@@ -1,5 +1,7 @@
 package com.casaverde.backend.fachadaServices.DTO;
 
+import java.util.List;
+
 import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoProducto;
 
 import lombok.AllArgsConstructor;
@@ -16,5 +18,7 @@ public class ProductoDTO {
     private Double prodPrecio; // Precio del producto
 
     private EstadoProducto prodEstado; // Estado del producto
+
+    private List<ProductoPresasDTO> presas; // Lista de presas Asociadas
 
 }

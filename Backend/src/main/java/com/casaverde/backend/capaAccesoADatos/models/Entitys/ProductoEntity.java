@@ -4,14 +4,6 @@ import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoProducto;
 import com.casaverde.backend.capaAccesoADatos.models.Relations.PedidoProductoRelation;
 
 import jakarta.persistence.*;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -34,6 +26,9 @@ public class ProductoEntity {
 
     @Column(nullable = false) // prodPrecio no puede ser nulo
     private Double prodPrecio;
+
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProductoPresasEntity> presas = new ArrayList<>();
 
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PedidoProductoRelation> pedidos = new ArrayList<>();

@@ -1,6 +1,7 @@
 package com.casaverde.backend.fachadaServices.services.ProductoService;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.casaverde.backend.fachadaServices.DTO.ProductoDTO;
 
@@ -13,5 +14,9 @@ public interface IProductoService {
 
     public ProductoDTO update(Long id, ProductoDTO producto);
 
-    public boolean delete(Long id);
+    public boolean updateEstado(Long id);
+
+    public Optional<Long> validarProductoParaGuardar(ProductoDTO productoDTO);
+
+    public Optional<Long> validarProductoParaActualizar(Long id, ProductoDTO productoDTO);
 }
