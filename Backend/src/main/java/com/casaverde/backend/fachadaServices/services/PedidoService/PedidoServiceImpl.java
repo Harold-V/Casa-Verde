@@ -9,12 +9,19 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.ConfiguracionEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoAtributoOpacionalEntity;
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.ProductoEntity;
+import com.casaverde.backend.capaAccesoADatos.models.Entitys.ProductoPresasEntity;
+import com.casaverde.backend.capaAccesoADatos.repositories.ConfiguracionRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoAtributoOpcionalRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.ProductoPresasRepository;
+import com.casaverde.backend.fachadaServices.DTO.PedidoAtributoOpcionalDTO;
 import com.casaverde.backend.fachadaServices.DTO.PedidoDTO;
 import com.casaverde.backend.fachadaServices.DTO.PedidoProductoDTO;
 
@@ -28,6 +35,12 @@ public class PedidoServiceImpl implements IPedidoService {
 
     @Autowired
     private PedidoAtributoOpcionalRepository pedidoAtributoOpcionalRepository;
+
+    @Autowired
+    private ProductoPresasRepository productoPresasRepository;
+
+    @Autowired
+    private ConfiguracionRepository configuracionRepository;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -86,17 +99,73 @@ public class PedidoServiceImpl implements IPedidoService {
         return convertToDTO(pedidoEntity);
     }
 
+    @Transactional
     @Override
     public PedidoDTO save(PedidoDTO pedidoDTO) {
         PedidoEntity pedidoEntity = convertToEntity(pedidoDTO);
 
-        List<Long> idsExistentes = pedidoRepository.findAllProductIds();
+        // Generar un nuevo ID manualmente (solo si no es generado automáticamente)
+        List<Long> idsExistentes = pedidoRepository.findAllIds(); // Método para obtener los IDs existentes
         Long nuevoId = obtenerNuevoId(idsExistentes);
+        pedidoEntity.setPedID(nuevoId);
 
-        pedidoEntity.setPedID(nuevoId); // Asignar el menor ID libre
+        // Guardar el pedido
         PedidoEntity savedEntity = pedidoRepository.save(pedidoEntity);
 
+        // Guardar los atributos opcionales vinculados al pedido
+        guardarAtributosOpcionales(pedidoDTO.getAtributosOpcionales(), savedEntity);
+
         return convertToDTO(savedEntity);
+    }
+
+    private void validarYActualizarStock(List<PedidoProductoDTO> productos, boolean revertir) {
+        for (PedidoProductoDTO producto : productos) {
+            // Obtener las presas asociadas al producto
+            List<ProductoPresasEntity> presas = productoPresasRepository.findByProductoProdID(producto.getProdID());
+
+            for (ProductoPresasEntity presa : presas) {
+                String recurso = presa.getId().getRecurso(); // Recurso asociado (e.g., cantGallinas, cantCuyes)
+                int cantidadRequerida = presa.getCantidad() * producto.getPedProdCantidad(); // Total requerido
+
+                ConfiguracionEntity config = configuracionRepository.findById(recurso)
+                        .orElseThrow(() -> new EntityNotFoundException("Recurso no encontrado: " + recurso));
+
+                int stockActual = Integer.parseInt(config.getConfigValor());
+                int nuevoStock = revertir ? stockActual + cantidadRequerida : stockActual - cantidadRequerida;
+
+                if (nuevoStock < 0) {
+                    throw new IllegalArgumentException("Stock insuficiente para " + recurso);
+                }
+
+                config.setConfigValor(String.valueOf(nuevoStock));
+                configuracionRepository.save(config);
+            }
+        }
+    }
+
+    private void guardarAtributosOpcionales(List<PedidoAtributoOpcionalDTO> atributosOpcionales,
+            PedidoEntity pedidoEntity) {
+        if (atributosOpcionales != null) {
+            for (PedidoAtributoOpcionalDTO atributo : atributosOpcionales) {
+                PedidoAtributoOpacionalEntity atributoEntity = new PedidoAtributoOpacionalEntity();
+
+                // Asignar la clave compuesta
+                PedidoAtributoOpacionalEntity.PedidoAtributoOpcionalKey key = new PedidoAtributoOpacionalEntity.PedidoAtributoOpcionalKey(
+                        pedidoEntity.getPedID(), // ID del pedido persistido
+                        Long.valueOf(atributo.getPedAtrOpcClave()) // Clave del atributo
+                );
+                atributoEntity.setId(key);
+
+                // Asociar el pedido persistido
+                atributoEntity.setPedido(pedidoEntity);
+
+                // Asignar el valor del atributo
+                atributoEntity.setPedAtribOpcValor(atributo.getPedAtrOpcValor());
+
+                // Guardar en el repositorio
+                pedidoAtributoOpcionalRepository.save(atributoEntity);
+            }
+        }
     }
 
     @Override

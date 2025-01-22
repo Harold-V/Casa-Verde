@@ -21,4 +21,5 @@ public class PedidoDTO {
     private EstadoPedido pedEstado;
 
     private List<PedidoProductoDTO> productos;
+    private List<PedidoAtributoOpcionalDTO> atributosOpcionales;
 }
