@@ -35,7 +35,7 @@ public class PedidoAtributoOpacionalEntity {
         private Long pedID;
 
         @Column(name = "pedAtribOpcClave")
-        private Long pedAtribOpcClave;
+        private String pedAtribOpcClave;
 
     }
 

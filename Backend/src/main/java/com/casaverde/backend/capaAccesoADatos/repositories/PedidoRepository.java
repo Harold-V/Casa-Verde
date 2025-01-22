@@ -12,5 +12,5 @@ import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
 public interface PedidoRepository extends CrudRepository<PedidoEntity, Long> {
 
     @Query("SELECT p.pedID FROM PedidoEntity p")
-    List<Long> findAllProductIds();
+    List<Long> findAllPedidoIds();
 }
