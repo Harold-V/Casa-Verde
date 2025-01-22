@@ -42,7 +42,10 @@ public class PedidoEntity {
     private EstadoPedido pedEstado;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<PagoEntity> pagos;
+    private List<PedidoAtributoOpacionalEntity> atributosOpcionales = new ArrayList<>();
+
+    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PagoEntity> pagos = new ArrayList<>();
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PedidoProductoRelation> productos = new ArrayList<>();

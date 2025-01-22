@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PedidoAtributoOpcionalDTO {
+
     private String pedAtrOpcClave;
     private String pedAtrOpcValor;
-    private Long pedID;
 }

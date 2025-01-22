@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.ProductoEntity;
+import com.casaverde.backend.capaAccesoADatos.repositories.PedidoAtributoOpcionalRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.DTO.PedidoDTO;
 import com.casaverde.backend.fachadaServices.DTO.PedidoProductoDTO;
@@ -24,6 +25,9 @@ public class PedidoServiceImpl implements IPedidoService {
 
     @Autowired
     private PedidoRepository pedidoRepository;
+
+    @Autowired
+    private PedidoAtributoOpcionalRepository pedidoAtributoOpcionalRepository;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -45,19 +49,20 @@ public class PedidoServiceImpl implements IPedidoService {
     // Método privado para convertir de Entity a DTO
     private PedidoDTO convertToDTO(PedidoEntity pedidoEntity) {
 
-        PedidoDTO pedidoDTO = modelMapper.map(pedidoEntity, PedidoDTO.class);
+        return modelMapper.map(pedidoEntity, PedidoDTO.class);
 
-        List<PedidoProductoDTO> productos = pedidoEntity.getProductos().stream().map(pedidoProducto -> {
-            ProductoEntity producto = pedidoProducto.getProducto();
-            return new PedidoProductoDTO(
-                    producto.getProdNombre(),
-                    producto.getProdPrecio(),
-                    pedidoProducto.getPedProdCantidad());
-        }).toList();
+        // List<PedidoProductoDTO> productos =
+        // pedidoEntity.getProductos().stream().map(pedidoProducto -> {
+        // ProductoEntity producto = pedidoProducto.getProducto();
+        // return new PedidoProductoDTO(
+        // producto.getProdNombre(),
+        // producto.getProdPrecio(),
+        // pedidoProducto.getPedProdCantidad());
+        // }).toList();
 
-        pedidoDTO.setProductos(productos);
+        // pedidoDTO.setProductos(productos);
 
-        return pedidoDTO;
+        // return pedidoDTO;
     }
 
     // Método privado para convertir de DTO a Entity
