@@ -80,7 +80,7 @@ public class ProductoRestController {
     }
 
     @GetMapping("/producto/validarParaActualizar/{id}")
-    public ResponseEntity<?> validarProductoParaActualizar(@RequestParam Long id, @RequestBody ProductoDTO producto) {
+    public ResponseEntity<?> validarProductoParaActualizar(@PathVariable Long id, @RequestBody ProductoDTO producto) {
         Optional<Long> productoId = productoService.validarProductoParaActualizar(id, producto);
 
         if (productoId.isPresent()) {
