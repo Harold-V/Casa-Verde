@@ -17,8 +17,8 @@ public class PagoEntity {
     @Id
     private Long pagoID;
 
-    @ManyToOne
-    @JoinColumn(name = "pedID", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pedID")
     private PedidoEntity pedido;
 
     @Enumerated(EnumType.STRING)

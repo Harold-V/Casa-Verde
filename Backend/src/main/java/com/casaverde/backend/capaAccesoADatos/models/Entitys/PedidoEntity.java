@@ -66,4 +66,9 @@ public class PedidoEntity {
     public void setPedHoraFromLocalTime(LocalTime time) {
         this.pedHora = time.format(DateTimeFormatter.ISO_TIME);
     }
+
+    public void addPago(PagoEntity pago) {
+        pagos.add(pago);
+        pago.setPedido(this);
+    }
 }
