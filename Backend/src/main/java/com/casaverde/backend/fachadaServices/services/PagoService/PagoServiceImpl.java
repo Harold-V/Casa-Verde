@@ -3,10 +3,13 @@ package com.casaverde.backend.fachadaServices.services.PagoService;
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.PagoEntity;
 import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoEntity;
 import com.casaverde.backend.capaAccesoADatos.models.Enums.EstadoPedido;
+
 import com.casaverde.backend.capaAccesoADatos.repositories.PagoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.DTO.PagoDTO;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
+
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,6 +19,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class PagoServiceImpl implements IPagoService {
+
+
+
     @Autowired
     private PagoRepository pagoRepository;
 
@@ -26,9 +32,7 @@ public class PagoServiceImpl implements IPagoService {
     private ModelMapper modelMapper;
 
     private PagoDTO convertToDTO(PagoEntity pagoEntity) {
-        PagoDTO pagoDTO = modelMapper.map(pagoEntity, PagoDTO.class);
-        pagoDTO.setPedID(pagoEntity.getPedido().getPedID());
-        return pagoDTO;
+        return modelMapper.map(pagoEntity, PagoDTO.class);
     }
 
     private PagoEntity convertToEntity(PagoDTO pagoDTO) {
@@ -53,18 +57,12 @@ public class PagoServiceImpl implements IPagoService {
     }
 
     @Override
+    @Transactional
     public PagoDTO save(PagoDTO pagoDTO) {
         PagoEntity pagoEntity = convertToEntity(pagoDTO);
         PedidoEntity pedidoEntity = pagoEntity.getPedido();
 
-        List<Long> idsExistentes = pagoRepository.findAllPagoIds();
-
-        Long nuevoId = obtenerNuevoId(idsExistentes);
-
-        pagoEntity.setPagoID(nuevoId); // Asignar el menor ID libre
-
-        double totalPagado = pedidoEntity.getPagos().stream().mapToDouble(PagoEntity::getPagoValor).sum()
-                + pagoEntity.getPagoValor();
+        double totalPagado = pedidoEntity.getPagos().stream().mapToDouble(PagoEntity::getPagoValor).sum() + pagoEntity.getPagoValor();
         if (totalPagado >= pedidoEntity.getPedValorTotal()) {
             pedidoEntity.setPedEstado(EstadoPedido.Finalizado);
         } else {
@@ -74,6 +72,8 @@ public class PagoServiceImpl implements IPagoService {
         PagoEntity savedEntity = pagoRepository.save(pagoEntity);
         return convertToDTO(savedEntity);
     }
+
+
 
     @Override
     public PagoDTO update(Long id, PagoDTO pagoDTO) {
@@ -94,19 +94,5 @@ public class PagoServiceImpl implements IPagoService {
             return true;
         }
         throw new EntityNotFoundException("Pago not found with ID: " + id);
-    }
-
-    private Long obtenerNuevoId(List<Long> idsExistentes) {
-        if (idsExistentes.isEmpty()) {
-            return 1L; // Si no hay productos, el ID inicial es 1
-        }
-
-        for (long i = 1L; i <= idsExistentes.size() + 1L; i++) { // Asegúrate de usar long con sufijo 'L'
-            if (!idsExistentes.contains(i)) {
-                return i; // Devuelve el primer ID libre
-            }
-        }
-
-        return (long) idsExistentes.size() + 1L; // Asegúrate de convertir size() a Long
     }
 }
