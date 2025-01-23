@@ -34,13 +34,13 @@ public class PagoServiceImpl implements IPagoService {
         return modelMapper.map(pagoEntity, PagoDTO.class);
     }
 
-    private PagoEntity convertToEntity(PagoDTO pagoDTO) {
+    /*private PagoEntity convertToEntity(PagoDTO pagoDTO) {
         PagoEntity pagoEntity = modelMapper.map(pagoDTO, PagoEntity.class);
         PedidoEntity pedidoEntity = pedidoRepository.findById(pagoDTO.getPedID())
                 .orElseThrow(() -> new EntityNotFoundException("Pedido not found with ID: " + pagoDTO.getPedID()));
         pagoEntity.setPedido(pedidoEntity);
         return pagoEntity;
-    }
+    }*/
 
     @Override
     public List<PagoDTO> findAll() {
