@@ -18,7 +18,7 @@ import com.casaverde.backend.capaAccesoADatos.models.Entitys.ProductoEntity;
 public class PedidoProductoRelation {
 
     @EmbeddedId
-    private PedidoProductoId id;
+    private PedidoProductoKey id;
 
     @Column(nullable = false)
     private Integer pedProdCantidad;
@@ -37,7 +37,7 @@ public class PedidoProductoRelation {
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
-    public static class PedidoProductoId implements Serializable {
+    public static class PedidoProductoKey implements Serializable {
 
         @Column(name = "prodID")
         private Long prodID;

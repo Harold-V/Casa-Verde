@@ -13,5 +13,5 @@ public interface IPedidoService {
 
     public PedidoDTO update(Long id, PedidoDTO pedido);
 
-    public boolean delete(Long id);
+    public boolean updateEstado(Long id);
 }

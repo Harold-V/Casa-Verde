@@ -7,6 +7,7 @@ import com.casaverde.backend.capaAccesoADatos.models.Entitys.PedidoAtributoOpaci
 
 @Repository
 public interface PedidoAtributoOpcionalRepository
-        extends CrudRepository<PedidoAtributoOpacionalEntity, PedidoAtributoOpacionalEntity.PedidoAtributoOpcionalKey> {
+                extends
+                CrudRepository<PedidoAtributoOpacionalEntity, PedidoAtributoOpacionalEntity.PedidoAtributoOpcionalKey> {
 
 }
