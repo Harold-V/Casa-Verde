@@ -5,47 +5,80 @@
             <div class="row">
                 <!-- Columna Izquierda -->
                 <div class="col-md-6">
-                    <div class="mb-3 d-flex align-items-center">
-                        <h1 class="text-success me-2">USD</h1>
-                        <input type="text" class="form-control me-2" placeholder="USD" aria-label="Precio USD" />
-                        <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;">
-                            <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
-                        </button>
+                    <div class="mb-3">
+                        <label for="usdInput" class="form-label">Precio en USD</label>
+                        <div class="d-flex align-items-center">
+                            <input id="usdInput" type="text" class="form-control me-2"
+                                [placeholder]="configuraciones['valorDolar'] || 'USD'"
+                                [disabled]="!editable['valorDolar']" aria-label="Precio USD" />
+                            <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;"
+                                (click)="toggleEditable('valorDolar')">
+                                <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
+                            </button>
+                        </div>
                     </div>
-                    <div class="mb-3 d-flex align-items-center">
-                        <input type="text" class="form-control me-2" placeholder="Nequi" aria-label="Cuenta Nequi" />
-                        <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;">
-                            <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
-                        </button>
+                    <div class="mb-3">
+                        <label for="nequiInput" class="form-label">Cuenta Nequi</label>
+                        <div class="d-flex align-items-center">
+                            <input id="nequiInput" type="text" class="form-control me-2"
+                                [placeholder]="configuraciones['cantNequi'] || 'Nequi'"
+                                [disabled]="!editable['cantNequi']" aria-label="Cuenta Nequi" />
+                            <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;"
+                                (click)="toggleEditable('cantNequi')">
+                                <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
+                            </button>
+                        </div>
                     </div>
-                    <div class="mb-3 d-flex align-items-center">
-                        <input type="text" class="form-control me-2" placeholder="Capital"
-                            aria-label="Capital Inicial" />
-                        <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;">
-                            <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
-                        </button>
+                    <div class="mb-3">
+                        <label for="capitalInput" class="form-label">Capital Inicial</label>
+                        <div class="d-flex align-items-center">
+                            <input id="capitalInput" type="text" class="form-control me-2"
+                                [placeholder]="configuraciones['cantCapital'] || 'Capital'"
+                                [disabled]="!editable['cantCapital']" aria-label="Capital Inicial" />
+                            <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;"
+                                (click)="toggleEditable('cantCapital')">
+                                <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <!-- Columna Derecha -->
                 <div class="col-md-6">
-                    <div class="mb-3 d-flex align-items-center">
-                        <input type="text" class="form-control me-2" placeholder="Cantidad"
-                            aria-label="Cantidad Gallina" />
-                        <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;">
-                            <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
-                        </button>
+                    <div class="mb-3">
+                        <label for="cantUSDInput" class="form-label">Cantidad de Dólares</label>
+                        <div class="d-flex align-items-center">
+                            <input id="cantUSDInput" type="text" class="form-control me-2"
+                                [placeholder]="configuraciones['cantDolar'] || 'Cantidad USD'"
+                                [disabled]="!editable['cantDolar']" aria-label="Cantidad USD" />
+                            <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;"
+                                (click)="toggleEditable('cantDolar')">
+                                <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
+                            </button>
+                        </div>
                     </div>
-                    <div class="mb-3 d-flex align-items-center">
-                        <input type="text" class="form-control me-2" placeholder="Cantidad" aria-label="Cantidad Cuy" />
-                        <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;">
-                            <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
-                        </button>
+                    <div class="mb-3">
+                        <label for="cuyInput" class="form-label">Cantidad de Cuy</label>
+                        <div class="d-flex align-items-center">
+                            <input id="cuyInput" type="text" class="form-control me-2"
+                                [placeholder]="configuraciones['cantCuy'] || 'Cantidad Cuy'"
+                                [disabled]="!editable['cantCuy']" aria-label="Cantidad Cuy" />
+                            <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;"
+                                (click)="toggleEditable('cantCuy')">
+                                <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
+                            </button>
+                        </div>
                     </div>
-                    <div class="mb-3 d-flex align-items-center">
-                        <input type="text" class="form-control me-2" placeholder="Cantidad" aria-label="Dolares" />
-                        <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;">
-                            <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
-                        </button>
+                    <div class="mb-3">
+                        <label for="gallinaInput" class="form-label">Cantidad de Gallina</label>
+                        <div class="d-flex align-items-center">
+                            <input id="gallinaInput" type="text" class="form-control me-2"
+                                [placeholder]="configuraciones['cantGallina'] || 'Cantidad Gallina'"
+                                [disabled]="!editable['cantGallina']" aria-label="Gallina" />
+                            <button type="button" class="btn btn-outline-secondary" style="border: 0; padding: 1;"
+                                (click)="toggleEditable('cantGallina')">
+                                <img src="pencil-fill.svg" alt="Editar" style="width: 20px; height: 20px;" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
