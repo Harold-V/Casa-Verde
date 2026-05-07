@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(./mvnw compile *)",
+      "Bash(npm install *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\npm\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\" -ErrorAction SilentlyContinue)",
+      "PowerShell($env:PATH)",
+      "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
+      "Bash(npm --version)",
+      "Bash(npm run *)",
+      "Bash(./mvnw spring-boot:run --quiet)",
+      "Bash(curl -s http://localhost:5000/api/v1/productos)",
+      "Bash(./mvnw spring-boot:run)",
+      "Bash(echo \"PID: $!\" sleep 18 curl -s --max-time 5 http://localhost:5000/api/v1/productos)",
+      "Bash(curl -s --max-time 5 http://localhost:5000/api/v1/inventario)",
+      "Bash(curl -s --max-time 5 http://localhost:5000/api/v1/productos)",
+      "Bash(python3 -m json.tool)",
+      "Bash(pkill -f \"spring-boot:run\")",
+      "Bash(pkill -f \"casaVerdeApplication\")",
+      "Bash(echo \"Backend iniciando PID: $!\" sleep 20 curl -s --max-time 5 http://localhost:5000/api/v1/productos)",
+      "Bash(./mvnw clean *)",
+      "Bash(echo \"Backend iniciando PID: $!\")",
+      "Bash(curl -s http://localhost:5000/api/v1/inventario)",
+      "Bash(curl -s http://localhost:5000/api/v1/tasa-cambio/vigente)"
+    ]
+  }
+}

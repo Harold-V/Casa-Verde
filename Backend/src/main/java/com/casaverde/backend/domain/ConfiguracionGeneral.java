@@ -1,0 +1,29 @@
+package com.casaverde.backend.domain;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "configuracion_general")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class ConfiguracionGeneral {
+
+    @Id
+    private String clave;
+
+    @Column(nullable = false)
+    private String valor;
+
+    private String descripcion;
+
+    @Column(name = "actualizado_en")
+    private LocalDateTime actualizadoEn;
+
+    @PrePersist
+    @PreUpdate
+    void onSave() {
+        actualizadoEn = LocalDateTime.now();
+    }
+}
