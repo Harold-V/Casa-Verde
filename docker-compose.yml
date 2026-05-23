@@ -9,6 +9,8 @@ services:
       - "5020:5020"
     volumes:
       - casaverde_db:/app/DataBase
+    environment:
+      - TZ=America/Bogota
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5020/actuator/health"]

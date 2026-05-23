@@ -73,7 +73,7 @@ export default function SalonesTab() {
   return (
     <div>
       <div className="toolbar">
-        <div style={{ flex: 1 }} />
+        <div className="flex-1" />
         <button className="btn btn-primary" onClick={() => setCreando(true)}>
           <Plus size={15} /> Nuevo salón
         </button>
@@ -93,14 +93,18 @@ export default function SalonesTab() {
               <tbody>
                 {salones.map((s) => (
                   <tr key={s.id}>
-                    <td style={{ fontWeight: 500 }}>{s.nombre}</td>
+                    <td className="font-medium">{s.nombre}</td>
                     <td>{s.aforo ?? "—"}</td>
-                    <td><span className={`badge ${s.activo ? "badge-success" : "badge-danger"}`}>{s.activo ? "Activo" : "Inactivo"}</span></td>
                     <td>
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <span className={`badge ${s.activo ? "badge-success" : "badge-danger"}`}>
+                        {s.activo ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex gap-1">
                         <button className="btn-icon" onClick={() => setEditando(s)}><Pencil size={15} /></button>
                         <button className="btn-icon" onClick={() => mutToggle.mutate(s.id)}>
-                          <Power size={15} style={{ color: s.activo ? "var(--success)" : "var(--danger)" }} />
+                          <Power size={15} className={s.activo ? "text-green-600" : "text-red-600"} />
                         </button>
                       </div>
                     </td>

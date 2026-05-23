@@ -3,6 +3,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import process from "process";
 
+// Propagar el timezone real del OS al renderer antes de cualquier window
+// Electron corre el renderer con UTC por defecto; esto lo fuerza al timezone del sistema
+process.env.TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

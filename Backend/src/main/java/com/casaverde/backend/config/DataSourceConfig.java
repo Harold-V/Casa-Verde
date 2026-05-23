@@ -7,6 +7,7 @@ import java.nio.file.Paths;
 
 import javax.sql.DataSource;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -14,23 +15,24 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @Configuration
 public class DataSourceConfig {
 
-    private static final String DB_DIR = "./DataBase";
-    private static final String DB_PATH = DB_DIR + "/casaverde.db";
+    @Value("${app.datasource.path:./DataBase/casaverde.db}")
+    private String dbPath;
 
     @Bean
     DataSource dataSource() {
         try {
-            Path dir = Paths.get(DB_DIR);
-            if (!Files.exists(dir)) {
+            Path path = Paths.get(dbPath);
+            Path dir = path.getParent();
+            if (dir != null && !Files.exists(dir)) {
                 Files.createDirectories(dir);
             }
         } catch (IOException e) {
-            throw new RuntimeException("No se pudo crear el directorio de base de datos: " + DB_DIR, e);
+            throw new RuntimeException("No se pudo crear el directorio de base de datos para: " + dbPath, e);
         }
 
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("org.sqlite.JDBC");
-        ds.setUrl("jdbc:sqlite:" + DB_PATH);
+        ds.setUrl("jdbc:sqlite:" + dbPath);
         return ds;
     }
 }

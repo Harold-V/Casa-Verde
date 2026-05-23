@@ -1,5 +1,6 @@
 package com.casaverde.backend.controller;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +31,7 @@ public class TasaCambioController {
     }
 
     @PostMapping
-    public ResponseEntity<TasaCambioDTO> registrar(@RequestBody Map<String, Double> body) {
+    public ResponseEntity<TasaCambioDTO> registrar(@RequestBody Map<String, BigDecimal> body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.registrar(body.get("valorCop")));
     }
 }

@@ -1,0 +1,30 @@
+package com.casaverde.backend.dto;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import lombok.*;
+
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class PedidoDTO {
+    private Long id;
+    private String nombre;
+    private Long salonId;
+    private String salonNombre;
+    private String mesa;
+    private String fechaReserva;
+    private String horaReserva;
+    private Integer cantPersonas;
+    private String estado;
+    private String observacion;
+    private BigDecimal totalCop;
+    private BigDecimal totalAbonado;
+    private BigDecimal saldoPendiente;
+    private BigDecimal valorCambio;
+    private LocalDateTime creadoEn;
+    private LocalDateTime actualizadoEn;
+    private LocalDateTime finalizadoEn;
+    private List<PedidoDetalleDTO> detalles;
+    private List<PagoDTO> pagos;
+}

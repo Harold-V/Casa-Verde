@@ -19,15 +19,19 @@ import lombok.RequiredArgsConstructor;
 public class SalonService {
 
     private final SalonRepository repo;
+    private final AuditoriaService auditoriaService;
 
+    @Transactional(readOnly = true)
     public List<SalonDTO> listarTodos() {
         return repo.findAllByOrderByNombreAsc().stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<SalonDTO> listarActivos() {
         return repo.findByActivoTrueOrderByNombreAsc().stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public SalonDTO buscarPorId(Long id) {
         return toDTO(findOrThrow(id));
     }
@@ -40,7 +44,9 @@ public class SalonService {
                 .aforo(dto.getAforo())
                 .activo(true)
                 .build();
-        return toDTO(repo.save(salon));
+        Salon guardado = repo.save(salon);
+        auditoriaService.registrar("salon", guardado.getId(), "CREAR", "Salón creado: " + guardado.getNombre());
+        return toDTO(guardado);
     }
 
     @Transactional
@@ -50,14 +56,18 @@ public class SalonService {
         salon.setNombre(dto.getNombre().trim());
         salon.setAforo(dto.getAforo());
         if (dto.getActivo() != null) salon.setActivo(dto.getActivo());
-        return toDTO(repo.save(salon));
+        Salon guardado = repo.save(salon);
+        auditoriaService.registrar("salon", guardado.getId(), "ACTUALIZAR", "Salón actualizado: " + guardado.getNombre());
+        return toDTO(guardado);
     }
 
     @Transactional
     public SalonDTO toggleActivo(Long id) {
         Salon salon = findOrThrow(id);
         salon.setActivo(!salon.getActivo());
-        return toDTO(repo.save(salon));
+        Salon guardado = repo.save(salon);
+        auditoriaService.registrar("salon", guardado.getId(), "CAMBIAR_ESTADO", "Salón activo=" + guardado.getActivo());
+        return toDTO(guardado);
     }
 
     private void validarNombre(String nombre, Long idExcluir) {

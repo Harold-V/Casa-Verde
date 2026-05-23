@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { tasaService } from "../../../services/tasaService";
-import { formatCOP, formatFecha } from "../../../utils/format";
+import { formatCOP } from "../../../utils/format";
+import { useFormatos } from "../../../hooks/useFormatos";
 
 export default function TasaUsdTab() {
   const qc = useQueryClient();
+  const { formatFecha } = useFormatos();
   const [nuevaTasa, setNuevaTasa] = useState("");
   const [msg, setMsg] = useState(null);
 
@@ -35,17 +37,18 @@ export default function TasaUsdTab() {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card mb-5">
         <div className="card-header">
           <span className="card-title">Tasa vigente del dólar</span>
         </div>
         <div className="card-body">
           {vigente ? (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: "var(--verde-oscuro)" }}>
-                {formatCOP(vigente.valorCop)} <span style={{ fontSize: 14, color: "var(--text-secondary)", fontWeight: 400 }}>COP / USD</span>
+            <div className="mb-4">
+              <div className="text-[28px] font-bold text-verde-oscuro">
+                {formatCOP(vigente.valorCop)}{" "}
+                <span className="text-sm text-gray-500 font-normal">COP / USD</span>
               </div>
-              <div style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4 }}>
+              <div className="text-gray-500 text-[13px] mt-1">
                 Vigente desde: {formatFecha(vigente.vigentDesde)}
               </div>
             </div>
@@ -55,8 +58,8 @@ export default function TasaUsdTab() {
 
           {msg && <div className={`alert alert-${msg.tipo}`}>{msg.texto}</div>}
 
-          <form onSubmit={handleGuardar} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-            <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+          <form onSubmit={handleGuardar} className="flex gap-2.5 items-end">
+            <div className="form-group mb-0 flex-1">
               <label className="form-label">Nueva tasa (COP por 1 USD)</label>
               <input
                 className="form-control"
@@ -88,8 +91,8 @@ export default function TasaUsdTab() {
               <tbody>
                 {historial.map((t, i) => (
                   <tr key={t.id}>
-                    <td style={{ fontWeight: i === 0 ? 700 : 400 }}>{formatCOP(t.valorCop)}</td>
-                    <td style={{ color: "var(--text-secondary)" }}>{formatFecha(t.vigentDesde)}</td>
+                    <td className={i === 0 ? "font-bold" : ""}>{formatCOP(t.valorCop)}</td>
+                    <td className="text-gray-500">{formatFecha(t.vigentDesde)}</td>
                   </tr>
                 ))}
               </tbody>

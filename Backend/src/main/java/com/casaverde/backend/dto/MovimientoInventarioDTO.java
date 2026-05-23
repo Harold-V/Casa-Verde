@@ -1,5 +1,6 @@
 package com.casaverde.backend.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import lombok.*;
@@ -9,8 +10,8 @@ public class MovimientoInventarioDTO {
     private Long id;
     private String insumo;
     private String tipo;
-    private Double cantidad;
-    private Double stockResultante;
+    private BigDecimal cantidad;
+    private BigDecimal stockResultante;
     private String referenciaTipo;
     private Long referenciaId;
     private String observacion;

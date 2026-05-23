@@ -1,6 +1,8 @@
 package com.casaverde.backend.domain;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,11 +22,11 @@ public class MovimientoInventario {
     @Column(nullable = false)
     private String tipo; // entrada | salida | ajuste
 
-    @Column(nullable = false)
-    private Double cantidad;
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal cantidad;
 
-    @Column(name = "stock_resultante", nullable = false)
-    private Double stockResultante;
+    @Column(name = "stock_resultante", nullable = false, precision = 19, scale = 4)
+    private BigDecimal stockResultante;
 
     @Column(name = "referencia_tipo")
     private String referenciaTipo; // pedido | gasto | ajuste_manual
@@ -39,6 +41,6 @@ public class MovimientoInventario {
 
     @PrePersist
     void onCreate() {
-        registradoEn = LocalDateTime.now();
+        registradoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
     }
 }

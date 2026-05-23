@@ -1,5 +1,6 @@
 package com.casaverde.backend.service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,17 +27,22 @@ public class ProductoService {
 
     private final ProductoRepository productoRepo;
     private final CategoriaProductoRepository categoriaRepo;
+    private final MonetaryService monetaryService;
+    private final AuditoriaService auditoriaService;
 
+    @Transactional(readOnly = true)
     public List<ProductoDTO> listarTodos() {
         return productoRepo.findAllByOrderByNombreAsc().stream()
                 .map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<ProductoDTO> listarActivos() {
         return productoRepo.findByActivoTrueOrderByNombreAsc().stream()
                 .map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public ProductoDTO buscarPorId(Long id) {
         return toDTO(findOrThrow(id));
     }
@@ -47,7 +53,7 @@ public class ProductoService {
 
         Producto producto = Producto.builder()
                 .nombre(req.getNombre().trim())
-                .precio(req.getPrecio() != null ? req.getPrecio() : 0.0)
+                .precio(monetaryService.normalizarPrecioCop(req.getPrecio()))
                 .afectaInventario(req.getAfectaInventario() != null ? req.getAfectaInventario() : false)
                 .activo(true)
                 .composicion(new ArrayList<>())
@@ -60,7 +66,10 @@ public class ProductoService {
         }
 
         aplicarComposicion(producto, req.getComposicion());
-        return toDTO(productoRepo.save(producto));
+        Producto guardado = productoRepo.save(producto);
+        auditoriaService.registrar("producto", guardado.getId(), "CREAR",
+                "Producto creado: " + guardado.getNombre());
+        return toDTO(guardado);
     }
 
     @Transactional
@@ -69,7 +78,7 @@ public class ProductoService {
         validarNombre(req.getNombre(), id);
 
         producto.setNombre(req.getNombre().trim());
-        if (req.getPrecio() != null) producto.setPrecio(req.getPrecio());
+        if (req.getPrecio() != null) producto.setPrecio(monetaryService.normalizarPrecioCop(req.getPrecio()));
         if (req.getAfectaInventario() != null) producto.setAfectaInventario(req.getAfectaInventario());
         if (req.getActivo() != null) producto.setActivo(req.getActivo());
 
@@ -84,24 +93,31 @@ public class ProductoService {
         producto.getComposicion().clear();
         aplicarComposicion(producto, req.getComposicion());
 
-        return toDTO(productoRepo.save(producto));
+        Producto guardado = productoRepo.save(producto);
+        auditoriaService.registrar("producto", guardado.getId(), "ACTUALIZAR",
+                "Producto actualizado: " + guardado.getNombre());
+        return toDTO(guardado);
     }
 
     @Transactional
-    public ProductoDTO actualizarPrecio(Long id, Double precio) {
-        if (precio == null || precio < 0) {
-            throw new ValidacionException("El precio debe ser mayor o igual a 0");
-        }
+    public ProductoDTO actualizarPrecio(Long id, BigDecimal precio) {
+        precio = monetaryService.normalizarPrecioCop(precio);
         Producto producto = findOrThrow(id);
         producto.setPrecio(precio);
-        return toDTO(productoRepo.save(producto));
+        Producto guardado = productoRepo.save(producto);
+        auditoriaService.registrar("producto", guardado.getId(), "ACTUALIZAR_PRECIO",
+                "Precio actualizado a COP " + precio);
+        return toDTO(guardado);
     }
 
     @Transactional
     public ProductoDTO toggleActivo(Long id) {
         Producto producto = findOrThrow(id);
         producto.setActivo(!producto.getActivo());
-        return toDTO(productoRepo.save(producto));
+        Producto guardado = productoRepo.save(producto);
+        auditoriaService.registrar("producto", guardado.getId(), "CAMBIAR_ESTADO",
+                "Producto activo=" + guardado.getActivo());
+        return toDTO(guardado);
     }
 
     private void validarNombre(String nombre, Long idExcluir) {
@@ -120,10 +136,10 @@ public class ProductoService {
         if (items == null || items.isEmpty()) return;
         for (ComposicionDTO item : items) {
             if (item.getInsumo() == null || item.getInsumo().isBlank()) continue;
-            if (item.getCantidad() == null || item.getCantidad() <= 0) continue;
+            if (item.getCantidad() == null || item.getCantidad().compareTo(BigDecimal.ZERO) <= 0) continue;
             ProductoComposicionInventario comp = ProductoComposicionInventario.builder()
                     .producto(producto)
-                    .insumo(item.getInsumo().trim())
+                    .insumo(item.getInsumo().trim().toLowerCase())
                     .cantidad(item.getCantidad())
                     .build();
             producto.getComposicion().add(comp);

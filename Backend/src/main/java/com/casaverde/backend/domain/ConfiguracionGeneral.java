@@ -1,6 +1,7 @@
 package com.casaverde.backend.domain;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,6 +25,6 @@ public class ConfiguracionGeneral {
     @PrePersist
     @PreUpdate
     void onSave() {
-        actualizadoEn = LocalDateTime.now();
+        actualizadoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
     }
 }

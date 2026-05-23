@@ -1,6 +1,8 @@
 package com.casaverde.backend.domain;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,13 +16,18 @@ public class Inventario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false, unique = true)
     private String insumo;
 
-    @Column(name = "stock_actual", nullable = false)
-    private Double stockActual = 0.0;
+    @Column(name = "stock_actual", nullable = false, precision = 19, scale = 4)
+    @Builder.Default
+    private BigDecimal stockActual = BigDecimal.ZERO;
 
     @Column(nullable = false)
+    @Builder.Default
     private String unidad = "unidad";
 
     @Column(name = "actualizado_en")
@@ -29,6 +36,6 @@ public class Inventario {
     @PrePersist
     @PreUpdate
     void onSave() {
-        actualizadoEn = LocalDateTime.now();
+        actualizadoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
     }
 }

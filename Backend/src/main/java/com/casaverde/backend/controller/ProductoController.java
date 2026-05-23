@@ -1,5 +1,6 @@
 package com.casaverde.backend.controller;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -41,7 +42,7 @@ public class ProductoController {
     }
 
     @PutMapping("/{id}/precio")
-    public ProductoDTO actualizarPrecio(@PathVariable Long id, @RequestBody Map<String, Double> body) {
+    public ProductoDTO actualizarPrecio(@PathVariable Long id, @RequestBody Map<String, BigDecimal> body) {
         return service.actualizarPrecio(id, body.get("precio"));
     }
 

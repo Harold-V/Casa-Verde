@@ -19,15 +19,19 @@ import lombok.RequiredArgsConstructor;
 public class CategoriaProductoService {
 
     private final CategoriaProductoRepository repo;
+    private final AuditoriaService auditoriaService;
 
+    @Transactional(readOnly = true)
     public List<CategoriaProductoDTO> listarTodas() {
         return repo.findAll().stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<CategoriaProductoDTO> listarActivas() {
         return repo.findByActivoTrueOrderByOrdenAsc().stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public CategoriaProductoDTO buscarPorId(Long id) {
         return toDTO(findOrThrow(id));
     }
@@ -42,7 +46,10 @@ public class CategoriaProductoService {
                 .orden(dto.getOrden() != null ? dto.getOrden() : 0)
                 .activo(true)
                 .build();
-        return toDTO(repo.save(entity));
+        CategoriaProducto guardado = repo.save(entity);
+        auditoriaService.registrar("categoria_producto", guardado.getId(), "CREAR",
+                "Categoría creada: " + guardado.getNombre());
+        return toDTO(guardado);
     }
 
     @Transactional
@@ -54,14 +61,19 @@ public class CategoriaProductoService {
         entity.setNombre(dto.getNombre());
         if (dto.getOrden() != null) entity.setOrden(dto.getOrden());
         if (dto.getActivo() != null) entity.setActivo(dto.getActivo());
-        return toDTO(repo.save(entity));
+        CategoriaProducto guardado = repo.save(entity);
+        auditoriaService.registrar("categoria_producto", guardado.getId(), "ACTUALIZAR",
+                "Categoría actualizada: " + guardado.getNombre());
+        return toDTO(guardado);
     }
 
     @Transactional
     public void toggleActivo(Long id) {
         CategoriaProducto entity = findOrThrow(id);
         entity.setActivo(!entity.getActivo());
-        repo.save(entity);
+        CategoriaProducto guardado = repo.save(entity);
+        auditoriaService.registrar("categoria_producto", guardado.getId(), "CAMBIAR_ESTADO",
+                "Categoría activo=" + guardado.getActivo());
     }
 
     private CategoriaProducto findOrThrow(Long id) {

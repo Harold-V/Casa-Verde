@@ -1,5 +1,6 @@
 package com.casaverde.backend.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,7 +10,7 @@ import lombok.*;
 public class ProductoDTO {
     private Long id;
     private String nombre;
-    private Double precio;
+    private BigDecimal precio;
     private Long categoriaId;
     private String categoriaNombre;
     private Boolean afectaInventario;

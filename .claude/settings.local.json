@@ -22,7 +22,22 @@
       "Bash(./mvnw clean *)",
       "Bash(echo \"Backend iniciando PID: $!\")",
       "Bash(curl -s http://localhost:5000/api/v1/inventario)",
-      "Bash(curl -s http://localhost:5000/api/v1/tasa-cambio/vigente)"
+      "Bash(curl -s http://localhost:5000/api/v1/tasa-cambio/vigente)",
+      "Bash(git commit -m ' *)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s http://localhost:5020/api/v1/productos)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'{len\\(d\\)} productos OK'\\)\")",
+      "Bash(curl -s http://localhost:5020/api/v1/inventario)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f'  {i[\\\\\"insumo\\\\\"]}: {i[\\\\\"stockActual\\\\\"]}'\\) for i in d]\")",
+      "Bash(curl -s http://localhost:5020/api/v1/tasa-cambio/vigente)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'  \\\\${d[\\\\\"valorCop\\\\\"]} COP/USD'\\)\")",
+      "Bash(git add *)",
+      "Bash(mvn compile *)",
+      "Bash(./mvnw.cmd compile *)",
+      "Bash(npx acorn *)",
+      "Bash(npm list *)"
     ]
   }
 }

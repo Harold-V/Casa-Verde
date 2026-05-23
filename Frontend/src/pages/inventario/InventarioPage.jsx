@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, ArrowDown, ArrowUp, SlidersHorizontal } from "lucide-react";
 import { inventarioService } from "../../services/inventarioService";
-import { formatDecimal, formatFecha } from "../../utils/format";
+import { formatDecimal } from "../../utils/format";
+import { useFormatos } from "../../hooks/useFormatos";
 
 const TIPO_CONFIG = {
   entrada: { label: "Entrada",  badge: "badge-success", icono: <ArrowDown size={13} /> },
@@ -86,6 +87,7 @@ function ModalMovimiento({ insumos, onClose, onSave }) {
 
 export default function InventarioPage() {
   const qc = useQueryClient();
+  const { formatFecha } = useFormatos();
   const [modalOpen, setModalOpen] = useState(false);
   const [filtroInsumo, setFiltroInsumo] = useState("");
 
@@ -117,26 +119,27 @@ export default function InventarioPage() {
       </div>
 
       {/* Stock actual */}
-      <div className="kpi-grid" style={{ marginBottom: 24 }}>
+      <div className="kpi-grid mb-6">
         {loadingStock ? (
           <div className="loading-center"><div className="spinner" /></div>
-        ) : stock.map((s) => (
-          <div key={s.insumo} className="kpi-card" style={{
-            borderLeftColor: s.stockActual < 2 ? "var(--danger)" : s.stockActual < 5 ? "var(--warning)" : "var(--verde-claro)"
-          }}>
-            <div className="kpi-label">{s.insumo}</div>
-            <div className="kpi-value">{formatDecimal(s.stockActual)}</div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{s.unidad}</div>
-          </div>
-        ))}
+        ) : stock.map((s) => {
+          const borderCls = s.stockActual < 2 ? "border-l-red-600" : s.stockActual < 5 ? "border-l-amber-500" : "border-l-verde-claro";
+          return (
+            <div key={s.insumo} className={`kpi-card ${borderCls}`}>
+              <div className="kpi-label">{s.insumo}</div>
+              <div className="kpi-value">{formatDecimal(s.stockActual)}</div>
+              <div className="text-[12px] text-gray-500 mt-0.5">{s.unidad}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Movimientos */}
       <div className="card">
         <div className="card-header">
           <span className="card-title">Historial de movimientos</span>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <select className="form-control" style={{ width: 160 }} value={filtroInsumo} onChange={(e) => setFiltroInsumo(e.target.value)}>
+          <div className="flex gap-2.5 items-center">
+            <select className="form-control w-40" value={filtroInsumo} onChange={(e) => setFiltroInsumo(e.target.value)}>
               <option value="">Todos los insumos</option>
               {stock.map((s) => <option key={s.insumo} value={s.insumo}>{s.insumo}</option>)}
             </select>
@@ -165,23 +168,21 @@ export default function InventarioPage() {
                   const conf = TIPO_CONFIG[m.tipo] ?? { label: m.tipo, badge: "badge-gray", icono: null };
                   return (
                     <tr key={m.id}>
-                      <td style={{ color: "var(--text-secondary)", fontSize: 12, whiteSpace: "nowrap" }}>
-                        {formatFecha(m.registradoEn)}
-                      </td>
-                      <td style={{ fontWeight: 500 }}>{m.insumo}</td>
+                      <td className="text-gray-500 text-[12px] whitespace-nowrap">{formatFecha(m.registradoEn)}</td>
+                      <td className="font-medium">{m.insumo}</td>
                       <td>
-                        <span className={`badge ${conf.badge}`} style={{ display: "inline-flex", gap: 4 }}>
+                        <span className={`badge ${conf.badge} gap-1`}>
                           {conf.icono} {conf.label}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 600 }}>
+                      <td className="font-semibold">
                         {m.tipo === "ajuste" ? "→" : m.tipo === "entrada" ? "+" : "-"}{formatDecimal(m.cantidad)}
                       </td>
                       <td>{formatDecimal(m.stockResultante)}</td>
-                      <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>
+                      <td className="text-gray-500 text-[12px]">
                         {m.referenciaTipo ? `${m.referenciaTipo}${m.referenciaId ? " #" + m.referenciaId : ""}` : "—"}
                       </td>
-                      <td style={{ color: "var(--text-secondary)" }}>{m.observacion ?? "—"}</td>
+                      <td className="text-gray-500">{m.observacion ?? "—"}</td>
                     </tr>
                   );
                 })}

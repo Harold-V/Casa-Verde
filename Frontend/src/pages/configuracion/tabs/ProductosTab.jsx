@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Power, Search, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Plus, Pencil, Power, Search, X } from "lucide-react";
 import { productoService, categoriaService } from "../../../services/productoService";
 import { formatCOP } from "../../../utils/format";
 
@@ -79,31 +79,33 @@ function ModalProducto({ producto, categorias, onClose, onSave }) {
                   {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
-              <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 22 }}>
+              <div className="form-group flex items-center gap-2.5 pt-[22px]">
                 <input type="checkbox" id="afecta" checked={form.afectaInventario} onChange={(e) => set("afectaInventario", e.target.checked)} />
-                <label htmlFor="afecta" style={{ cursor: "pointer", fontWeight: 500 }}>Afecta inventario</label>
+                <label htmlFor="afecta" className="cursor-pointer font-medium">Afecta inventario</label>
               </div>
             </div>
 
             {form.afectaInventario && (
               <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>Composición de inventario</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="form-label mb-0">Composición de inventario</label>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={agregarComp}>
                     <Plus size={13} /> Agregar insumo
                   </button>
                 </div>
                 {form.composicion.map((c, i) => (
                   <div key={i} className="composicion-row">
-                    <select className="form-control" style={{ flex: 1 }} value={c.insumo} onChange={(e) => setComp(i, "insumo", e.target.value)}>
+                    <select className="form-control flex-1" value={c.insumo} onChange={(e) => setComp(i, "insumo", e.target.value)}>
                       <option value="gallina">Gallina</option>
                       <option value="cuy">Cuy</option>
                     </select>
-                    <input className="form-control" type="number" step="0.001" min="0" style={{ width: 100 }} value={c.cantidad} onChange={(e) => setComp(i, "cantidad", e.target.value)} />
+                    <input className="form-control w-[100px]" type="number" step="0.001" min="0" value={c.cantidad} onChange={(e) => setComp(i, "cantidad", e.target.value)} />
                     <button type="button" className="btn-icon" onClick={() => quitarComp(i)}><X size={15} /></button>
                   </div>
                 ))}
-                {form.composicion.length === 0 && <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>Sin composición — no descontará inventario</p>}
+                {form.composicion.length === 0 && (
+                  <p className="text-gray-500 text-[13px]">Sin composición — no descontará inventario</p>
+                )}
               </div>
             )}
           </div>
@@ -183,11 +185,11 @@ export default function ProductosTab() {
           <Search size={16} />
           <input className="form-control" placeholder="Buscar producto…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+        <label className="flex items-center gap-1.5 text-[13px] cursor-pointer">
           <input type="checkbox" checked={soloActivos} onChange={(e) => setSoloActivos(e.target.checked)} />
           Solo activos
         </label>
-        <div style={{ flex: 1 }} />
+        <div className="flex-1" />
         <button className="btn btn-primary" onClick={() => setCreando(true)}>
           <Plus size={15} /> Nuevo producto
         </button>
@@ -214,10 +216,14 @@ export default function ProductosTab() {
               <tbody>
                 {filtrados.map((p) => (
                   <tr key={p.id}>
-                    <td style={{ fontWeight: 500 }}>{p.nombre}</td>
-                    <td style={{ color: "var(--text-secondary)" }}>{p.categoriaNombre ?? "—"}</td>
+                    <td className="font-medium">{p.nombre}</td>
+                    <td className="text-gray-500">{p.categoriaNombre ?? "—"}</td>
                     <td>
-                      <span style={{ cursor: "pointer", textDecoration: "underline dotted" }} onClick={() => handlePrecio(p)} title="Clic para cambiar precio">
+                      <span
+                        className="cursor-pointer underline decoration-dotted"
+                        onClick={() => handlePrecio(p)}
+                        title="Clic para cambiar precio"
+                      >
                         {formatCOP(p.precio)}
                       </span>
                     </td>
@@ -234,10 +240,10 @@ export default function ProductosTab() {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <div className="flex gap-1">
                         <button className="btn-icon" title="Editar" onClick={() => setEditando(p)}><Pencil size={15} /></button>
                         <button className="btn-icon" title={p.activo ? "Desactivar" : "Activar"} onClick={() => mutToggle.mutate(p.id)}>
-                          <Power size={15} style={{ color: p.activo ? "var(--success)" : "var(--danger)" }} />
+                          <Power size={15} className={p.activo ? "text-green-600" : "text-red-600"} />
                         </button>
                       </div>
                     </td>

@@ -1,5 +1,7 @@
 package com.casaverde.backend.domain;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +24,6 @@ public class ProductoComposicionInventario {
     @Column(nullable = false)
     private String insumo;
 
-    @Column(nullable = false)
-    private Double cantidad;
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal cantidad;
 }

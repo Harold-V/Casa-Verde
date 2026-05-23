@@ -1,6 +1,8 @@
 package com.casaverde.backend.domain;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -15,19 +17,19 @@ public class TasaCambio {
     private Long id;
 
     @Column(name = "valor_cop", nullable = false)
-    private Double valorCop;
+    private BigDecimal valorCop;
 
     @Column(name = "vigente_desde", nullable = false)
-    private LocalDateTime vigentDesde;
+    private LocalDateTime vigenteDesde;
 
     @Column(name = "creado_en")
     private LocalDateTime creadoEn;
 
     @PrePersist
     void onCreate() {
-        creadoEn = LocalDateTime.now();
-        if (vigentDesde == null) {
-            vigentDesde = LocalDateTime.now();
+        creadoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
+        if (vigenteDesde == null) {
+            vigenteDesde = LocalDateTime.now(ZoneId.of("America/Bogota"));
         }
     }
 }

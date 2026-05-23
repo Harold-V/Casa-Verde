@@ -1,5 +1,6 @@
 package com.casaverde.backend.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,20 +26,26 @@ public class InventarioService {
     private final InventarioRepository inventarioRepo;
     private final MovimientoInventarioRepository movimientoRepo;
 
+    private final AuditoriaService auditoriaService;
+
+    @Transactional(readOnly = true)
     public List<InventarioDTO> listarStock() {
         return inventarioRepo.findAllByOrderByInsumoAsc().stream()
                 .map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public InventarioDTO obtenerStock(String insumo) {
         return toDTO(findInsumoOrThrow(insumo));
     }
 
+    @Transactional(readOnly = true)
     public List<MovimientoInventarioDTO> listarMovimientos() {
         return movimientoRepo.findAllByOrderByRegistradoEnDesc().stream()
                 .map(this::toMovDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<MovimientoInventarioDTO> listarMovimientosPorInsumo(String insumo) {
         return movimientoRepo.findByInsumoOrderByRegistradoEnDesc(insumo).stream()
                 .map(this::toMovDTO).collect(Collectors.toList());
@@ -52,14 +59,14 @@ public class InventarioService {
                 .orElseGet(() -> {
                     Inventario nuevo = Inventario.builder()
                             .insumo(req.getInsumo().trim())
-                            .stockActual(0.0)
+                            .stockActual(BigDecimal.ZERO)
                             .unidad("unidad")
                             .build();
                     return inventarioRepo.save(nuevo);
                 });
 
-        double nuevoStock = calcularNuevoStock(inv.getStockActual(), req);
-        if (nuevoStock < 0) {
+        BigDecimal nuevoStock = calcularNuevoStock(inv.getStockActual(), req);
+        if (nuevoStock.compareTo(BigDecimal.ZERO) < 0) {
             throw new ValidacionException("Stock insuficiente. Stock actual: " + inv.getStockActual()
                     + " — solicitado: " + req.getCantidad());
         }
@@ -76,13 +83,16 @@ public class InventarioService {
                 .observacion(req.getObservacion())
                 .build();
 
-        return toMovDTO(movimientoRepo.save(mov));
+        MovimientoInventario guardado = movimientoRepo.save(mov);
+        auditoriaService.registrar("inventario", inv.getId(), "MOVIMIENTO_MANUAL",
+                req.getTipo() + " " + req.getCantidad() + " " + req.getInsumo());
+        return toMovDTO(guardado);
     }
 
-    private double calcularNuevoStock(double actual, MovimientoRequest req) {
+    private BigDecimal calcularNuevoStock(BigDecimal actual, MovimientoRequest req) {
         return switch (req.getTipo()) {
-            case "entrada" -> actual + req.getCantidad();
-            case "salida"  -> actual - req.getCantidad();
+            case "entrada" -> actual.add(req.getCantidad());
+            case "salida"  -> actual.subtract(req.getCantidad());
             case "ajuste"  -> req.getCantidad();
             default -> throw new ValidacionException("Tipo de movimiento inválido: " + req.getTipo());
         };
@@ -92,7 +102,7 @@ public class InventarioService {
         if (req.getInsumo() == null || req.getInsumo().isBlank()) {
             throw new ValidacionException("El insumo es obligatorio");
         }
-        if (req.getCantidad() == null || req.getCantidad() < 0) {
+        if (req.getCantidad() == null || req.getCantidad().compareTo(BigDecimal.ZERO) < 0) {
             throw new ValidacionException("La cantidad debe ser mayor o igual a 0");
         }
         if (req.getTipo() == null || !List.of("entrada", "salida", "ajuste").contains(req.getTipo())) {

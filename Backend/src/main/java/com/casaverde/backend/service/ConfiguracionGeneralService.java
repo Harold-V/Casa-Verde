@@ -20,10 +20,12 @@ public class ConfiguracionGeneralService {
 
     private final ConfiguracionGeneralRepository repo;
 
+    @Transactional(readOnly = true)
     public List<ConfiguracionDTO> listarTodas() {
         return repo.findAll().stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public ConfiguracionDTO buscarPorClave(String clave) {
         return toDTO(findOrThrow(clave));
     }

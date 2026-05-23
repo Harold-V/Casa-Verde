@@ -1,12 +1,15 @@
 package com.casaverde.backend.config;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.domain.*;
+import com.casaverde.backend.exception.RecursoNoEncontradoException;
 import com.casaverde.backend.repository.*;
 
 import lombok.RequiredArgsConstructor;
@@ -22,16 +25,23 @@ public class DataInitializer implements CommandLineRunner {
     private final TasaCambioRepository tasaRepo;
     private final ConfiguracionGeneralRepository configRepo;
     private final InventarioRepository inventarioRepo;
+    private final FondoRepository fondoRepo;
+    private final PedidoRepository pedidoRepo;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
     public void run(String... args) {
+        backfillVersiones();
         initCategorias();
         initProductos();
         initSalones();
         initTasaCambio();
         initConfiguracion();
         initInventario();
+        initFondos();
+        backfillFinalizadoEn();
+        backfillEstadosPedido();
     }
 
     private void initCategorias() {
@@ -48,11 +58,11 @@ public class DataInitializer implements CommandLineRunner {
     private void initProductos() {
         if (productoRepo.count() > 0) return;
 
-        CategoriaProducto cuyes    = categoriaRepo.findByActivoTrueOrderByOrdenAsc().get(0);
-        CategoriaProducto gallinas = categoriaRepo.findByActivoTrueOrderByOrdenAsc().get(1);
-        CategoriaProducto almuerzos = categoriaRepo.findByActivoTrueOrderByOrdenAsc().get(2);
-        CategoriaProducto complementos = categoriaRepo.findByActivoTrueOrderByOrdenAsc().get(3);
-        CategoriaProducto bebidas  = categoriaRepo.findByActivoTrueOrderByOrdenAsc().get(4);
+        CategoriaProducto cuyes        = findCat("Cuyes");
+        CategoriaProducto gallinas     = findCat("Gallinas");
+        CategoriaProducto almuerzos    = findCat("Almuerzos");
+        CategoriaProducto complementos = findCat("Complementos");
+        CategoriaProducto bebidas      = findCat("Bebidas");
 
         // Cuyes
         Producto cuy       = saveProducto("Cuy",       0.0, cuyes,       true);
@@ -82,16 +92,16 @@ public class DataInitializer implements CommandLineRunner {
         saveProducto("Pokeron",  0.0, bebidas, false);
 
         // Composiciones de inventario
-        addComp(cuy,       "cuy",     1.0);
-        addComp(medioCuy,  "cuy",     0.5);
-        addComp(cuartoCuy, "cuy",     0.25);
-        addComp(gallina,      "gallina", 1.0);
-        addComp(medioGallina, "gallina", 0.5);
-        addComp(octavoGallina, "gallina", 0.125);
-        addComp(alm1, "gallina", 0.125);
-        addComp(alm1, "cuy",     0.5);
-        addComp(alm2, "gallina", 0.125);
-        addComp(alm2, "cuy",     0.25);
+        addComp(cuy,       "cuy",     new BigDecimal("1.0000"));
+        addComp(medioCuy,  "cuy",     new BigDecimal("0.5000"));
+        addComp(cuartoCuy, "cuy",     new BigDecimal("0.2500"));
+        addComp(gallina,      "gallina", new BigDecimal("1.0000"));
+        addComp(medioGallina, "gallina", new BigDecimal("0.5000"));
+        addComp(octavoGallina, "gallina", new BigDecimal("0.1250"));
+        addComp(alm1, "gallina", new BigDecimal("0.1250"));
+        addComp(alm1, "cuy",     new BigDecimal("0.5000"));
+        addComp(alm2, "gallina", new BigDecimal("0.1250"));
+        addComp(alm2, "cuy",     new BigDecimal("0.2500"));
     }
 
     private void initSalones() {
@@ -105,28 +115,107 @@ public class DataInitializer implements CommandLineRunner {
 
     private void initTasaCambio() {
         if (tasaRepo.count() > 0) return;
-        tasaRepo.save(TasaCambio.builder().valorCop(4200.0).build());
+        tasaRepo.save(TasaCambio.builder().valorCop(BigDecimal.valueOf(4200)).build());
     }
 
     private void initConfiguracion() {
-        if (configRepo.count() > 0) return;
-        configRepo.saveAll(List.of(
-            cfg("nombre_negocio",      "Asadero Casa Verde",  "Nombre del negocio"),
-            cfg("moneda_base",         "COP",                 "Moneda base del sistema"),
-            cfg("capital_inicial_cop", "0",                   "Capital inicial en COP"),
-            cfg("mostrar_tasa_dolar",  "1",                   "Mostrar tasa USD en topbar")
-        ));
+        saveConfigIfAbsent("nombre_negocio",      "Asadero Casa Verde", "Nombre del negocio");
+        saveConfigIfAbsent("moneda_base",         "COP",                "Moneda base del sistema");
+        saveConfigIfAbsent("capital_inicial_cop", "0",                  "Capital inicial en COP");
+        saveConfigIfAbsent("mostrar_tasa_dolar",  "1",                  "Mostrar tasa USD en topbar");
+        saveConfigIfAbsent("zona_horaria",        "America/Bogota",     "Zona horaria del sistema");
+    }
+
+    private void saveConfigIfAbsent(String clave, String valor, String desc) {
+        if (configRepo.findById(clave).isEmpty()) {
+            configRepo.save(cfg(clave, valor, desc));
+        }
     }
 
     private void initInventario() {
         if (inventarioRepo.count() > 0) return;
         inventarioRepo.saveAll(List.of(
-            Inventario.builder().insumo("gallina").stockActual(0.0).unidad("unidad").build(),
-            Inventario.builder().insumo("cuy").stockActual(0.0).unidad("unidad").build()
+            Inventario.builder().insumo("gallina").stockActual(BigDecimal.ZERO).unidad("unidad").build(),
+            Inventario.builder().insumo("cuy").stockActual(BigDecimal.ZERO).unidad("unidad").build()
         ));
     }
 
+    private void initFondos() {
+        if (fondoRepo.count() > 0) return;
+        fondoRepo.saveAll(List.of(
+            Fondo.builder().moneda("COP").saldo(BigDecimal.ZERO).build(),
+            Fondo.builder().moneda("USD").saldo(BigDecimal.ZERO).build(),
+            Fondo.builder().moneda("NEQUI").saldo(BigDecimal.ZERO).build()
+        ));
+    }
+
+    private void backfillVersiones() {
+        List.of("pedido", "fondo", "inventario", "producto", "gasto")
+                .forEach(tabla -> {
+                    try {
+                        jdbcTemplate.update("UPDATE " + tabla + " SET version = 0 WHERE version IS NULL");
+                    } catch (Exception ignored) {
+                        // La tabla o columna puede no existir en una base recien creada antes de que Hibernate la materialice.
+                    }
+                });
+    }
+
+    private void backfillFinalizadoEn() {
+        List<Pedido> finalizadosSinCierre = pedidoRepo.findByEstadoOrderByCreadoEnDesc("FINALIZADO").stream()
+                .filter(p -> p.getFinalizadoEn() == null)
+                .peek(p -> p.setFinalizadoEn(p.getActualizadoEn() != null ? p.getActualizadoEn() : p.getCreadoEn()))
+                .toList();
+        if (!finalizadosSinCierre.isEmpty()) {
+            pedidoRepo.saveAll(finalizadosSinCierre);
+        }
+    }
+
+    private void backfillEstadosPedido() {
+        List<Pedido> actualizados = pedidoRepo.findAllByOrderByCreadoEnDesc().stream()
+                .filter(this::permiteRecalcularEstado)
+                .filter(p -> {
+                    String estadoActual = p.getEstado();
+                    String estadoNuevo = calcularEstadoPedido(p);
+                    p.setEstado(estadoNuevo);
+                    return !estadoNuevo.equals(estadoActual);
+                })
+                .toList();
+        if (!actualizados.isEmpty()) {
+            pedidoRepo.saveAll(actualizados);
+        }
+    }
+
+    private boolean permiteRecalcularEstado(Pedido pedido) {
+        try {
+            return EstadoPedido.from(pedido.getEstado()).permiteEdicion();
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    private String calcularEstadoPedido(Pedido pedido) {
+        BigDecimal total = pedido.getDetalles().stream()
+                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal abonado = pedido.getPagos().stream()
+                .map(Pago::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (total.compareTo(BigDecimal.ZERO) <= 0 || abonado.compareTo(BigDecimal.ZERO) <= 0) {
+            return EstadoPedido.PENDIENTE.name();
+        }
+        if (abonado.compareTo(total) < 0) {
+            return EstadoPedido.ABONADO_PARCIAL.name();
+        }
+        return EstadoPedido.PAGADO.name();
+    }
+
     // ---- helpers ----
+
+    private CategoriaProducto findCat(String nombre) {
+        return categoriaRepo.findByNombreIgnoreCase(nombre)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Categoría no encontrada: " + nombre));
+    }
 
     private CategoriaProducto cat(String nombre, int orden) {
         return CategoriaProducto.builder().nombre(nombre).orden(orden).activo(true).build();
@@ -134,11 +223,11 @@ public class DataInitializer implements CommandLineRunner {
 
     private Producto saveProducto(String nombre, double precio, CategoriaProducto cat, boolean afectaInventario) {
         return productoRepo.save(Producto.builder()
-                .nombre(nombre).precio(precio).categoria(cat)
+                .nombre(nombre).precio(BigDecimal.valueOf(precio)).categoria(cat)
                 .afectaInventario(afectaInventario).activo(true).build());
     }
 
-    private void addComp(Producto producto, String insumo, double cantidad) {
+    private void addComp(Producto producto, String insumo, BigDecimal cantidad) {
         composicionRepo.save(ProductoComposicionInventario.builder()
                 .producto(producto).insumo(insumo).cantidad(cantidad).build());
     }

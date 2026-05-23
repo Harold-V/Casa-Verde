@@ -16,8 +16,10 @@ public class CategoriaProducto {
     private String nombre;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer orden = 0;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean activo = true;
 }
