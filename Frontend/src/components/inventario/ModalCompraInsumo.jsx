@@ -36,7 +36,7 @@ export default function ModalCompraInsumo({ insumos, onClose }) {
     const cantidad = parseInt(form.cantidad, 10);
     const monto    = Number(form.monto);
     if (!cantidad || cantidad < 1) { setError("La cantidad debe ser al menos 1"); return; }
-    if (!monto    || monto   <= 0) { setError("El monto debe ser mayor a 0");     return; }
+    if (!isFinite(monto) || monto <= 0) { setError("El monto debe ser mayor a 0"); return; }
 
     const plural   = form.insumo === "cuy" ? "cuyes" : `${form.insumo}s`;
     const concepto = `Compra ${cantidad} ${plural}`;
@@ -133,7 +133,7 @@ export default function ModalCompraInsumo({ insumos, onClose }) {
                   className="form-control"
                   type="number"
                   min="0"
-                  step={form.moneda === "USD" ? "0.01" : "100"}
+                  step={form.moneda === "USD" ? "0.01" : "1"}
                   value={form.monto}
                   onChange={(e) => set("monto", e.target.value)}
                 />
