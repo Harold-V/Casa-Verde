@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -154,6 +154,12 @@ describe("ModalCompraInsumo", () => {
   it("llama onClose al hacer clic en Cancelar", async () => {
     render(<ModalCompraInsumo insumos={INSUMOS} onClose={onClose} />, { wrapper });
     await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("llama onClose al presionar Escape", () => {
+    render(<ModalCompraInsumo insumos={INSUMOS} onClose={onClose} />, { wrapper });
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
