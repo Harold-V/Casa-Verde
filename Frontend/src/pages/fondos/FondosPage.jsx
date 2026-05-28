@@ -1,110 +1,78 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Edit2, X, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import {
+  Download, RotateCcw, TrendingUp, TrendingDown,
+  DollarSign, SlidersHorizontal, Plus, ArrowLeftRight,
+} from "lucide-react";
 import { fondoService } from "../../services/fondoService";
 import { tasaService } from "../../services/tasaService";
-import { formatCOP } from "../../utils/format";
-import { useFormatos } from "../../hooks/useFormatos";
+import { exportacionService } from "../../services/exportacionService";
+import { formatCOP, formatFecha, formatHora, formatUSD } from "../../utils/format";
+import ModalEntrada from "../../components/fondos/ModalEntrada";
+import ModalTransferencia from "../../components/fondos/ModalTransferencia";
 
-const MONEDA_LABEL = { COP: "Pesos colombianos", USD: "Dólares estadounidenses", NEQUI: "Nequi" };
-const MONEDA_COLOR_CLS = {
-  COP:   "text-verde-claro",
-  USD:   "text-[#1a6b3c]",
-  NEQUI: "text-[#8c00ff]",
-};
-const MONEDA_BORDER_CLS = {
-  COP:   "border-l-verde-claro",
-  USD:   "border-l-[#1a6b3c]",
-  NEQUI: "border-l-[#8c00ff]",
-};
+/* ── helpers visuales ─────────────────────────────────────────────── */
+function getFondoLabel(fondo) {
+  if (fondo.moneda === "COP")  return "Pesos colombianos";
+  if (fondo.moneda === "USD")  return "Dólares estadounidenses";
+  if (fondo.moneda.startsWith("NEQUI"))
+    return `Nequi${fondo.alias ? ` — ${fondo.alias}` : ""}`;
+  return fondo.moneda;
+}
 
-function ModalAjuste({ fondo, onClose, onAjustar }) {
-  const [nuevoSaldo, setNuevoSaldo] = useState(fondo.saldo ?? 0);
-  const [motivo, setMotivo] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+function getColorCls(moneda) {
+  if (moneda === "COP") return "text-verde-claro";
+  if (moneda === "USD") return "text-[#1a6b3c]";
+  if (moneda.startsWith("NEQUI")) return "text-[#8c00ff]";
+  return "text-verde-oscuro";
+}
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (nuevoSaldo === "" || isNaN(Number(nuevoSaldo))) {
-      setError("Ingresa un saldo válido");
-      return;
-    }
-    setSaving(true);
-    try {
-      await onAjustar(fondo.moneda, Number(nuevoSaldo), motivo);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.mensaje ?? err.message);
-      setSaving(false);
-    }
-  };
+function getBorderCls(moneda) {
+  if (moneda === "COP") return "border-l-verde-claro";
+  if (moneda === "USD") return "border-l-[#1a6b3c]";
+  if (moneda.startsWith("NEQUI")) return "border-l-[#8c00ff]";
+  return "border-l-verde-claro";
+}
 
-  const diferencia = Number(nuevoSaldo) - (fondo.saldo ?? 0);
+/** Agrupa todos los movimientos tipo "cobro" por día + moneda en una única fila "Venta del día". */
+function procesarHistorial(movs) {
+  const cobros = movs.filter((m) => m.tipo === "cobro");
+  const otros  = movs.filter((m) => m.tipo !== "cobro");
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal max-w-[420px]">
-        <div className="modal-header">
-          <span className="modal-title">Ajustar fondo {fondo.moneda}</span>
-          <button className="btn-icon" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            {error && <div className="alert alert-error">{error}</div>}
+  const grupos = {};
+  cobros.forEach((m) => {
+    const dia = m.fecha.substring(0, 10);
+    const key = `${dia}__${m.moneda}`;
+    if (!grupos[key]) grupos[key] = { dia, moneda: m.moneda, monto: 0, montoCop: 0 };
+    grupos[key].monto    += Number(m.monto);
+    grupos[key].montoCop += Number(m.montoCop);
+  });
 
-            <div className="form-group">
-              <label className="form-label">
-                Saldo actual: <strong>
-                  {fondo.moneda === "USD"
-                    ? `$${(fondo.saldo ?? 0).toFixed(2)} USD`
-                    : formatCOP(fondo.saldo ?? 0)}
-                </strong>
-              </label>
-              <input
-                className="form-control"
-                type="number"
-                step={fondo.moneda === "USD" ? "0.01" : "1"}
-                value={nuevoSaldo}
-                onChange={(e) => setNuevoSaldo(e.target.value)}
-                autoFocus
-              />
-              {diferencia !== 0 && (
-                <div className={`mt-1.5 text-[13px] ${diferencia > 0 ? "text-verde-claro" : "text-red-600"}`}>
-                  {diferencia > 0 ? "+" : ""}{fondo.moneda === "USD"
-                    ? `$${diferencia.toFixed(2)} USD`
-                    : formatCOP(diferencia)}
-                </div>
-              )}
-            </div>
+  const ventasDia = Object.values(grupos).map((g) => ({
+    id:          `venta-${g.dia}-${g.moneda}`,
+    tipo:        "cobro",
+    concepto:    "Venta del día",
+    moneda:      g.moneda,
+    monto:       g.monto,
+    montoCop:    g.montoCop,
+    fecha:       `${g.dia}T23:59:59`,
+    _esVentaDia: true,
+    _fechaNav:   g.dia,
+  }));
 
-            <div className="form-group">
-              <label className="form-label">Motivo (opcional)</label>
-              <input
-                className="form-control"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="ej. Capital inicial, corrección de caja"
-              />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Guardando…" : "Aplicar ajuste"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+  return [...ventasDia, ...otros].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 
 export default function FondosPage() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
-  const { formatFecha, formatHora } = useFormatos();
-  const [ajustando, setAjustando] = useState(null);
+
+  const [modalEntradaOpen, setModalEntradaOpen]             = useState(false);
+  const [modalTransferenciaOpen, setModalTransferenciaOpen] = useState(false);
+  const [filtroFecha, setFiltroFecha]   = useState("");
+  const [filtroMoneda, setFiltroMoneda] = useState("");
+  const [filtroTipo, setFiltroTipo]     = useState("");
 
   const { data: fondos = [], isLoading: loadingFondos } = useQuery({
     queryKey: ["fondos"],
@@ -112,8 +80,12 @@ export default function FondosPage() {
   });
 
   const { data: historial = [], isLoading: loadingHistorial } = useQuery({
-    queryKey: ["fondos-historial"],
-    queryFn: fondoService.historial,
+    queryKey: ["fondos-historial", filtroFecha, filtroMoneda, filtroTipo],
+    queryFn: () => fondoService.historial({
+      ...(filtroFecha  ? { fecha: filtroFecha }   : {}),
+      ...(filtroMoneda ? { moneda: filtroMoneda } : {}),
+      ...(filtroTipo   ? { tipo: filtroTipo }     : {}),
+    }),
   });
 
   const { data: tasa } = useQuery({
@@ -122,20 +94,36 @@ export default function FondosPage() {
     retry: false,
   });
 
-  const ajustarMut = useMutation({
-    mutationFn: ({ moneda, nuevoSaldo, motivo }) =>
-      fondoService.ajustar(moneda, nuevoSaldo, motivo),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["fondos"] }),
+  const invalidarFondos = () => {
+    qc.invalidateQueries({ queryKey: ["fondos"] });
+    qc.invalidateQueries({ queryKey: ["fondos-historial"] });
+  };
+
+  const entradaMut = useMutation({
+    mutationFn: fondoService.registrarEntrada,
+    onSuccess: invalidarFondos,
   });
 
-  const saldoCop   = fondos.find((f) => f.moneda === "COP")?.saldo   ?? 0;
-  const saldoUsd   = fondos.find((f) => f.moneda === "USD")?.saldo   ?? 0;
-  const saldoNequi = fondos.find((f) => f.moneda === "NEQUI")?.saldo ?? 0;
-  const tasaValor  = tasa?.valorCop ?? null;
-  const usdEnCop   = tasaValor != null ? saldoUsd * tasaValor : null;
-  const capitalTotal = tasaValor != null
-    ? saldoCop + saldoNequi + usdEnCop
-    : saldoCop + saldoNequi;
+  const transferenciaMut = useMutation({
+    mutationFn: fondoService.registrarTransferencia,
+    onSuccess: () => {
+      invalidarFondos();
+      qc.invalidateQueries({ queryKey: ["nequi-estado-mes"] });
+    },
+  });
+
+  /* ── cálculos de totales ─────────────────────────────────────────── */
+  const saldoCop        = fondos.find((f) => f.moneda === "COP")?.saldo ?? 0;
+  const saldoUsd        = fondos.find((f) => f.moneda === "USD")?.saldo ?? 0;
+  const nequiFondos     = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
+  const saldoNequiTotal = nequiFondos.reduce((acc, f) => acc + Number(f.saldo ?? 0), 0);
+  const tasaValor       = tasa?.valorCop ?? null;
+  const usdEnCop        = tasaValor != null ? saldoUsd * tasaValor : null;
+  const capitalTotal    = tasaValor != null
+    ? saldoCop + saldoNequiTotal + usdEnCop
+    : saldoCop + saldoNequiTotal;
+
+  const historialProcesado = useMemo(() => procesarHistorial(historial), [historial]);
 
   return (
     <div>
@@ -159,10 +147,10 @@ export default function FondosPage() {
               <div className="text-[11px] text-white/55 mt-1">
                 COP {formatCOP(saldoCop)}
                 {" + "}
-                NEQUI {formatCOP(saldoNequi)}
+                NEQUI {formatCOP(saldoNequiTotal)}{nequiFondos.length > 1 ? ` (${nequiFondos.length} cuentas)` : ""}
                 {usdEnCop != null
-                  ? ` + USD $${saldoUsd.toFixed(2)} × ${formatCOP(tasaValor)} = ${formatCOP(usdEnCop)}`
-                  : ` + USD $${saldoUsd.toFixed(2)} (tasa no configurada)`}
+                  ? ` + USD ${formatUSD(saldoUsd)} × ${formatCOP(tasaValor)} = ${formatCOP(usdEnCop)}`
+                  : ` + USD ${formatUSD(saldoUsd)} (tasa no configurada)`}
               </div>
             </div>
           </div>
@@ -173,50 +161,88 @@ export default function FondosPage() {
       {loadingFondos ? (
         <div className="loading-center"><div className="spinner" /></div>
       ) : (
-        <div className="grid gap-[14px] mb-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-          {fondos.map((f) => (
-            <div key={f.moneda} className={`card border-l-4 ${MONEDA_BORDER_CLS[f.moneda] ?? "border-l-verde-claro"}`}>
-              <div className="p-[18px] flex justify-between items-start">
-                <div>
-                  <div className="text-[13px] text-gray-500 mb-1">
-                    {MONEDA_LABEL[f.moneda] ?? f.moneda}
-                  </div>
-                  <div className={`text-[28px] font-extrabold ${(f.saldo ?? 0) < 0 ? "text-red-600" : MONEDA_COLOR_CLS[f.moneda] ?? "text-verde-oscuro"}`}>
+        <>
+          <div className="grid gap-[14px] mb-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+            {fondos.map((f) => (
+              <div key={f.moneda} className={`card border-l-4 ${getBorderCls(f.moneda)}`}>
+                <div className="p-[18px]">
+                  <div className="text-[13px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
+                  <div className={`text-[28px] font-extrabold ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
                     {f.moneda === "USD"
-                      ? `$${(f.saldo ?? 0).toFixed(2)}`
+                      ? formatUSD(f.saldo ?? 0)
                       : formatCOP(f.saldo ?? 0)}
                   </div>
                   <div className="text-[11px] text-gray-500 mt-1">
                     {f.moneda}
                     {f.moneda === "USD" && tasaValor != null && (
-                      <span> · ≈ {formatCOP((f.saldo ?? 0) * tasaValor)} COP</span>
+                      <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
                     )}
                     {f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
                   </div>
                 </div>
-                <button
-                  className="btn-icon"
-                  title="Ajustar saldo"
-                  onClick={() => setAjustando(f)}
-                >
-                  <Edit2 size={16} />
-                </button>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+        </>
       )}
 
       {/* Historial unificado */}
       <div className="card">
         <div className="card-header">
           <span className="card-title">Historial de movimientos</span>
-          <span className="text-[13px] text-gray-500">{historial.length} registros</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button className="btn btn-secondary btn-sm flex items-center gap-1" onClick={() => setModalTransferenciaOpen(true)}>
+              <ArrowLeftRight size={14} /> Transferencia
+            </button>
+            <button className="btn btn-primary btn-sm flex items-center gap-1" onClick={() => setModalEntradaOpen(true)}>
+              <Plus size={14} /> Nueva entrada
+            </button>
+            <a className="btn btn-secondary btn-sm" href={exportacionService.cajaUrl(filtroFecha)}>
+              <Download size={14} />
+              CSV caja
+            </a>
+          </div>
+        </div>
+        <div className="toolbar px-[18px] pt-4 mb-0">
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-500 mr-1">
+            <SlidersHorizontal size={15} />
+            <span>{historialProcesado.length} registros</span>
+          </div>
+          <input
+            type="date"
+            className="form-control w-40"
+            value={filtroFecha}
+            onChange={(e) => setFiltroFecha(e.target.value)}
+          />
+          <select className="form-control w-36" value={filtroMoneda} onChange={(e) => setFiltroMoneda(e.target.value)}>
+            <option value="">Todas</option>
+            <option value="COP">COP</option>
+            <option value="USD">USD</option>
+            {nequiFondos.map((f) => (
+              <option key={f.moneda} value={f.moneda}>
+                {f.alias ? `Nequi ${f.alias}` : f.moneda}
+              </option>
+            ))}
+          </select>
+          <select className="form-control w-36" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+            <option value="">Todo tipo</option>
+            <option value="cobro">Ventas</option>
+            <option value="entrada">Entradas</option>
+            <option value="salida">Salidas</option>
+            <option value="ajuste">Ajustes</option>
+            <option value="reverso">Reversos</option>
+          </select>
+          {(filtroFecha || filtroMoneda || filtroTipo) && (
+            <button className="btn btn-secondary btn-sm" onClick={() => { setFiltroFecha(""); setFiltroMoneda(""); setFiltroTipo(""); }}>
+              Limpiar
+            </button>
+          )}
         </div>
         <div className="table-wrap">
           {loadingHistorial ? (
             <div className="loading-center"><div className="spinner" /></div>
-          ) : historial.length === 0 ? (
+          ) : historialProcesado.length === 0 ? (
             <div className="empty-state"><p>Sin movimientos registrados</p></div>
           ) : (
             <table>
@@ -231,24 +257,45 @@ export default function FondosPage() {
                 </tr>
               </thead>
               <tbody>
-                {historial.map((m, i) => {
-                  const esCobro = m.tipo === "cobro";
+                {historialProcesado.map((m) => {
+                  const esVentaDia = !!m._esVentaDia;
+                  const esEntrada  = esVentaDia || m.tipo === "cobro" || m.tipo === "entrada";
+                  const esSalida   = m.tipo === "salida";
+                  const esReverso  = m.tipo === "reverso";
+                  const esCobro    = esEntrada;
+                  const Icon  = esEntrada ? TrendingUp : esSalida ? TrendingDown : esReverso ? RotateCcw : DollarSign;
+                  const badge = esEntrada ? "badge-success" : esSalida ? "badge-danger" : esReverso ? "badge-gray" : "badge-warning";
+                  const color = esEntrada ? "text-verde-claro" : esSalida ? "text-red-600" : "text-gray-600";
+                  // Etiqueta de moneda: si hay alias, mostrarlo
+                  const nequiFondo = fondos.find((f) => f.moneda === m.moneda);
+                  const monedaLabel = nequiFondo?.alias && m.moneda.startsWith("NEQUI")
+                    ? `Nequi ${nequiFondo.alias}`
+                    : m.moneda;
                   return (
-                    <tr key={i}>
-                      <td className="text-[12px] text-gray-500 whitespace-nowrap">{formatFecha(m.fecha)}</td>
+                    <tr key={m.id}
+                      className={esVentaDia ? "cursor-pointer hover:bg-green-50 transition-colors font-medium" : ""}
+                      onClick={esVentaDia ? () => navigate("/resumen", { state: { fecha: m._fechaNav } }) : undefined}
+                      title={esVentaDia ? "Ver resumen del día" : undefined}
+                    >
+                      <td className="text-[12px] text-gray-500 whitespace-nowrap">
+                        {esVentaDia
+                          ? new Date(`${m._fechaNav}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })
+                          : formatFecha(m.fecha)
+                        }
+                      </td>
                       <td>
-                        <span className={`badge gap-1 ${esCobro ? "badge-success" : "badge-danger"}`}>
-                          {esCobro ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                          {esCobro ? "Cobro" : "Gasto"}
+                        <span className={`badge gap-1 ${badge}`}>
+                          <Icon size={11} />
+                          {m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : ""}
                         </span>
                       </td>
                       <td className="font-medium">{m.concepto}</td>
-                      <td><span className="badge badge-warning">{m.moneda}</span></td>
-                      <td className={`text-right font-semibold ${esCobro ? "text-verde-claro" : "text-red-600"}`}>
+                      <td><span className="badge badge-warning">{monedaLabel}</span></td>
+                      <td className={`text-right font-semibold ${color}`}>
                         {esCobro ? "+" : "−"}
-                        {m.moneda === "USD" ? `$${m.monto.toFixed(2)}` : formatCOP(m.monto)}
+                        {m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
                       </td>
-                      <td className={`text-right ${esCobro ? "text-verde-claro" : "text-red-600"}`}>
+                      <td className={`text-right ${color}`}>
                         {esCobro ? "+" : "−"}{formatCOP(m.montoCop)}
                       </td>
                     </tr>
@@ -260,13 +307,18 @@ export default function FondosPage() {
         </div>
       </div>
 
-      {ajustando && (
-        <ModalAjuste
-          fondo={ajustando}
-          onClose={() => setAjustando(null)}
-          onAjustar={(moneda, nuevoSaldo, motivo) =>
-            ajustarMut.mutateAsync({ moneda, nuevoSaldo, motivo })
-          }
+      {modalEntradaOpen && (
+        <ModalEntrada
+          onClose={() => setModalEntradaOpen(false)}
+          onGuardar={(data) => entradaMut.mutateAsync(data)}
+        />
+      )}
+
+      {modalTransferenciaOpen && (
+        <ModalTransferencia
+          fondos={fondos}
+          onClose={() => setModalTransferenciaOpen(false)}
+          onGuardar={(data) => transferenciaMut.mutateAsync(data)}
         />
       )}
     </div>
