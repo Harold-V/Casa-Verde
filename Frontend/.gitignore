@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Electron build
+dist-electron/
+
+# Recursos bundleados (generados en build, no van al repo)
+resources/backend.jar
+resources/jre/
