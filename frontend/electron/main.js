@@ -1,4 +1,6 @@
 import { app, BrowserWindow, dialog } from "electron";
+import electronUpdater from "electron-updater";
+const { autoUpdater } = electronUpdater;
 import path from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
@@ -129,6 +131,39 @@ async function waitForBackend(retries = 60, delayMs = 500) {
   return false;
 }
 
+function setupAutoUpdater() {
+  const updateConfigPath = path.join(resourcesPath, "update-config.json");
+  if (fs.existsSync(updateConfigPath)) {
+    try {
+      const { ghTokenRead } = JSON.parse(fs.readFileSync(updateConfigPath, "utf-8"));
+      if (ghTokenRead && ghTokenRead !== "REEMPLAZAR_CON_TOKEN_REAL") {
+        process.env.GH_TOKEN = ghTokenRead;
+      }
+    } catch (err) {
+      console.error("[updater] error leyendo update-config.json:", err.message);
+    }
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("error", (err) => {
+    console.error("[updater] error:", err.message);
+  });
+  autoUpdater.on("update-available", (info) => {
+    console.log("[updater] nueva versión disponible:", info.version);
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log("[updater] versión descargada:", info.version, "— se instalará al cerrar");
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error("[updater] checkForUpdates falló:", err.message);
+    });
+  }, 3000);
+}
+
 app.whenReady().then(async () => {
   ensureDataDirs();
 
@@ -155,6 +190,7 @@ app.whenReady().then(async () => {
   }
 
   createMainWindow();
+  setupAutoUpdater();
 });
 
 app.on("will-quit", (e) => {
