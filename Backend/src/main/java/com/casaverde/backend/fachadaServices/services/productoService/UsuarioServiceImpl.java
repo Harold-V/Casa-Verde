@@ -92,8 +92,7 @@ public class UsuarioServiceImpl implements IUsuarioService {
                 .activo(true)
                 .build();
 
-        usuarioRepo.save(admin);
-        usuarioRepo.save(operador);
+        usuarioRepo.saveAll(List.of(admin, operador));
         auditoriaService.registrar("usuario", null, "INICIALIZAR",
                 "Usuarios locales iniciales creados: Administrador y Operador");
     }
@@ -120,10 +119,7 @@ public class UsuarioServiceImpl implements IUsuarioService {
         Usuario u = usuarioRepo.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
         if (Boolean.TRUE.equals(u.getActivo()) && RolUsuario.ADMIN.name().equals(u.getRol())) {
-            long adminsActivos = usuarioRepo.findAllByOrderByNombreAsc().stream()
-                    .filter(x -> RolUsuario.ADMIN.name().equals(x.getRol())
-                              && Boolean.TRUE.equals(x.getActivo()))
-                    .count();
+            long adminsActivos = usuarioRepo.countByRolAndActivoTrue(RolUsuario.ADMIN.name());
             if (adminsActivos <= 1) {
                 throw new ValidacionException("No se puede desactivar el único administrador activo");
             }
