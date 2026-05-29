@@ -504,14 +504,6 @@ public class PedidoServiceImpl implements IPedidoService {
         }
     }
 
-    private void revertirInventario(Pedido pedido) {
-        Map<String, BigDecimal> consumos = calcularConsumosInventario(pedido);
-        for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
-            registrarMovimientoInventario(consumo.getKey(), TipoMovimientoInventario.ENTRADA, consumo.getValue(),
-                    pedido.getId());
-        }
-    }
-
     private Map<String, BigDecimal> calcularConsumosInventario(Pedido pedido) {
         Map<String, BigDecimal> consumos = new LinkedHashMap<>();
         for (PedidoDetalle detalle : pedido.getDetalles()) {
@@ -521,7 +513,7 @@ public class PedidoServiceImpl implements IPedidoService {
                 Object insumoRaw = item.get("insumo");
                 Object cantidadRaw = item.get("cantidad");
                 if (!(insumoRaw instanceof String insumo) || insumo.isBlank()
-                        || !(cantidadRaw instanceof Number cantidad)) {
+                        || !(cantidadRaw instanceof Number)) {
                     throw new ValidacionException(
                             "Composicion de inventario invalida en el item: " + detalle.getNombreSnapshot());
                 }
@@ -585,11 +577,6 @@ public class PedidoServiceImpl implements IPedidoService {
                 .stockResultante(nuevo).referenciaTipo("pedido")
                 .referenciaId(pedidoId).observacion(obs)
                 .build());
-    }
-
-    private BigDecimal calcularMontoCop(String moneda, BigDecimal monto) {
-        BigDecimal tasa = "USD".equals(moneda) ? getTasaVigente() : null;
-        return monetaryService.convertirACop(moneda, monto, tasa);
     }
 
     /**
