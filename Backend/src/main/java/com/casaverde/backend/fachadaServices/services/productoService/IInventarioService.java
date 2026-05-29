@@ -2,6 +2,7 @@ package com.casaverde.backend.fachadaServices.services.productoService;
 
 import java.util.List;
 
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.fachadaServices.dto.InventarioDTO;
 import com.casaverde.backend.fachadaServices.dto.MovimientoInventarioDTO;
 import com.casaverde.backend.fachadaServices.dto.MovimientoRequest;
@@ -17,4 +18,6 @@ public interface IInventarioService {
     List<MovimientoInventarioDTO> listarMovimientosPorInsumo(String insumo);
 
     MovimientoInventarioDTO registrarMovimiento(MovimientoRequest req);
+
+    void descontarPorPedido(Pedido pedido);
 }

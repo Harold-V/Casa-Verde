@@ -1,8 +1,18 @@
 package com.casaverde.backend.fachadaServices.services.productoService;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
+import com.casaverde.backend.capaAccesoADatos.models.enums.TipoMovimientoInventario;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +38,7 @@ public class InventarioServiceImpl implements IInventarioService {
     private final MovimientoInventarioRepository movimientoRepo;
     private final IAuditoriaService auditoriaService;
     private final InventarioMapper inventarioMapper;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<InventarioDTO> listarStock() {
@@ -114,5 +125,86 @@ public class InventarioServiceImpl implements IInventarioService {
     private Inventario findInsumoOrThrow(String insumo) {
         return inventarioRepo.findByInsumo(insumo)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Insumo no encontrado: " + insumo));
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void descontarPorPedido(Pedido pedido) {
+        Map<String, BigDecimal> consumos = calcularConsumos(pedido);
+        validarStock(consumos);
+        for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
+            registrarSalida(consumo.getKey(), consumo.getValue(), pedido.getId());
+        }
+    }
+
+    private Map<String, BigDecimal> calcularConsumos(Pedido pedido) {
+        Map<String, BigDecimal> consumos = new LinkedHashMap<>();
+        for (PedidoDetalle detalle : pedido.getDetalles()) {
+            if (detalle.getComposicionSnapshot() == null || detalle.getComposicionSnapshot().isBlank())
+                continue;
+            for (Map<String, Object> item : leerSnapshot(detalle)) {
+                Object insumoRaw = item.get("insumo");
+                Object cantidadRaw = item.get("cantidad");
+                if (!(insumoRaw instanceof String insumo) || insumo.isBlank()
+                        || !(cantidadRaw instanceof Number)) {
+                    throw new ValidacionException(
+                            "Composicion de inventario invalida en el item: " + detalle.getNombreSnapshot());
+                }
+                BigDecimal cantPorUnidad = new BigDecimal(cantidadRaw.toString()).setScale(4, RoundingMode.HALF_UP);
+                if (cantPorUnidad.compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new ValidacionException("Cantidad de inventario invalida para " + insumo
+                            + " en el item: " + detalle.getNombreSnapshot());
+                }
+                consumos.merge(insumo.trim(),
+                        cantPorUnidad.multiply(BigDecimal.valueOf(detalle.getCantidad())),
+                        BigDecimal::add);
+            }
+        }
+        return consumos;
+    }
+
+    private List<Map<String, Object>> leerSnapshot(PedidoDetalle detalle) {
+        try {
+            return objectMapper.readValue(detalle.getComposicionSnapshot(), new TypeReference<>() {});
+        } catch (Exception e) {
+            throw new ValidacionException(
+                    "No se pudo leer la composicion de inventario del item: " + detalle.getNombreSnapshot());
+        }
+    }
+
+    private void validarStock(Map<String, BigDecimal> consumos) {
+        for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
+            Inventario inv = inventarioRepo.findByInsumo(consumo.getKey())
+                    .orElseThrow(() -> new ValidacionException(
+                            "No existe inventario configurado para el insumo: " + consumo.getKey()));
+            if (inv.getStockActual().compareTo(consumo.getValue()) < 0) {
+                throw new ValidacionException("Stock insuficiente de " + consumo.getKey()
+                        + ". Disponible: " + inv.getStockActual()
+                        + ", requerido: " + consumo.getValue());
+            }
+        }
+    }
+
+    private void registrarSalida(String insumo, BigDecimal cantidad, Long pedidoId) {
+        Inventario inv = inventarioRepo.findByInsumo(insumo)
+                .orElseThrow(() -> new ValidacionException(
+                        "No existe inventario configurado para el insumo: " + insumo));
+        if (inv.getStockActual().compareTo(cantidad) < 0) {
+            throw new ValidacionException("Stock insuficiente de " + insumo
+                    + ". Disponible: " + inv.getStockActual()
+                    + ", requerido: " + cantidad);
+        }
+        BigDecimal nuevo = inv.getStockActual().subtract(cantidad);
+        inv.setStockActual(nuevo);
+        inventarioRepo.save(inv);
+        movimientoRepo.save(MovimientoInventario.builder()
+                .insumo(insumo)
+                .tipo(TipoMovimientoInventario.SALIDA.valor())
+                .cantidad(cantidad)
+                .stockResultante(nuevo)
+                .referenciaTipo("pedido")
+                .referenciaId(pedidoId)
+                .observacion("Finalización pedido #" + pedidoId)
+                .build());
     }
 }
