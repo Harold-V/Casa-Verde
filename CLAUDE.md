@@ -15,478 +15,486 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 
 ---
 
-## Objetivo del sistema
+## Stack
 
-Construir una aplicación administrativa tipo panel de operación para gestionar:
+### Backend
+| Capa | Tecnología |
+|---|---|
+| Lenguaje / runtime | Java 17 + Spring Boot 3.4 |
+| ORM / Persistencia | Spring Data JPA + Hibernate + SQLiteDialect custom |
+| Base de datos | SQLite (local) |
+| Mapeo DTO | MapStruct 1.6.3 |
+| Boilerplate | Lombok (`@RequiredArgsConstructor`, `@Builder`, `@Data`, etc.) |
+| Puerto local | `5020` |
 
-- pedidos,
-- abonos y cobros,
-- pedidos pendientes,
-- resumen del día,
-- inventario,
-- gastos,
-- capital neto acumulado,
-- fondos en COP, USD y Nequi,
-- configuración general,
-- catálogo de productos,
-- catálogo de salones,
-- tasa del dólar.
+### Frontend
+| Capa | Tecnología |
+|---|---|
+| UI | React 19 + Vite 7 |
+| Estilos | Tailwind CSS v4 (clases utilitarias + `@layer components` propias) |
+| Routing | React Router v7 (`createBrowserRouter`) |
+| Estado global | Zustand v5 (`useSessionStore`) |
+| Fetching / caché | TanStack React Query v5 |
+| HTTP | Axios — base URL `/api/v1` (relativa; nginx la proxea al backend) |
+| Formularios | react-hook-form + zod |
+| Iconos | lucide-react |
+| Fechas | date-fns |
+| Tests | Vitest + Testing Library (jsdom) |
+| Desktop (futuro) | Electron 37 — carpeta `electron/` existe pero no integrada aún |
+| Puerto local | nginx `:80` → proxy `/api/*` → `backend:5020` |
 
-El sistema corre localmente, usando SQLite, Electron, React y Spring Boot.
-
----
-
-## Stack obligatorio
-
-No proponer variantes salvo que se justifique explícitamente para una mejora futura.
-
-- Base de datos: SQLite.
-- Frontend desktop: React + Tailwind+ Electron.
-- Backend: Java + Spring Boot.
-- Arquitectura preparada para evolución futura a multiusuario o cliente-servidor.
+### Despliegue (Docker Compose)
+- `casaverde-backend` → `:5020` (Spring Boot JAR)
+- `casaverde-frontend` → `:80` (nginx sirve React SPA + proxy `/api/*` al backend)
+- El frontend usa URLs relativas `/api/v1/...`; nginx hace el proxy. No hay CORS en producción.
+- En desarrollo (`npm run dev`): Vite corre en `:5173`, las llamadas a `/api/v1` van directo a `:5020` (CORS habilitado para ese origen).
 
 ### Decisiones base
 
-- Electron embebe el frontend React y arranca el backend local.
-- Spring Boot expone API REST local en `localhost`.
-- SQLite es la persistencia principal del entorno local.
-- La lógica de negocio vive en backend, no en Electron ni solo en el frontend.
-- El frontend debe ser delgado, orientado a operación y validación visual.
+- La lógica de negocio vive en backend; el frontend es delgado y consume la API.
+- Los repositories NO llevan `@Repository` — Spring Data los registra automáticamente por extender `JpaRepository`.
+- Los servicios se inyectan siempre por su **interfaz** (`IXxxService`), nunca por la clase impl.
+- No se usa `@Autowired` — inyección por constructor vía `@RequiredArgsConstructor`.
+- `BigDecimal` para todo cálculo monetario. Nunca `double` ni `float`.
+- Zona horaria operativa: `America/Bogota` (hardcoded en `@PrePersist`/`@PreUpdate`).
 
 ---
 
-## Principios de diseño
+## Estructura real del proyecto
 
-Cuando generes código, diseño o decisiones técnicas, sigue estas reglas:
+```
+Casa-Verde/
+├── Backend/          ← Spring Boot 3.4 / Java 17
+├── Frontend/         ← React 19 + Vite + Tailwind v4
+│   └── electron/     ← Electron 37 (no integrado aún)
+├── docker-compose.yml
+└── CLAUDE.md
+```
 
-1. Priorizar velocidad operativa.
-2. Minimizar cantidad de clics.
-3. Garantizar trazabilidad de dinero, inventario y cambios críticos.
-4. Mantener separación clara entre UI, lógica de negocio y persistencia.
-5. Diseñar para migración futura a PostgreSQL y backend remoto.
-6. No acoplar decisiones de negocio a SQLite de forma irreversible.
-7. Toda operación crítica debe ser transaccional.
-8. Toda regla crítica debe validarse en backend aunque ya exista validación en frontend.
-9. No usar lógica oculta en frontend para cálculos financieros finales.
-10. Cada módulo debe tener vista de listado y vista de detalle.
-
----
-
-## UX/UI obligatoria
-
-La aplicación es un admin panel de escritorio, no una landing page.
-
-### Layout general
-
-- Sidebar como navegación principal.
-- Topbar para acciones secundarias y contexto.
-- En escritorio, el sidebar debe permanecer visible.
-- En pantallas pequeñas, el sidebar puede colapsarse.
-- La estructura visual estándar debe ser:
-  - KPIs arriba,
-  - filtros en zona media,
-  - detalle o listado abajo.
-
-### Criterios de usabilidad
-
-- Formularios rápidos.
-- Acciones frecuentes visibles sin navegar demasiado.
-- Validación clara cerca del campo.
-- Estados con color y texto.
-- Búsqueda rápida de productos.
-- Modales solo cuando aceleren la operación.
-- Confirmaciones únicamente en acciones destructivas o irreversibles.
-
-### Pantallas mínimas
-
-- Dashboard.
-- Pedidos.
-- Pedidos pendientes.
-- Resumen del día.
-- Inventario.
-- Gastos.
-- Capital y fondos.
-- Configuración.
-- Catálogo de productos.
-- Catálogo de salones.
+### Backend (`Backend/src/main/java/com/casaverde/backend/`)
+├── casaVerdeApplication.java                          ← @SpringBootApplication raíz
+├── capaAccesoADatos/
+│   ├── models/
+│   │   ├── entitys/   ← 18 @Entity JPA
+│   │   └── enums/     ← 4 enums de dominio
+│   └── repositories/  ← 17 interfaces JpaRepository (sin @Repository)
+├── capaControladores/ ← 15 @RestController
+├── config/
+│   ├── DataSourceConfig.java      ← DataSource SQLite
+│   ├── CorsConfig.java            ← CORS (localhost:5173, :80, null/Electron)
+│   ├── DataInitializer.java       ← CommandLineRunner — carga datos iniciales
+│   ├── controllerAdvice/
+│   │   ├── GlobalExceptionHandler.java
+│   │   ├── ValidacionException.java
+│   │   └── RecursoNoEncontradoException.java
+│   └── dialect/
+│       └── SQLiteDialect.java
+└── fachadaServices/
+    ├── dto/      ← 33 DTOs y Requests
+    ├── mapper/   ← 12 @Mapper MapStruct
+    └── services/
+        ├── configuracionService/   ← IConfiguracionGeneralService, ITasaCambioService
+        ├── pagoService/            ← IFondoService, ICajaMovimientoService
+        ├── pedidoService/          ← IPedidoService, ICierreCajaService, IResumenService
+        └── productoService/        ← IProductoService, ICategoriaProductoService,
+                                       IInventarioService, ISalonService, IGastoService,
+                                       IUsuarioService, IMonetaryService,
+                                       IBackupService, IExportacionService, IAuditoriaService
+```
 
 ---
 
-## Arquitectura esperada
+## API REST — Endpoints implementados
 
-### Backend
+### Pedidos — `/api/v1/pedidos`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista pedidos activos. `?todos=true` devuelve todos |
+| GET | `/{id}` | Detalle de un pedido |
+| GET | `/{id}/comprobante` | Comprobante texto plano (`text/plain`) |
+| POST | `/` | Crear pedido (con detalles y abono inicial opcional) |
+| PATCH | `/{id}` | Actualizar datos del pedido (nombre, salón, mesa, etc.) |
+| POST | `/{id}/detalles` | Agregar ítem al pedido |
+| PATCH | `/{id}/detalles/{detalleId}` | Actualizar cantidad de un ítem |
+| DELETE | `/{id}/detalles/{detalleId}` | Quitar ítem del pedido |
+| POST | `/{id}/pagos` | Registrar pago (COP / USD / NEQUI) |
+| PATCH | `/{id}/pagos/{pagoId}` | Editar un pago |
+| DELETE | `/{id}/pagos/{pagoId}` | Quitar un pago |
+| PUT | `/{id}/finalizar` | Finalizar pedido (requiere saldo = 0) |
+| PUT | `/{id}/anular` | Anular pedido |
 
-Organizar en capas exactas o equivalentes:
+### Productos — `/api/v1/productos`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista productos. `?soloActivos=true` filtra inactivos |
+| GET | `/{id}` | Detalle de un producto |
+| GET | `/{id}/precios` | Historial de cambios de precio |
+| POST | `/` | Crear producto con composición de inventario |
+| PUT | `/{id}` | Actualizar producto |
+| PUT | `/{id}/precio` | Actualizar precio (registra historial automático) |
+| PUT | `/{id}/toggle` | Activar / desactivar |
 
-- `controller`
-- `service`
-- `repository`
-- `domain/model`
-- `dto`
-- `mapper`
-- `exceptions`
+### Categorías — `/api/v1/categorias`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista categorías. `?soloActivas=true` |
+| GET | `/{id}` | Detalle |
+| POST | `/` | Crear |
+| PUT | `/{id}` | Actualizar |
+| PUT | `/{id}/toggle` | Activar / desactivar |
 
-### Reglas backend
+### Inventario — `/api/v1/inventario`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Stock actual de todos los insumos |
+| GET | `/{insumo}` | Stock de un insumo específico |
+| GET | `/movimientos` | Historial de movimientos. `?insumo=gallina` filtra |
+| POST | `/movimiento` | Registrar entrada o ajuste manual |
 
-- Los controladores no contienen lógica de negocio compleja.
-- Los services contienen orquestación, validaciones de negocio y transacciones.
-- Los repositories solo resuelven acceso a datos.
-- Los DTO separan contrato externo del modelo persistido.
-- Los mappers convierten entre entidad y DTO.
-- Las excepciones de negocio deben ser explícitas y centralizadas.
-- Debe existir manejo global de errores.
+### Gastos — `/api/v1/gastos`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista gastos. `?fecha=2025-01-15` filtra por día |
+| POST | `/` | Registrar gasto (descuenta fondo, puede sumar inventario) |
+| DELETE | `/{id}` | Eliminar gasto |
 
-### Frontend
+### Fondos — `/api/v1/fondos`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Saldo de los tres fondos (COP, USD, NEQUI) |
+| GET | `/historial` | Historial libro de caja. Filtros: `fecha`, `moneda`, `tipo` |
+| PUT | `/{moneda}` | Ajustar saldo de un fondo manualmente |
 
-Sugerencia organizativa:
+### Tasa de cambio — `/api/v1/tasa-cambio`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/vigente` | Tasa USD → COP vigente |
+| GET | `/historial` | Historial de tasas |
+| POST | `/` | Registrar nueva tasa (`{valorCop}`) |
 
-- `modules/` por dominio funcional.
-- `shared/` para componentes reutilizables.
-- `layouts/` para sidebar, topbar y contenedores.
-- `hooks/` para lógica UI.
-- `services/` o `api/` para consumo REST.
-- `types/` para contratos TypeScript.
+### Configuración — `/api/v1/configuracion`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Todos los parámetros clave-valor |
+| GET | `/{clave}` | Un parámetro |
+| POST | `/` | Crear parámetro |
+| PUT | `/{clave}` | Actualizar valor (`{valor}`) |
+| DELETE | `/{clave}` | Eliminar parámetro |
 
-### Escalabilidad futura
+### Salones — `/api/v1/salones`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista salones. `?soloActivos=true` |
+| GET | `/{id}` | Detalle |
+| POST | `/` | Crear |
+| PUT | `/{id}` | Actualizar |
+| PUT | `/{id}/toggle` | Activar / desactivar |
 
-Preparar el código para que luego sea posible:
+### Cierre de caja — `/api/v1/cierres-caja`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Historial de cierres |
+| GET | `/{fecha}` | Cierre de una fecha (yyyy-MM-dd) |
+| POST | `/` | Cerrar caja del día (requiere 0 pedidos abiertos, crea backup) |
 
-- reemplazar SQLite por PostgreSQL,
-- mover Spring Boot fuera del equipo local,
-- habilitar autenticación por usuario,
-- soportar múltiples estaciones operando sobre la misma base.
+### Resumen del día — `/api/v1/resumen`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Resumen completo. `?fecha=2025-01-15` (default: hoy) |
+
+### Usuarios y sesión
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/v1/usuarios` | Lista usuarios activos |
+| POST | `/api/v1/sesion/login` | Login (`{usuarioId, password}`) |
+
+### Auditoría — `/api/v1/auditoria`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Historial. Filtros opcionales: `entidad`, `entidadId` |
+
+### Backups — `/api/v1/backups`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista backups disponibles |
+| POST | `/` | Crear backup manual. `?motivo=manual` |
+
+### Exportaciones — `/api/v1/exportaciones`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/resumen` | CSV resumen del día. `?fecha=` |
+| GET | `/caja` | CSV libro de caja del día. `?fecha=` |
 
 ---
 
-## Modelo mental del dominio
+## Entidades implementadas
 
-Claude Code debe razonar con estos núcleos funcionales:
+### Pedido
+- Campos principales: `id`, `nombre`, `estado`, `mesa`, `salonId`, `fechaReserva`, `horaReserva`, `cantPersonas`, `paraLlevar`, `observacion`
+- Totales calculados al vuelo por mapper: `totalCop`, `totalAbonado`, `saldoPendiente`, `valorCambio`
+- Relaciones: `@OneToMany detalles` (cascade ALL), `@OneToMany pagos` (cascade ALL)
+- `@Version` para bloqueo optimista
+- Estado: `PENDIENTE` → `ABONADO_PARCIAL` → `PAGADO` → `FINALIZADO` / `ANULADO`
 
-### 1. Pedido
+### PedidoDetalle
+- `nombreSnapshot`: copia del nombre del producto al momento de agregar
+- `composicionSnapshot`: JSON de la composición inventariable (snapshot, no FK a Producto)
+- `precioUnitarioCop`, `cantidad`
 
-Un pedido pertenece a un cliente, tiene ítems, abonos, saldo pendiente, estado y eventualmente cierre.
+### Pago
+- `moneda` (COP | USD | NEQUI), `monto`, `montoCop`, `tasaUsada`
+- Los pagos **no** afectan el fondo hasta que el pedido se **finaliza**
 
-### 2. Pago
+### Producto
+- `afectaInventario` (boolean): si true, al finalizar el pedido se descuenta inventario
+- `composicion`: lista de `ProductoComposicionInventario` (insumo + cantidad)
+- `@Version` para bloqueo optimista
 
-Un pedido puede tener múltiples pagos y pagos mixtos. Cada movimiento debe registrar moneda, método, tasa aplicada, equivalente en moneda base y trazabilidad temporal.
+### ProductoPrecioHistorial
+- Se crea automáticamente en `actualizarPrecio()`: guarda precio anterior, precio nuevo y motivo
 
-### 3. Inventario
+### Fondo
+- PK = `moneda` (string: "COP", "USD", "NEQUI")
+- `@Version` para bloqueo optimista concurrente
+- El fondo se acredita **al finalizar un pedido**, no al registrar el pago
 
-Inicialmente controla gallinas y cuyes, pero debe ser extensible a más insumos o productos inventariables.
+### CajaMovimiento
+- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO
+- `referenciaTipo` + `referenciaId`: trazabilidad al origen del movimiento
+- Cada movimiento guarda `saldoResultante` en el momento del registro
 
-### 4. Caja/Fondos
-
-No mezclar COP, USD y Nequi como si fueran el mismo fondo. Deben convivir en consolidado, pero mantenerse separados operativamente.
-
-### 5. Gasto
-
-Todo gasto impacta fondos. Algunos gastos además impactan inventario.
-
-### 6. Configuración
-
-La configuración no es decorativa; debe dejar el sistema listo para operar desde el primer día.
-
----
-
-## Reglas funcionales que no se deben violar
-
-### Pedidos
-
-- `nombreCliente` es obligatorio.
-- Si no se informa fecha u hora, usar fecha y hora actual del sistema.
-- El pedido puede tener múltiples productos.
-- Se puede agregar producto desde catálogo.
-- Se puede agregar producto manual no catalogado.
-- Cada ítem del pedido debe guardar:
-  - nombre,
-  - cantidad,
-  - precio unitario,
-  - subtotal,
-  - observación opcional.
-- El backend debe calcular automáticamente:
-  - total,
-  - abonos acumulados,
-  - saldo pendiente,
-  - estado.
-
-### Estados del pedido
-
-Estados válidos sugeridos:
-
-- `PENDIENTE`
-- `ABONADO_PARCIAL`
-- `PAGADO`
-- `FINALIZADO`
-- `ANULADO`
-
-Regla:
-
-- un pedido solo puede pasar a `FINALIZADO` cuando está completamente pagado.
-
-### Pagos, abonos y cobros
-
-- Soportar COP, USD y Nequi.
-- Soportar pago mixto entre esos tres fondos.
-- Calcular automáticamente:
-  - total recibido,
-  - total abonado acumulado,
-  - saldo pendiente,
-  - valor de cambio.
-- Si hay USD, usar la tasa del dólar configurada.
-- Registrar trazabilidad de cada movimiento con:
-  - fecha,
-  - hora,
-  - tipo de movimiento,
-  - método,
-  - moneda,
-  - monto original,
-  - tasa aplicada si corresponde,
-  - equivalente en moneda base.
-
-### Pedidos pendientes
-
-La pantalla de pendientes debe mostrar pedidos no finalizados o con saldo pendiente.
-Debe permitir:
-
-- ver factura,
-- editar pedido,
-- editar ítems,
-- ver pagos previos,
-- registrar nuevos cobros,
-- finalizar cuando saldo sea cero.
-
-### Resumen del día
-
-Debe permitir filtro por fecha y mostrar:
-
-- pedidos finalizados del día,
-- cliente,
-- total,
-- hora de cierre.
-
-KPIs mínimos:
-
-- total vendido,
-- número de pedidos finalizados,
-- cantidad de gallinas vendidas,
-- cantidad de cuyes vendidos,
-- ingresos por COP,
-- ingresos por USD,
-- ingresos por Nequi,
-- gastos del día,
-- balance del día.
+### Gasto
+- `categoria`: insumos | servicios | equipos | otros
+- `insumoInventario` + `cantidadInventario`: si se completan, el gasto suma stock al inventario
+- Descuenta el fondo correspondiente en la misma transacción
 
 ### Inventario
+- Un registro por insumo (`"gallina"`, `"cuy"`)
+- `@Version` para bloqueo optimista
+- Insumos iniciales: gallina (0), cuy (0)
 
-Inicialmente controlar:
+### MovimientoInventario
+- `tipo`: entrada | salida | ajuste
+- `referenciaTipo`: pedido | gasto | ajuste_manual
 
-- gallinas,
-- cuyes.
+### TasaCambio
+- Historial completo; la vigente es la de mayor `vigenteDesde`
+- Valor inicial: 1 USD = 4200 COP
 
-Debe soportar:
+### CierreCaja
+- Único por fecha (`UNIQUE(fecha)`)
+- Guarda esperado vs contado en los tres fondos y genera backup automático
+- Bloqueado si hay pedidos en estado activo (PENDIENTE, ABONADO_PARCIAL, PAGADO)
 
-- entradas,
-- salidas,
-- ajustes manuales,
-- consulta de stock,
-- historial auditado.
+### Usuario
+- `rol`: ADMIN | OPERADOR
+- `requierePassword`: solo ADMIN requiere clave por defecto
+- Usuarios iniciales: un ADMIN (password: `admin123`, hasheado SHA-256) y un OPERADOR
 
-Regla crítica:
+### ConfiguracionGeneral
+- Parámetros clave-valor. Claves iniciales:
+  - `nombre_negocio`, `moneda_base`, `capital_inicial_cop`
+  - `mostrar_tasa_dolar`, `zona_horaria`, `backup_dir`
 
-- al finalizar un pedido, descontar inventario automáticamente según la composición de sus productos.
-
-### Gastos
-
-Registrar:
-
-- compra de cuyes,
-- compra de gallinas,
-- gastos operativos,
-- gastos varios.
-
-Cada gasto debe guardar:
-
-- fecha,
-- hora,
-- tipo,
-- descripción,
-- valor,
-- fondo usado,
-- observaciones.
-
-Si el gasto compra gallinas o cuyes:
-
-- puede impactar inventario,
-- debe afectar fondos,
-- debe afectar capital neto acumulado.
-
-### Capital y fondos
-
-Gestionar por separado:
-
-- disponible en COP,
-- disponible en USD,
-- disponible en Nequi,
-- capital neto acumulado total.
-
-El consolidado total puede calcularse usando la tasa del dólar configurada.
-Nequi siempre debe verse separado.
-
-### Configuración
-
-Debe permitir administrar:
-
-- tasa del dólar,
-- parámetros generales,
-- productos,
-- precios,
-- salones,
-- capital inicial si aplica.
-
-La tasa del dólar debe guardar fecha de actualización y preferiblemente historial.
+### HistorialAuditoria
+- Registra acción, entidad, id de entidad y detalle
+- Usuario por defecto: `"sistema-local"`
 
 ---
 
-## Entidades mínimas esperadas
+## Catálogo inicial (DataInitializer)
 
-Cuando modeles dominio, incluye como mínimo estas entidades o equivalentes:
+### Categorías (en orden de aparición en UI)
+Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 
-- Usuario
-- Rol
-- Pedido
-- DetallePedido
-- Producto
-- CategoriaProducto
-- ProductoComposicionInventario
-- Pago
-- MetodoPago
-- Moneda
-- TasaCambio
-- Inventario
-- MovimientoInventario
-- Gasto
-- TipoGasto
-- CajaMovimiento
-- Salon
-- ConfiguracionGeneral
-- HistorialAuditoria
+### Productos y composición de inventario
+| Producto | afectaInventario | Composición |
+|---|---|---|
+| Cuy | ✅ | 1 gallina + 1 cuy *(ver nota)* |
+| 1/2 Cuy | ✅ | 0.5 cuy |
+| 1/4 Cuy | ✅ | 0.25 cuy |
+| Gallina | ✅ | 1 gallina |
+| 1/2 Gallina | ✅ | 0.5 gallina |
+| 1/8 Gallina | ✅ | 0.125 gallina |
+| Almuerzo 1/8 gallina y 1/2 cuy | ✅ | 0.125 gallina + 0.5 cuy |
+| Almuerzo 1/8 gallina y 1/4 cuy | ✅ | 0.125 gallina + 0.25 cuy |
+| Consomé | ❌ | — |
+| Consomé desmechado | ❌ | — |
+| Porción Arroz | ❌ | — |
+| Porción Papa | ❌ | — |
+| Gaseosa | ❌ | — |
+| Jugo Hit | ❌ | — |
+| Agua | ❌ | — |
+| Cerveza | ❌ | — |
+| Pokeron | ❌ | — |
 
-No eliminar estas entidades por simplificación apresurada. Si se consolidan, justificarlo claramente.
-
----
-
-## Catálogo inicial obligatorio
-
-El sistema debe venir preparado con este catálogo base:
-
-- Cuy
-- 1/2 Cuy
-- 1/4 Cuy
-- Gallina
-- 1/2 Gallina
-- 1/8 Gallina
-- Almuerzo 1/8 gallina y 1/2 cuy
-- Almuerzo de 1/8 gallina y 1/4 cuy
-- Consomé
-- Consomé desmechado
-- Porción Arroz
-- Porción Papa
-- Gaseosa
-- Jugo Hit
-- Agua
-- Cerveza
-- Pokeron
-
-Cada producto debe permitir:
-
-- precio configurable,
-- edición,
-- activación/inactivación,
-- composición de inventario configurable.
+### Salones iniciales
+- Salón principal (aforo 30)
+- Terraza (aforo 20)
+- Para llevar (sin aforo)
 
 ---
 
-## Composición de inventario por producto
+## Reglas de negocio implementadas
 
-El sistema debe permitir definir el impacto inventariable por producto.
+### Flujo de pedido (NO cambiar este comportamiento)
+1. `crear()` — crea pedido con detalles; acepta abono inicial opcional
+2. `agregarDetalle()` / `quitarDetalle()` / `actualizarDetalle()` — edita ítems mientras no esté finalizado/anulado
+3. `registrarPago()` — registra pago; **NO toca el fondo todavía**; recalcula estado
+4. `finalizarPedido()` — solo si estado = PAGADO:
+   - descuenta inventario según `composicionSnapshot` de cada detalle
+   - acredita los fondos por moneda (`COBRO_PEDIDO` en CajaMovimiento, ref = pedidoId)
+   - registra auditoría
+5. `anularPedido()` — solo pedidos no FINALIZADOS; como el fondo nunca fue acreditado, no hay reversión
 
-Ejemplos obligatorios:
+### Flujo de gasto
+1. Descuenta el fondo indicado (valida saldo suficiente)
+2. Si `insumoInventario` no es null: suma stock (ENTRADA en MovimientoInventario)
+3. Registra `GASTO` en CajaMovimiento
+4. Registra auditoría
 
-- Cuy -> 1 cuy
-- 1/2 Cuy -> 0.5 cuy
-- 1/4 Cuy -> 0.25 cuy
-- Gallina -> 1 gallina
-- 1/2 Gallina -> 0.5 gallina
-- 1/8 Gallina -> 0.125 gallina
-- Almuerzo 1/8 gallina y 1/2 cuy -> 0.125 gallina + 0.5 cuy
-- Almuerzo de 1/8 gallina y 1/4 cuy -> 0.125 gallina + 0.25 cuy
-- Bebidas o complementos inicialmente no afectan inventario animal
+### Moneda
+- Monedas válidas: `COP`, `USD`, `NEQUI` (validadas por `MonetaryService`)
+- COP y NEQUI: sin centavos (escala 0). USD: máximo 2 decimales
+- Conversión USD→COP usa la tasa vigente en `TasaCambio`
+- El cambio (vueltas) al cliente nunca se registra en el fondo
 
-Nunca hardcodear estas reglas solo en frontend. Deben quedar persistidas y administrables.
+### Inventario
+- Al finalizar pedido: por cada detalle con `composicionSnapshot` no vacío, descuenta proporcional a cantidad
+- Valida stock suficiente antes de finalizar (lanza `ValidacionException` si hay déficit)
+- Movimientos manuales solo permiten tipo `entrada` o `ajuste` (no `salida` directa vía API)
 
----
-
-## Requisitos no funcionales
-
-- Arquitectura limpia y desacoplada.
-- Persistencia local con SQLite.
-- Buen manejo de validaciones y errores.
-- Auditoría básica de cambios críticos.
-- Diseño responsive dentro de Electron.
-- Código mantenible y escalable.
-- Preparado para exportación futura a PDF o Excel.
-
-### Calidad técnica mínima
-
-- Sin lógica duplicada entre frontend y backend.
-- Sin cálculos monetarios ambiguos.
-- Sin uso indiscriminado de tipos `double` para dinero en backend.
-- Sin queries N+1 evitables.
-- Sin strings mágicos repartidos por todo el código.
+### Cierre de caja
+- Bloquea si hay pedidos activos (PENDIENTE, ABONADO_PARCIAL, PAGADO)
+- Crea backup automático al cerrar
+- Solo uno por fecha (unique constraint)
 
 ---
 
-## Reglas de implementación para Claude Code
+## Frontend — Estado actual y convenciones
 
-### Al generar backend
+### Estructura de archivos (`Frontend/src/`)
 
-- Usar Java moderno y buenas prácticas de Spring Boot.
-- Separar request DTO y response DTO.
-- Usar servicios transaccionales para operaciones críticas.
-- Crear validaciones de negocio explícitas.
-- Centralizar enums para estados, monedas y tipos de movimiento.
-- Guardar timestamps de creación y actualización.
-- Hacer persistencia compatible con SQLite.
-- Diseñar repositorios y servicios pensando en futura migración a PostgreSQL.
+```
+src/
+├── App.jsx                         ← Router (createBrowserRouter) + QueryClientProvider
+├── main.jsx                        ← ReactDOM.createRoot
+├── index.css                       ← Tailwind v4 + @layer components (design system)
+├── components/
+│   ├── auth/LoginScreen.jsx        ← Pantalla de login local
+│   ├── layout/
+│   │   ├── AppLayout.jsx           ← Shell: guard de sesión → LoginScreen o layout
+│   │   ├── Sidebar.jsx             ← Nav lateral colapsable (Zustand)
+│   │   └── Topbar.jsx              ← Barra superior (fecha, tasa USD, usuario)
+│   ├── shared/                     ← KpiCard, ConfirmDialog, MoneyInput, ToggleChip
+│   ├── pedidos/                    ← OrdenCard, ProductoRow, ModalCrearPedido,
+│   │                                  ModalDetallePedido, ModalCobrar, ModalAgregarItems
+│   ├── configuracion/              ← ModalProducto, ModalSalon, ModalHistorialPrecios
+│   ├── fondos/                     ← ModalAjuste
+│   ├── gastos/                     ← ModalGasto
+│   ├── inventario/                 ← ModalMovimiento
+│   └── resumen/                    ← CierreCajaPanel
+├── pages/
+│   ├── dashboard/Dashboard.jsx     ← ✅ Implementado
+│   ├── pedidos/PedidosPage.jsx     ← ✅ Implementado (prioritario)
+│   ├── gastos/GastosPage.jsx       ← ✅ Implementado
+│   ├── fondos/FondosPage.jsx       ← ✅ Implementado
+│   ├── inventario/InventarioPage.jsx ← ✅ Implementado
+│   ├── resumen/ResumenPage.jsx     ← ✅ Implementado (incluye CierreCajaPanel)
+│   ├── configuracion/
+│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Salones, Tasa USD, General
+│   │   └── tabs/*.jsx              ← ✅ Los 4 tabs implementados
+│   └── Placeholder.jsx             ← Componente vacío para módulos pendientes
+├── services/                       ← Un archivo por dominio (pedidoService.js, etc.)
+├── store/useSessionStore.js        ← Zustand: { usuario, tasaUsd, sidebarColapsado }
+├── hooks/usePedidoMutations.js     ← Mutations TanStack Query para pedidos
+└── utils/
+    ├── format.js                   ← formatCOP, formatDecimal, formatFecha, formatHora
+    ├── constants.js                ← Constantes (estados, monedas, etc.)
+    └── pedidoHelpers.js            ← Helpers de cálculo para pedidos
+```
 
-### Al generar frontend
+### Módulos pendientes de implementar (no tienen página en el router)
+- **Auditoría** — endpoint `/api/v1/auditoria` existe, sin UI
+- **Backups** — endpoint `/api/v1/backups` existe, sin UI
+- **Exportaciones CSV** — endpoints `/api/v1/exportaciones/*` existen, sin UI
 
-- Crear vistas de listado y detalle por módulo.
-- Mantener un diseño consistente de admin panel.
-- Priorizar accesos rápidos a crear pedido, cobrar y registrar gasto.
-- Hacer formularios con validación clara.
-- Diseñar tablas prácticas, no decorativas.
-- Mostrar estados, saldos y alertas de forma visible.
-- Evitar componentes innecesariamente complejos.
+### Prioridad de trabajo actual
+**El módulo de Pedidos es el más crítico.** Trabajar primero cualquier mejora, corrección o feature relacionada con pedidos antes de otros módulos.
 
-### Al generar SQL
+### Auth y sesión
+- `AppLayout` verifica `useSessionStore.usuario`. Si es `null`, muestra `LoginScreen`.
+- `LoginScreen` llama a `GET /api/v1/usuarios` para listar usuarios activos, luego `POST /api/v1/sesion/login`.
+- La sesión vive **solo en memoria Zustand** (no se persiste en localStorage). Al recargar la página se pide login de nuevo.
+- Los endpoints del backend **no están protegidos** — no hay Spring Security ni JWT. El login es un control UI solamente.
+- El usuario ADMIN requiere password; el OPERADOR no.
 
-- Incluir llaves primarias.
-- Incluir llaves foráneas cuando apliquen.
-- Incluir índices relevantes.
-- Incluir restricciones `CHECK` cuando apliquen.
-- Pensar la integridad para SQLite, no para otro motor.
-- Mantener nombres consistentes y fáciles de mapear desde JPA o JDBC.
+### Design system (CSS — `index.css`)
+Clases utilitarias propias definidas en `@layer components`:
 
-### Al generar endpoints
+| Grupo | Clases disponibles |
+|---|---|
+| Layout | `.layout`, `.main`, `.page-content`, `.page-header`, `.page-title` |
+| Sidebar | `.sidebar`, `.sidebar.colapsado`, `.nav-item`, `.nav-item.activo` |
+| Topbar | `.topbar`, `.topbar-chip` |
+| Cards | `.card`, `.card-header`, `.card-title`, `.card-body` |
+| KPIs | `.kpi-grid`, `.kpi-card`, `.kpi-label`, `.kpi-value` |
+| Tabs | `.tabs`, `.tab`, `.tab.activo` |
+| Botones | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-sm`, `.btn-icon` |
+| Formularios | `.form-group`, `.form-label`, `.form-control`, `.form-error`, `.form-row`, `.form-row-3` |
+| Modales | `.modal-overlay`, `.modal`, `.modal-lg`, `.modal-header`, `.modal-title`, `.modal-body`, `.modal-footer` |
+| Badges | `.badge`, `.badge-success`, `.badge-danger`, `.badge-warning`, `.badge-info`, `.badge-gray` |
+| Tablas | `.table-wrap` (+ estilos globales en `@layer base`) |
+| Estados | `.empty-state`, `.loading-center`, `.spinner`, `.alert`, `.alert-error` |
+| Toolbar | `.toolbar`, `.search-wrap` |
 
-- Ser concreto.
-- Nombrar recursos de forma RESTful.
-- No mezclar operaciones masivas y acciones de dominio en rutas ambiguas.
-- Para acciones de dominio válidas, se permiten rutas tipo:
-  - `/pedidos/{id}/pagos`
-  - `/pedidos/{id}/finalizar`
-  - `/pedidos/{id}/anular`
+**Paleta de marca** (variables CSS Tailwind v4):
+```css
+--color-verde-oscuro: #1a4731  /* sidebar, títulos */
+--color-verde-medio:  #2d6a4f
+--color-verde-claro:  #40916c  /* botones primarios, activo */
+--color-verde-hover:  #52b788
+--color-verde-bg:     #f0faf4  /* fondos sutiles */
+--color-page:         #f4f6f8  /* fondo global */
+```
+
+### Convenciones de código frontend
+
+- **Fetching**: siempre con TanStack Query (`useQuery` / `useMutation`). No usar `useState + useEffect` para llamadas a la API.
+- **queryKey**: array descriptivo `["recurso", filtro]` p.ej. `["pedidos", false]`, `["resumen", fecha]`.
+- **Mutaciones**: invalidar el queryKey afectado con `queryClient.invalidateQueries(...)` después de cada mutation exitosa.
+- **Modales**: componentes independientes con prop `onClose`. Se abren con `useState` local en la página padre.
+- **Formularios**: react-hook-form + zod. No validar en el backend y repetir la misma lógica en frontend — la validación de negocio vive en backend; en frontend solo validaciones de formato/requerido.
+- **Números/dinero**: usar `formatCOP(valor)` de `utils/format.js`. Nunca formatear manualmente con `toLocaleString`.
+- **Iconos**: lucide-react exclusivamente.
+- **No crear nuevos archivos CSS** — todo estilo va en clases Tailwind o en las clases del design system de `index.css`.
+- **Electron**: no tocar la carpeta `electron/` sin instrucción explícita.
+
+---
+
+## Principios de diseño (no negociables)
+
+1. Velocidad operativa sobre elegancia visual.
+2. Todo cálculo financiero final: en backend.
+3. Toda operación crítica: transaccional (`@Transactional`).
+4. Toda modificación crítica: auditada (`auditoriaService.registrar(...)`).
+5. Separación estricta: controller → service interface → service impl → repository → entity.
+6. `BigDecimal` siempre para dinero e inventario. Nunca `double`.
+7. Los fondos COP, USD y NEQUI son separados; no se mezclan como si fueran uno.
+8. El diseño debe poder migrar a PostgreSQL sin cambios de lógica.
+
+---
+
+## Convenciones de código backend
+
+- Interfaces de servicio en `fachadaServices/services/XxxService/IXxxService.java`
+- Implementaciones: `XxxServiceImpl implements IXxxService`
+- Controllers inyectan `IXxxService` (nunca la impl)
+- Los mappers son interfaces MapStruct con `@Mapper(componentModel = "spring")`
+- `default` methods en mappers con lógica personalizada deben anotarse con `@Named(...)` si retornan tipos comunes (`String`, `BigDecimal`) para evitar que MapStruct los aplique automáticamente en otros mappings
+- Los repositories extienden `JpaRepository<Entity, ID>` sin `@Repository`
+- Las entidades usan `@PrePersist` / `@PreUpdate` para timestamps en zona `America/Bogota`
+- Optimistic locking en entidades con concurrencia: `@Version Long version` (Fondo, Gasto, Inventario, Pedido, Producto)
 
 ---
 
@@ -495,138 +503,93 @@ Nunca hardcodear estas reglas solo en frontend. Deben quedar persistidas y admin
 Cuando respondas o generes cambios en este repositorio:
 
 1. No dar explicaciones genéricas.
-2. Justificar decisiones importantes en términos de operación del asadero.
+2. Justificar decisiones en términos de operación del asadero.
 3. Si hay ambigüedad, resolver con una decisión razonable y explícita.
 4. Si la decisión puede afectar dinero, inventario o auditoría, explicarla claramente.
-5. Entregar resultados accionables.
-6. Cuando generes código, procurar que compile o quede muy cerca de compilar.
-7. No introducir librerías o frameworks no solicitados sin justificar su valor.
-8. Si cambias estructura del proyecto, explicar impacto y motivo.
-9. Si generas SQL, mantener consistencia con el modelo Java.
-10. Si generas UI, respetar el layout sidebar + topbar + contenido operativo.
+5. Entregar resultados accionables que compilen.
+6. No introducir librerías no solicitadas sin justificar su valor.
+7. Si cambias estructura del proyecto, explicar impacto y motivo.
+8. Si generas UI, respetar el layout sidebar + topbar + contenido operativo.
+9. Al agregar un endpoint nuevo: agregar también su contrato en esta documentación.
+10. Al agregar un servicio nuevo: crear siempre la interfaz `IXxxService` primero.
 
 ---
 
-## Qué debe evitar Claude Code
+## Qué NO hacer
 
-- No convertir esto en POS de mesas genérico sin contexto del asadero.
-- No simplificar pagos mezclando Nequi con efectivo COP.
-- No eliminar historial de movimientos “por facilidad”.
-- No calcular inventario solo con stock agregado sin historial.
-- No modelar pedidos sin detalle de pagos.
-- No hacer toda la lógica en React.
-- No proponer Firebase, MongoDB, Supabase o stacks alternos para el núcleo del sistema.
-- No usar arquitectura innecesariamente compleja para un entorno local MVP.
-- No omitir restricciones de integridad por comodidad.
-- No asumir que un producto manual impacta inventario si no tiene composición definida.
-
----
-
-## Decisiones razonables ya tomadas
-
-Para evitar bloqueos por ambigüedad, asumir lo siguiente salvo instrucción contraria:
-
-- La moneda base del sistema es COP.
-- Nequi se maneja como fondo separado, aunque contablemente se consolide en COP.
-- Un pedido puede quedar `PAGADO` antes de `FINALIZADO`.
-- `FINALIZADO` implica cierre operativo del pedido.
-- El descuento de inventario se hace al finalizar, no al crear el pedido.
-- Los productos manuales no afectan inventario por defecto.
-- La tasa USD activa se toma desde configuración al registrar un pago en USD.
-- Todo movimiento de caja debe quedar trazado.
-- Todo cambio crítico debe quedar listo para auditoría.
+- No calcular totales de pedido en el frontend — siempre vienen del backend en el DTO.
+- No acreditar fondos en `registrarPago` — el fondo se acredita al **finalizar**.
+- No eliminar `composicionSnapshot` de `PedidoDetalle` — es el registro histórico.
+- No simplificar pagos mezclando NEQUI con COP.
+- No eliminar historial de movimientos de caja o inventario.
+- No proponer Firebase, MongoDB, Supabase ni stacks alternos para el núcleo.
+- No usar `@Autowired` — usar constructor injection vía Lombok.
+- No inyectar `XxxServiceImpl` directamente — siempre la interfaz `IXxxService`.
+- No añadir `@Repository` a las interfaces Spring Data — es redundante.
+- No hardcodear reglas de composición de inventario en frontend.
 
 ---
 
-## Estructura sugerida del proyecto
+## UX/UI obligatoria
 
-```text
-root/
-  backend/
-    src/main/java/.../
-      controller/
-      service/
-      repository/
-      domain/
-      dto/
-      mapper/
-      exceptions/
-      config/
-  frontend/
-    src/
-      app/
-      modules/
-      components/
-      layouts/
-      services/
-      hooks/
-      types/
-  electron/
-  database/
-  docs/
-```
+Admin panel de escritorio, no landing page.
 
-Si el repositorio aún no tiene estructura definitiva, usar esta como base.
+- Sidebar visible permanentemente en escritorio; colapsable en pantallas pequeñas.
+- Estructura estándar: KPIs arriba → filtros → listado/detalle abajo.
+- Formularios rápidos con validación cerca del campo.
+- Modales solo cuando aceleren la operación.
+- Confirmaciones solo en acciones destructivas o irreversibles.
+- Estados de pedido con color y texto visibles.
+- Búsqueda rápida de productos al crear pedido.
 
----
-
-## Orden recomendado de implementación
-
-Si no se especifica otra tarea, priorizar en este orden:
-
-1. Modelo de datos SQLite.
-2. Entidades, enums y repositorios backend.
-3. Servicios de negocio de pedidos, pagos, gastos, inventario y caja.
-4. Endpoints REST principales.
-5. Pantallas core de operación.
-6. Configuración inicial.
-7. Dashboard y resumen del día.
-8. Auditoría y mejoras.
-
----
-
-## Flujo crítico que nunca debe romperse
-
-### Flujo de pedido
-
-1. Crear pedido.
-2. Agregar ítems.
-3. Calcular total.
-4. Registrar uno o varios pagos.
-5. Calcular saldo pendiente.
-6. Si saldo es cero, permitir finalizar.
-7. Al finalizar:
-   - cerrar pedido,
-   - descontar inventario,
-   - consolidar trazabilidad,
-   - reflejar impacto en reportes.
-
-### Flujo de gasto
-
-1. Registrar gasto.
-2. Descontar del fondo correspondiente.
-3. Si compra inventariable, aumentar stock.
-4. Reflejar impacto en capital neto.
-5. Registrar auditoría o historial del movimiento.
+### Pantallas implementadas / pendientes
+| Pantalla | Ruta | Estado |
+|---|---|---|
+| Dashboard | `/` | ✅ Implementado |
+| Pedidos | `/pedidos` | ✅ Implementado — **prioridad #1** |
+| Resumen del día | `/resumen` | ✅ Implementado (incluye Cierre de Caja) |
+| Inventario | `/inventario` | ✅ Implementado |
+| Gastos | `/gastos` | ✅ Implementado |
+| Capital y fondos | `/fondos` | ✅ Implementado |
+| Configuración (Productos, Salones, Tasa USD, General) | `/configuracion` | ✅ Implementado |
+| Auditoría | — | ⏳ Pendiente — endpoint backend listo |
+| Backups | — | ⏳ Pendiente — endpoint backend listo |
+| Exportaciones CSV | — | ⏳ Pendiente — endpoints backend listos |
 
 ---
 
 ## Definición de terminado
 
-Una tarea se considera realmente terminada solo si cumple esto:
+Una tarea se considera realmente terminada solo si:
 
-- compila o queda estructuralmente consistente,
+- compila sin errores,
+- los tests existentes siguen pasando (`mvn test`),
 - respeta el dominio del asadero,
-- no rompe reglas de negocio clave,
-- no compromete trazabilidad,
-- incluye validaciones mínimas,
-- conserva coherencia con el stack obligatorio,
-- deja base escalable para iteraciones futuras.
+- no rompe las reglas de negocio documentadas arriba,
+- no compromete trazabilidad (caja, inventario, auditoría),
+- incluye validaciones en backend,
+- conserva coherencia con el stack y la arquitectura.
+
+---
+
+## Mantenimiento de este archivo
+
+Este archivo es la fuente de verdad del proyecto. Se desactualiza cada vez que se agrega un endpoint, una pantalla, una entidad o una decisión técnica relevante.
+
+**Claude Code debe evaluar si CLAUDE.md necesita actualización al final de cualquier tarea que:**
+- agregue o modifique un endpoint REST,
+- implemente o modifique una pantalla del frontend,
+- cambie la estructura de paquetes o archivos,
+- agregue una dependencia nueva al stack,
+- cambie una regla de negocio implementada,
+- tome una decisión arquitectónica que no estaba documentada.
+
+Si la tarea califica, proponer los cambios concretos al CLAUDE.md antes de cerrar la conversación. No actualizar silenciosamente sin avisar al usuario qué cambió y por qué.
 
 ---
 
 ## Instrucción final para Claude Code
 
-Al trabajar en este proyecto, pensar siempre en un sistema real de operación diaria: rápido para cobrar, claro para revisar pendientes, confiable para dinero e inventario, y simple de mantener.
+Pensar siempre en un sistema real de operación diaria: rápido para cobrar, claro para revisar pendientes, confiable para dinero e inventario, y simple de mantener.
 
-No optimizar para “verse bonito” antes de asegurar integridad operativa.
+El backend está implementado y funcionando. El frontend es el frente de trabajo actual.

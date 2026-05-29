@@ -24,4 +24,6 @@ public interface IUsuarioService {
     UsuarioDTO toggleActivo(Long id);
 
     UsuarioDTO cambiarPassword(Long id, CambiarPasswordRequest request);
+
+    void eliminarOperador(Long id);
 }

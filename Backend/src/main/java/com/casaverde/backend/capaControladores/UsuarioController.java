@@ -41,7 +41,12 @@ public class UsuarioController {
 
     @PutMapping("/api/v1/usuarios/{id}/password")
     public UsuarioDTO cambiarPassword(@PathVariable Long id,
-                                      @Valid @RequestBody CambiarPasswordRequest request) {
+            @Valid @RequestBody CambiarPasswordRequest request) {
         return service.cambiarPassword(id, request);
+    }
+
+    @DeleteMapping("/api/v1/usuarios/{id}")
+    public void eliminar(@PathVariable Long id) {
+        service.eliminarOperador(id);
     }
 }

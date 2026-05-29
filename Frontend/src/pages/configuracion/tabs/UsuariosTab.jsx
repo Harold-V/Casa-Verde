@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Power, Trash2 } from "lucide-react";
 import { usuarioService } from "../../../services/usuarioService";
 import ModalCrearOperador from "../../../components/configuracion/ModalCrearOperador";
 import ModalCambiarPassword from "../../../components/configuracion/ModalCambiarPassword";
@@ -38,6 +38,12 @@ export default function UsuariosTab() {
   const mutPassword = useMutation({
     mutationFn: ({ id, nuevaPassword }) => usuarioService.cambiarPassword(id, nuevaPassword),
     onSuccess: () => { invalidar(); flash("success", "Contraseña actualizada"); },
+    onError:   (err) => flash("error", err.response?.data?.mensaje ?? err.message),
+  });
+
+  const mutEliminar = useMutation({
+    mutationFn: (id) => usuarioService.eliminar(id),
+    onSuccess: () => { invalidar(); flash("success", "Operador eliminado"); },
     onError:   (err) => flash("error", err.response?.data?.mensaje ?? err.message),
   });
 
@@ -85,7 +91,7 @@ export default function UsuariosTab() {
                       </span>
                     </td>
                     <td>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
                         {u.requierePassword && (
                           <button
                             className="btn btn-secondary btn-sm"
@@ -94,13 +100,30 @@ export default function UsuariosTab() {
                             Cambiar clave
                           </button>
                         )}
-                        <button
-                          className={`btn btn-sm ${u.activo ? "btn-secondary" : "btn-primary"}`}
-                          disabled={mutToggle.isPending}
-                          onClick={() => mutToggle.mutate(u.id)}
-                        >
-                          {u.activo ? "Desactivar" : "Activar"}
-                        </button>
+                        {u.rol !== "ADMIN" && (
+                          <>
+                            <button
+                              className="btn-icon"
+                              title={u.activo ? "Desactivar" : "Activar"}
+                              disabled={mutToggle.isPending}
+                              onClick={() => mutToggle.mutate(u.id)}
+                            >
+                              <Power size={15} className={u.activo ? "text-green-600" : "text-red-500"} />
+                            </button>
+                            <button
+                              className="btn-icon text-red-400 hover:text-red-600"
+                              title="Eliminar operador"
+                              disabled={mutEliminar.isPending}
+                              onClick={() => {
+                                if (window.confirm(`¿Eliminar al operador "${u.nombre}"?`)) {
+                                  mutEliminar.mutate(u.id);
+                                }
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

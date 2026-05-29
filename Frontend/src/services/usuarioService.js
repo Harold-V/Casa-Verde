@@ -9,4 +9,5 @@ export const usuarioService = {
   toggle: (id) => api.put(`/usuarios/${id}/toggle`).then((r) => r.data),
   cambiarPassword: (id, nuevaPassword) =>
     api.put(`/usuarios/${id}/password`, { nuevaPassword }).then((r) => r.data),
+  eliminar: (id) => api.delete(`/usuarios/${id}`).then((r) => r.data),
 };

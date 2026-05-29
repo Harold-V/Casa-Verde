@@ -1,7 +1,5 @@
 package com.casaverde.backend.fachadaServices.services.productoService;
 
-import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
-
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +18,6 @@ import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoExceptio
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.mapper.UsuarioMapper;
 import com.casaverde.backend.capaAccesoADatos.repositories.UsuarioRepository;
-import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -141,6 +138,18 @@ public class UsuarioServiceImpl implements IUsuarioService {
         auditoriaService.registrar("usuario", id, "CAMBIAR_PASSWORD",
                 "Contraseña actualizada para: " + u.getNombre());
         return usuarioMapper.toDTO(u);
+    }
+
+    @Transactional
+    public void eliminarOperador(Long id) {
+        Usuario u = usuarioRepo.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+        if (RolUsuario.ADMIN.name().equals(u.getRol())) {
+            throw new ValidacionException("No se puede eliminar un administrador");
+        }
+        auditoriaService.registrar("usuario", id, "ELIMINAR",
+                "Operador eliminado: " + u.getNombre());
+        usuarioRepo.delete(u);
     }
 
     public String hashPassword(String password) {

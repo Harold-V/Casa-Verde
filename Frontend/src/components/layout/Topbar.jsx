@@ -1,19 +1,20 @@
-import { Menu, DollarSign } from "lucide-react";
+import { DollarSign, LogOut, Menu, UserRound } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "../../store/useSessionStore";
 import { formatCOP } from "../../utils/format";
-import { useEffect } from "react";
 import { tasaService } from "../../services/tasaService";
 
 export default function Topbar() {
   const toggleSidebar = useSessionStore((s) => s.toggleSidebar);
-  const tasaUsd = useSessionStore((s) => s.tasaUsd);
-  const setTasaUsd = useSessionStore((s) => s.setTasaUsd);
+  const usuario = useSessionStore((s) => s.usuario);
+  const logout = useSessionStore((s) => s.logout);
 
-  useEffect(() => {
-    tasaService.vigente()
-      .then((t) => setTasaUsd(t.valorCop))
-      .catch(() => {});
-  }, [setTasaUsd]);
+  const { data: tasa } = useQuery({
+    queryKey: ["tasa-vigente"],
+    queryFn: tasaService.vigente,
+    staleTime: 60_000,
+    retry: false,
+  });
 
   const fechaHoy = new Date().toLocaleDateString("es-CO", {
     weekday: "short", day: "2-digit", month: "short", year: "numeric",
@@ -26,12 +27,21 @@ export default function Topbar() {
       </button>
       <span className="topbar-fecha">{fechaHoy}</span>
       <div className="topbar-spacer" />
-      {tasaUsd && (
+      {tasa && (
         <div className="topbar-chip">
           <DollarSign size={14} />
-          <span>USD = {formatCOP(tasaUsd)}</span>
+          <span>USD = {formatCOP(tasa.valorCop)}</span>
         </div>
       )}
+      {usuario && (
+        <div className="topbar-chip bg-gray-100 text-gray-700">
+          <UserRound size={14} />
+          <span>{usuario.nombre}</span>
+        </div>
+      )}
+      <button className="btn-icon" title="Cambiar usuario" onClick={logout}>
+        <LogOut size={17} />
+      </button>
     </header>
   );
 }

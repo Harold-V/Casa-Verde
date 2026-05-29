@@ -3,7 +3,7 @@ import api from "./api";
 export const productoService = {
   listar: (soloActivos = false) =>
     api.get("/productos", { params: { soloActivos } }).then((r) => r.data),
-  buscar: (id) => api.get(`/productos/${id}`).then((r) => r.data),
+  historialPrecios: (id) => api.get(`/productos/${id}/precios`).then((r) => r.data),
   crear: (data) => api.post("/productos", data).then((r) => r.data),
   actualizar: (id, data) => api.put(`/productos/${id}`, data).then((r) => r.data),
   actualizarPrecio: (id, precio) =>

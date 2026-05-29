@@ -6,6 +6,7 @@ import { fondoService } from "../../services/fondoService";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 import { formatDecimal } from "../../utils/format";
 import { capFirst } from "../../utils/pedidoHelpers";
+import MoneyInput from "../shared/MoneyInput";
 
 export default function ModalCompraInsumo({ insumos, onClose }) {
   const queryClient = useQueryClient();
@@ -128,14 +129,12 @@ export default function ModalCompraInsumo({ insumos, onClose }) {
                 <label className="form-label" htmlFor="compra-monto">
                   Monto {form.moneda === "USD" ? "(en dólares)" : "(en pesos)"}
                 </label>
-                <input
+                <MoneyInput
                   id="compra-monto"
                   className="form-control"
-                  type="number"
-                  min="0"
-                  step={form.moneda === "USD" ? "0.01" : "1"}
+                  moneda={form.moneda}
                   value={form.monto}
-                  onChange={(e) => set("monto", e.target.value)}
+                  onChange={(v) => set("monto", v)}
                 />
               </div>
             </div>

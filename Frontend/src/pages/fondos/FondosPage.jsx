@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Download, RotateCcw, TrendingUp, TrendingDown,
-  DollarSign, SlidersHorizontal, Plus, ArrowLeftRight,
+  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw,
 } from "lucide-react";
 import { fondoService } from "../../services/fondoService";
 import { tasaService } from "../../services/tasaService";
@@ -68,8 +68,8 @@ export default function FondosPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [modalEntradaOpen, setModalEntradaOpen]             = useState(false);
-  const [modalTransferenciaOpen, setModalTransferenciaOpen] = useState(false);
+  const [modalEntradaOpen, setModalEntradaOpen]         = useState(false);
+  const [modalTransferenciaMoneda, setModalTransferenciaMoneda] = useState(null);
   const [filtroFecha, setFiltroFecha]   = useState("");
   const [filtroMoneda, setFiltroMoneda] = useState("");
   const [filtroTipo, setFiltroTipo]     = useState("");
@@ -163,25 +163,47 @@ export default function FondosPage() {
       ) : (
         <>
           <div className="grid gap-[14px] mb-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-            {fondos.map((f) => (
-              <div key={f.moneda} className={`card border-l-4 ${getBorderCls(f.moneda)}`}>
-                <div className="p-[18px]">
-                  <div className="text-[13px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
-                  <div className={`text-[28px] font-extrabold ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
-                    {f.moneda === "USD"
-                      ? formatUSD(f.saldo ?? 0)
-                      : formatCOP(f.saldo ?? 0)}
-                  </div>
-                  <div className="text-[11px] text-gray-500 mt-1">
-                    {f.moneda}
-                    {f.moneda === "USD" && tasaValor != null && (
-                      <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
-                    )}
-                    {f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
+            {fondos.map((f) => {
+              const esNequi = f.moneda.startsWith("NEQUI");
+              const esUsd   = f.moneda === "USD";
+              return (
+                <div key={f.moneda} className={`card border-l-4 ${getBorderCls(f.moneda)}`}>
+                  <div className="p-[18px] flex flex-col gap-1">
+                    <div className="text-[13px] text-gray-500">{getFondoLabel(f)}</div>
+                    <div className={`text-[28px] font-extrabold ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
+                      {f.moneda === "USD"
+                        ? formatUSD(f.saldo ?? 0)
+                        : formatCOP(f.saldo ?? 0)}
+                    </div>
+                    <div className="flex items-end justify-between gap-2 mt-1">
+                      <div className="text-[11px] text-gray-500">
+                        {f.moneda}
+                        {f.moneda === "USD" && tasaValor != null && (
+                          <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
+                        )}
+                        {f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
+                      </div>
+                      {esNequi && (
+                        <button
+                          className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                          onClick={() => setModalTransferenciaMoneda(f.moneda)}
+                        >
+                          <ArrowUpRight size={13} /> Retiro
+                        </button>
+                      )}
+                      {esUsd && (
+                        <button
+                          className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                          onClick={() => setModalTransferenciaMoneda("USD")}
+                        >
+                          <RefreshCw size={13} /> Cambio
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
         </>
@@ -192,9 +214,6 @@ export default function FondosPage() {
         <div className="card-header">
           <span className="card-title">Historial de movimientos</span>
           <div className="flex items-center gap-2 ml-auto">
-            <button className="btn btn-secondary btn-sm flex items-center gap-1" onClick={() => setModalTransferenciaOpen(true)}>
-              <ArrowLeftRight size={14} /> Transferencia
-            </button>
             <button className="btn btn-primary btn-sm flex items-center gap-1" onClick={() => setModalEntradaOpen(true)}>
               <Plus size={14} /> Nueva entrada
             </button>
@@ -314,13 +333,27 @@ export default function FondosPage() {
         />
       )}
 
-      {modalTransferenciaOpen && (
-        <ModalTransferencia
-          fondos={fondos}
-          onClose={() => setModalTransferenciaOpen(false)}
-          onGuardar={(data) => transferenciaMut.mutateAsync(data)}
-        />
-      )}
+      {modalTransferenciaMoneda && (() => {
+        const esUsdModal   = modalTransferenciaMoneda === "USD";
+        const fondoNequi   = fondos.find((f) => f.moneda === modalTransferenciaMoneda);
+        const aliasNequi   = fondoNequi?.alias;
+        const tituloModal  = esUsdModal
+          ? "Cambio de dólares"
+          : `Retiro Nequi${aliasNequi ? ` — ${aliasNequi}` : ""}`;
+        const conceptoAuto = esUsdModal
+          ? "Cambio USD → COP"
+          : `Retiro Nequi${aliasNequi ? ` ${aliasNequi}` : ""}`;
+        return (
+          <ModalTransferencia
+            fondos={fondos}
+            monedaOrigenInicial={modalTransferenciaMoneda}
+            titulo={tituloModal}
+            conceptoFijo={conceptoAuto}
+            onClose={() => setModalTransferenciaMoneda(null)}
+            onGuardar={(data) => transferenciaMut.mutateAsync(data)}
+          />
+        );
+      })()}
     </div>
   );
 }

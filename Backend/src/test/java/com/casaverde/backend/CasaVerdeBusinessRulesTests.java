@@ -9,27 +9,38 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.casaverde.backend.domain.Inventario;
-import com.casaverde.backend.domain.CajaMovimientoTipo;
-import com.casaverde.backend.domain.EstadoPedido;
-import com.casaverde.backend.domain.Producto;
-import com.casaverde.backend.dto.CrearPedidoRequest;
-import com.casaverde.backend.dto.DetalleItemRequest;
-import com.casaverde.backend.dto.GastoRequest;
-import com.casaverde.backend.dto.RegistrarPagoRequest;
-import com.casaverde.backend.dto.PedidoDTO;
-import com.casaverde.backend.exception.ValidacionException;
-import com.casaverde.backend.repository.CajaMovimientoRepository;
-import com.casaverde.backend.repository.FondoRepository;
-import com.casaverde.backend.repository.HistorialAuditoriaRepository;
-import com.casaverde.backend.repository.InventarioRepository;
-import com.casaverde.backend.repository.ProductoRepository;
-import com.casaverde.backend.repository.TasaCambioRepository;
-import com.casaverde.backend.service.GastoService;
-import com.casaverde.backend.service.PedidoService;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
+import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
+import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
+import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.HistorialAuditoriaRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.ProductoPrecioHistorialRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.TasaCambioRepository;
+import com.casaverde.backend.config.controllerAdvice.ValidacionException;
+import com.casaverde.backend.fachadaServices.dto.AjusteCapitalRequest;
+import com.casaverde.backend.fachadaServices.dto.CierreCajaDTO;
+import com.casaverde.backend.fachadaServices.dto.CierreCajaRequest;
+import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
+import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
+import com.casaverde.backend.fachadaServices.dto.GastoRequest;
+import com.casaverde.backend.fachadaServices.dto.LoginRequest;
+import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
+import com.casaverde.backend.fachadaServices.dto.UsuarioDTO;
+import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
+import com.casaverde.backend.fachadaServices.services.pedidoService.ICierreCajaService;
+import com.casaverde.backend.fachadaServices.services.pedidoService.IPedidoService;
+import com.casaverde.backend.fachadaServices.services.productoService.IGastoService;
+import com.casaverde.backend.fachadaServices.services.productoService.IProductoService;
+import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 
 @SpringBootTest
@@ -37,178 +48,279 @@ import java.util.List;
 @Transactional
 class CasaVerdeBusinessRulesTests {
 
-    @Autowired
-    private PedidoService pedidoService;
+        @Autowired
+        private IPedidoService pedidoService;
 
-    @Autowired
-    private GastoService gastoService;
+        @Autowired
+        private IGastoService gastoService;
 
-    @Autowired
-    private ProductoRepository productoRepository;
+        @Autowired
+        private IFondoService fondoService;
 
-    @Autowired
-    private InventarioRepository inventarioRepository;
+        @Autowired
+        private IUsuarioService usuarioService;
 
-    @Autowired
-    private TasaCambioRepository tasaCambioRepository;
+        @Autowired
+        private ICierreCajaService cierreCajaService;
 
-    @Autowired
-    private CajaMovimientoRepository cajaMovimientoRepository;
+        @Autowired
+        private IProductoService productoService;
 
-    @Autowired
-    private FondoRepository fondoRepository;
+        @Autowired
+        private ProductoRepository productoRepository;
 
-    @Autowired
-    private HistorialAuditoriaRepository historialAuditoriaRepository;
+        @Autowired
+        private InventarioRepository inventarioRepository;
 
-    @Test
-    void noFinalizaPedidoSiNoHayStockSuficiente() {
-        Inventario cuy = inventarioRepository.findByInsumo("cuy").orElseThrow();
-        cuy.setStockActual(BigDecimal.ZERO);
-        inventarioRepository.save(cuy);
+        @Autowired
+        private TasaCambioRepository tasaCambioRepository;
 
-        Producto productoCuy = productoRepository.findAllByOrderByNombreAsc().stream()
-                .filter(p -> "Cuy".equals(p.getNombre()))
-                .findFirst()
-                .orElseThrow();
-        productoCuy.setPrecio(BigDecimal.valueOf(1000));
-        productoRepository.save(productoCuy);
+        @Autowired
+        private CajaMovimientoRepository cajaMovimientoRepository;
 
-        CrearPedidoRequest request = new CrearPedidoRequest();
-        request.setNombre("Cliente prueba stock");
-        request.setDetalles(List.of(new DetalleItemRequest(productoCuy.getId(), null, null, 1)));
+        @Autowired
+        private FondoRepository fondoRepository;
 
-        PedidoDTO pedido = pedidoService.crear(request);
-        pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+        @Autowired
+        private HistorialAuditoriaRepository historialAuditoriaRepository;
 
-        assertThatThrownBy(() -> pedidoService.finalizarPedido(pedido.getId()))
-                .isInstanceOf(ValidacionException.class)
-                .hasMessageContaining("Stock insuficiente de cuy");
-    }
+        @Autowired
+        private ProductoPrecioHistorialRepository precioHistorialRepository;
 
-    @Test
-    void gastoInventariableAumentaStockYDejaMovimiento() {
-        Inventario gallina = inventarioRepository.findByInsumo("gallina").orElseThrow();
-        BigDecimal stockInicial = gallina.getStockActual();
+        @Test
+        void noFinalizaPedidoSiNoHayStockSuficiente() {
+                Inventario cuy = inventarioRepository.findByInsumo("cuy").orElseThrow();
+                cuy.setStockActual(BigDecimal.ZERO);
+                inventarioRepository.save(cuy);
 
-        GastoRequest request = new GastoRequest();
-        request.setConcepto("Compra prueba gallinas");
-        request.setCategoria("insumos");
-        request.setMoneda("COP");
-        request.setMonto(BigDecimal.valueOf(10000));
-        request.setInsumoInventario("gallina");
-        request.setCantidadInventario(new BigDecimal("3"));
+                Producto productoCuy = productoRepository.findAllByOrderByNombreAsc().stream()
+                                .filter(p -> "Cuy".equals(p.getNombre()))
+                                .findFirst()
+                                .orElseThrow();
+                productoCuy.setPrecio(BigDecimal.valueOf(1000));
+                productoRepository.save(productoCuy);
 
-        gastoService.registrar(request);
+                CrearPedidoRequest request = new CrearPedidoRequest();
+                request.setNombre("Cliente prueba stock");
+                request.setDetalles(List.of(new DetalleItemRequest(productoCuy.getId(), null, null, 1)));
 
-        Inventario actualizado = inventarioRepository.findByInsumo("gallina").orElseThrow();
-        assertThat(actualizado.getStockActual()).isEqualByComparingTo(stockInicial.add(new BigDecimal("3")));
-        assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
-                .anySatisfy(m -> {
-                    assertThat(m.getTipo()).isEqualTo(CajaMovimientoTipo.GASTO.name());
-                    assertThat(m.getMonto()).isEqualByComparingTo(BigDecimal.valueOf(-10000));
-                });
-    }
+                PedidoDTO pedido = pedidoService.crear(request);
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
 
-    @Test
-    void pagoUsdAceptaCentavosYCalculaEquivalenteCop() {
-        PedidoDTO pedido = crearPedidoManual("Cliente USD", BigDecimal.valueOf(5000));
-        BigDecimal tasa = tasaCambioRepository.findVigente().orElseThrow().getValorCop();
-        BigDecimal montoUsd = new BigDecimal("0.25");
+                assertThatThrownBy(() -> pedidoService.finalizarPedido(pedido.getId()))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("Stock insuficiente de cuy");
+        }
 
-        PedidoDTO actualizado = pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("USD", montoUsd));
+        @Test
+        void gastoInventariableAumentaStockYDejaMovimiento() {
+                ajustarFondo("COP", BigDecimal.valueOf(20000));
+                Inventario gallina = inventarioRepository.findByInsumo("gallina").orElseThrow();
+                BigDecimal stockInicial = gallina.getStockActual();
 
-        assertThat(actualizado.getPagos()).hasSize(1);
-        assertThat(actualizado.getPagos().get(0).getMonto()).isEqualByComparingTo("0.25");
-        assertThat(actualizado.getPagos().get(0).getMontoCop())
-                .isEqualByComparingTo(montoUsd.multiply(tasa).setScale(0, RoundingMode.HALF_UP));
-    }
+                GastoRequest request = new GastoRequest();
+                request.setConcepto("Compra prueba gallinas");
+                request.setCategoria("insumos");
+                request.setMoneda("COP");
+                request.setMonto(BigDecimal.valueOf(10000));
+                request.setInsumoInventario("gallina");
+                request.setCantidadInventario(new BigDecimal("3"));
 
-    @Test
-    void pagoCopRechazaCentavos() {
-        PedidoDTO pedido = crearPedidoManual("Cliente COP decimal", BigDecimal.valueOf(5000));
+                gastoService.registrar(request);
 
-        assertThatThrownBy(() -> pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("COP", new BigDecimal("0.25"))))
-                .isInstanceOf(ValidacionException.class)
-                .hasMessageContaining("COP no debe tener centavos");
-    }
+                Inventario actualizado = inventarioRepository.findByInsumo("gallina").orElseThrow();
+                assertThat(actualizado.getStockActual()).isEqualByComparingTo(stockInicial.add(new BigDecimal("3")));
+                assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
+                                .anySatisfy(m -> {
+                                        assertThat(m.getTipo()).isEqualTo(CajaMovimientoTipo.GASTO.name());
+                                        assertThat(m.getMonto()).isEqualByComparingTo(BigDecimal.valueOf(-10000));
+                                });
+        }
 
-    @Test
-    void pedidoTransicionaPorEstadosDePagoHastaFinalizar() {
-        PedidoDTO pedido = crearPedidoManual("Cliente estados", BigDecimal.valueOf(1000));
+        @Test
+        void gastoSinSaldoDisponibleEsRechazado() {
+                GastoRequest request = new GastoRequest();
+                request.setConcepto("Gasto sin caja");
+                request.setCategoria("otros");
+                request.setMoneda("COP");
+                request.setMonto(BigDecimal.valueOf(1000));
 
-        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.PENDIENTE.name());
+                assertThatThrownBy(() -> gastoService.registrar(request))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("no tiene saldo suficiente");
+                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(BigDecimal.ZERO);
+        }
 
-        PedidoDTO parcial = pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("COP", BigDecimal.valueOf(250)));
-        assertThat(parcial.getEstado()).isEqualTo(EstadoPedido.ABONADO_PARCIAL.name());
+        @Test
+        void pagoUsdAceptaCentavosYCalculaEquivalenteCop() {
+                PedidoDTO pedido = crearPedidoManual("Cliente USD", BigDecimal.valueOf(5000));
+                BigDecimal tasa = tasaCambioRepository.findVigente().orElseThrow().getValorCop();
+                BigDecimal montoUsd = new BigDecimal("0.25");
 
-        PedidoDTO pagado = pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("COP", BigDecimal.valueOf(750)));
-        assertThat(pagado.getEstado()).isEqualTo(EstadoPedido.PAGADO.name());
+                PedidoDTO actualizado = pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("USD", montoUsd));
 
-        PedidoDTO finalizado = pedidoService.finalizarPedido(pedido.getId());
-        assertThat(finalizado.getEstado()).isEqualTo(EstadoPedido.FINALIZADO.name());
-        assertThat(finalizado.getFinalizadoEn()).isNotNull();
-    }
+                assertThat(actualizado.getPagos()).hasSize(1);
+                assertThat(actualizado.getPagos().get(0).getMonto()).isEqualByComparingTo("0.25");
+                assertThat(actualizado.getPagos().get(0).getMontoCop())
+                                .isEqualByComparingTo(montoUsd.multiply(tasa).setScale(0, RoundingMode.HALF_UP));
+        }
 
-    @Test
-    void pagoConSobranteSeparaSaldoPendienteYValorCambio() {
-        PedidoDTO pedido = crearPedidoManual("Cliente cambio", BigDecimal.valueOf(1000));
+        @Test
+        void pagoCopRechazaCentavos() {
+                PedidoDTO pedido = crearPedidoManual("Cliente COP decimal", BigDecimal.valueOf(5000));
 
-        PedidoDTO pagado = pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1200)));
+                assertThatThrownBy(() -> pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", new BigDecimal("0.25"))))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("COP no debe tener centavos");
+        }
 
-        assertThat(pagado.getEstado()).isEqualTo(EstadoPedido.PAGADO.name());
-        assertThat(pagado.getSaldoPendiente()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(pagado.getValorCambio()).isEqualByComparingTo(BigDecimal.valueOf(200));
-    }
+        @Test
+        void pedidoTransicionaPorEstadosDePagoHastaFinalizar() {
+                PedidoDTO pedido = crearPedidoManual("Cliente estados", BigDecimal.valueOf(1000));
 
-    @Test
-    void pagoRegistraLibroCajaAuditoriaYActualizaFondo() {
-        PedidoDTO pedido = crearPedidoManual("Cliente caja", BigDecimal.valueOf(1000));
+                assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.PENDIENTE.name());
 
-        PedidoDTO pagado = pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+                PedidoDTO parcial = pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(250)));
+                assertThat(parcial.getEstado()).isEqualTo(EstadoPedido.ABONADO_PARCIAL.name());
 
-        Long pagoId = pagado.getPagos().get(0).getId();
-        assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
-                .isEqualByComparingTo(BigDecimal.valueOf(1000));
-        assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
-                .extracting(m -> m.getTipo() + "|" + m.getReferenciaTipo() + "|" + m.getReferenciaId())
-                .contains(CajaMovimientoTipo.COBRO_PEDIDO.name() + "|pago|" + pagoId);
-        assertThat(historialAuditoriaRepository.findByEntidadAndEntidadIdOrderByRegistradoEnDesc("pedido", pedido.getId()))
-                .anySatisfy(a -> assertThat(a.getAccion()).isEqualTo("REGISTRAR_PAGO"));
-    }
+                PedidoDTO pagado = pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(750)));
+                assertThat(pagado.getEstado()).isEqualTo(EstadoPedido.PAGADO.name());
 
-    @Test
-    void anularPedidoReviertePagosEnLibroCajaYFondo() {
-        PedidoDTO pedido = crearPedidoManual("Cliente reverso", BigDecimal.valueOf(1000));
-        PedidoDTO pagado = pedidoService.registrarPago(
-                pedido.getId(),
-                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+                PedidoDTO finalizado = pedidoService.finalizarPedido(pedido.getId());
+                assertThat(finalizado.getEstado()).isEqualTo(EstadoPedido.FINALIZADO.name());
+                assertThat(finalizado.getFinalizadoEn()).isNotNull();
+        }
 
-        PedidoDTO anulado = pedidoService.anularPedido(pedido.getId());
+        @Test
+        void pagoConSobranteSeparaSaldoPendienteYValorCambio() {
+                PedidoDTO pedido = crearPedidoManual("Cliente cambio", BigDecimal.valueOf(1000));
 
-        assertThat(anulado.getEstado()).isEqualTo(EstadoPedido.ANULADO.name());
-        assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
-                .isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(cajaMovimientoRepository.existsByReferenciaTipoAndReferenciaIdAndTipo(
-                "pago", pagado.getPagos().get(0).getId(), CajaMovimientoTipo.REVERSO_PAGO.name())).isTrue();
-    }
+                PedidoDTO pagado = pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1200)));
 
-    private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {
-        CrearPedidoRequest request = new CrearPedidoRequest();
-        request.setNombre(cliente);
-        request.setDetalles(List.of(new DetalleItemRequest(null, "Producto manual", precioCop, 1)));
-        return pedidoService.crear(request);
-    }
+                assertThat(pagado.getEstado()).isEqualTo(EstadoPedido.PAGADO.name());
+                assertThat(pagado.getSaldoPendiente()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(pagado.getValorCambio()).isEqualByComparingTo(BigDecimal.valueOf(200));
+        }
+
+        @Test
+        void pagoRegistraLibroCajaAuditoriaYActualizaFondo() {
+                PedidoDTO pedido = crearPedidoManual("Cliente caja", BigDecimal.valueOf(1000));
+
+                // El fondo solo se acredita al finalizar, no en el momento del pago
+                pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+                pedidoService.finalizarPedido(pedido.getId());
+
+                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(BigDecimal.valueOf(1000));
+                assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
+                                .extracting(m -> m.getTipo() + "|" + m.getReferenciaTipo() + "|" + m.getReferenciaId())
+                                .contains(CajaMovimientoTipo.COBRO_PEDIDO.name() + "|pedido|" + pedido.getId());
+                assertThat(historialAuditoriaRepository.findByEntidadAndEntidadIdOrderByRegistradoEnDesc("pedido",
+                                pedido.getId()))
+                                .anySatisfy(a -> assertThat(a.getAccion()).isEqualTo("REGISTRAR_PAGO"));
+        }
+
+        @Test
+        void anularPedidoReviertePagosEnLibroCajaYFondo() {
+                PedidoDTO pedido = crearPedidoManual("Cliente reverso", BigDecimal.valueOf(1000));
+                pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+
+                PedidoDTO anulado = pedidoService.anularPedido(pedido.getId());
+
+                assertThat(anulado.getEstado()).isEqualTo(EstadoPedido.ANULADO.name());
+                // El fondo solo se acredita al finalizar; anular antes de finalizar no genera
+                // impacto en fondos
+                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
+                                .noneMatch(m -> CajaMovimientoTipo.REVERSO_PAGO.name().equals(m.getTipo())
+                                                || CajaMovimientoTipo.COBRO_PEDIDO.name().equals(m.getTipo()));
+        }
+
+        @Test
+        void loginLocalSoloExigeClaveAlAdmin() {
+                List<UsuarioDTO> usuarios = usuarioService.listarActivos();
+                UsuarioDTO admin = usuarios.stream().filter(u -> "ADMIN".equals(u.getRol())).findFirst().orElseThrow();
+                UsuarioDTO operador = usuarios.stream().filter(u -> "OPERADOR".equals(u.getRol())).findFirst()
+                                .orElseThrow();
+
+                assertThat(usuarioService.login(new LoginRequest(operador.getId(), null)).getNombre())
+                                .isEqualTo(operador.getNombre());
+                assertThatThrownBy(() -> usuarioService.login(new LoginRequest(admin.getId(), "mala")))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("incorrecta");
+                assertThat(usuarioService.login(new LoginRequest(admin.getId(), "admin123")).getRol())
+                                .isEqualTo("ADMIN");
+        }
+
+        @Test
+        void cierreCajaBloqueaPedidosAbiertosYCreaBackupCuandoNoHayPendientes() {
+                PedidoDTO pedido = crearPedidoManual("Cliente pendiente cierre", BigDecimal.valueOf(1000));
+                CierreCajaRequest bloqueado = new CierreCajaRequest();
+                bloqueado.setFecha(LocalDate.now());
+
+                assertThatThrownBy(() -> cierreCajaService.cerrar(bloqueado))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("pedido(s) pendiente(s)");
+
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+                pedidoService.finalizarPedido(pedido.getId());
+
+                CierreCajaRequest request = new CierreCajaRequest();
+                request.setFecha(LocalDate.now());
+                request.setContadoCop(BigDecimal.valueOf(1000));
+                request.setContadoUsd(BigDecimal.ZERO);
+                request.setContadoNequi(BigDecimal.ZERO);
+
+                CierreCajaDTO cierre = cierreCajaService.cerrar(request);
+                assertThat(cierre.getId()).isNotNull();
+                assertThat(cierre.getBackupPath()).contains("casaverde-");
+                assertThat(cierre.getDiferenciaCop()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        void cambioDePrecioQuedaEnHistorial() {
+                Producto producto = productoRepository.findAllByOrderByNombreAsc().stream()
+                                .filter(p -> "Gaseosa".equals(p.getNombre()))
+                                .findFirst()
+                                .orElseThrow();
+
+                productoService.actualizarPrecio(producto.getId(), BigDecimal.valueOf(3500));
+
+                assertThat(precioHistorialRepository.findByProductoIdOrderByRegistradoEnDesc(producto.getId()))
+                                .anySatisfy(h -> {
+                                        assertThat(h.getPrecioAnterior()).isEqualByComparingTo(BigDecimal.ZERO);
+                                        assertThat(h.getPrecioNuevo()).isEqualByComparingTo(BigDecimal.valueOf(3500));
+                                        assertThat(h.getMotivo()).isEqualTo("ACTUALIZAR_PRECIO");
+                                });
+        }
+
+        private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {
+                CrearPedidoRequest request = new CrearPedidoRequest();
+                request.setNombre(cliente);
+                request.setDetalles(List.of(new DetalleItemRequest(null, "Producto manual", precioCop, 1)));
+                return pedidoService.crear(request);
+        }
+
+        private void ajustarFondo(String moneda, BigDecimal saldo) {
+                AjusteCapitalRequest request = new AjusteCapitalRequest();
+                request.setNuevoSaldo(saldo);
+                request.setMotivo("Preparacion prueba");
+                fondoService.ajustar(moneda, request);
+        }
 }

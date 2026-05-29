@@ -13,10 +13,34 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
+function ErrorPage() {
+  return (
+    <div className="empty-state" style={{ height: "100vh" }}>
+      <p className="text-lg font-semibold text-gray-700">Algo salió mal</p>
+      <p className="text-sm text-gray-500 mt-1">Recarga la página o contacta al administrador.</p>
+      <button className="btn btn-secondary mt-4" onClick={() => window.location.href = "/"}>
+        Volver al inicio
+      </button>
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="empty-state" style={{ height: "100vh" }}>
+      <p className="text-lg font-semibold text-gray-700">Página no encontrada</p>
+      <button className="btn btn-secondary mt-4" onClick={() => window.location.href = "/"}>
+        Volver al inicio
+      </button>
+    </div>
+  );
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
     element: <AppLayout />,
+    errorElement: <ErrorPage />,
     children: [
       { index: true,           element: <Dashboard /> },
       { path: "pedidos",       element: <PedidosPage /> },
@@ -25,6 +49,7 @@ const router = createBrowserRouter([
       { path: "gastos",        element: <GastosPage /> },
       { path: "fondos",        element: <FondosPage /> },
       { path: "configuracion", element: <ConfiguracionPage /> },
+      { path: "*",             element: <NotFound /> },
     ],
   },
 ]);

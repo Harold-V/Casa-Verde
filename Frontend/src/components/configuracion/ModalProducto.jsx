@@ -1,0 +1,131 @@
+import { useState } from "react";
+import { Plus, X } from "lucide-react";
+import { useModalKeyboard } from "../../hooks/useModalKeyboard";
+
+/** Modal para crear/editar un producto del catálogo. Extraído de ProductosTab. */
+export default function ModalProducto({ producto, categorias, onClose, onSave }) {
+  const [form, setForm] = useState({
+    nombre:          producto?.nombre          ?? "",
+    precio:          producto?.precio          ?? 0,
+    categoriaId:     producto?.categoriaId     ?? "",
+    afectaInventario: producto?.afectaInventario ?? false,
+    composicion:     producto?.composicion     ?? [],
+  });
+  const [error, setError]   = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useModalKeyboard({ onEscape: onClose });
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const agregarComp = () =>
+    setForm((f) => ({ ...f, composicion: [...f.composicion, { insumo: "gallina", cantidad: 1 }] }));
+
+  const quitarComp = (i) =>
+    setForm((f) => ({ ...f, composicion: f.composicion.filter((_, idx) => idx !== i) }));
+
+  const setComp = (i, k, v) =>
+    setForm((f) => {
+      const comp = [...f.composicion];
+      comp[i] = { ...comp[i], [k]: v };
+      return { ...f, composicion: comp };
+    });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.nombre.trim()) { setError("El nombre es obligatorio"); return; }
+    setSaving(true);
+    try {
+      await onSave({
+        ...form,
+        precio:      parseFloat(form.precio) || 0,
+        categoriaId: form.categoriaId ? Number(form.categoriaId) : null,
+        composicion: form.afectaInventario
+          ? form.composicion.map((c) => ({ ...c, cantidad: parseFloat(c.cantidad) || 0 }))
+          : [],
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal modal-lg">
+        <div className="modal-header">
+          <span className="modal-title">{producto ? "Editar producto" : "Nuevo producto"}</span>
+          <button className="btn-icon" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            {error && <div className="alert alert-error">{error}</div>}
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Nombre *</label>
+                <input className="form-control" value={form.nombre}
+                  onChange={(e) => set("nombre", e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Precio (COP)</label>
+                <input className="form-control" type="number" min="0" value={form.precio}
+                  onChange={(e) => set("precio", e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Categoría</label>
+                <select className="form-control" value={form.categoriaId}
+                  onChange={(e) => set("categoriaId", e.target.value)}>
+                  <option value="">— Sin categoría —</option>
+                  {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+              </div>
+              <div className="form-group flex items-center gap-2.5 pt-[22px]">
+                <input type="checkbox" id="afecta" checked={form.afectaInventario}
+                  onChange={(e) => set("afectaInventario", e.target.checked)} />
+                <label htmlFor="afecta" className="cursor-pointer font-medium">Afecta inventario</label>
+              </div>
+            </div>
+
+            {form.afectaInventario && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="form-label mb-0">Composición de inventario</label>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={agregarComp}>
+                    <Plus size={13} /> Agregar insumo
+                  </button>
+                </div>
+                {form.composicion.map((c, i) => (
+                  <div key={i} className="composicion-row">
+                    <select className="form-control flex-1" value={c.insumo}
+                      onChange={(e) => setComp(i, "insumo", e.target.value)}>
+                      <option value="gallina">Gallina</option>
+                      <option value="cuy">Cuy</option>
+                    </select>
+                    <input className="form-control w-[100px]" type="number" step="0.001" min="0"
+                      value={c.cantidad} onChange={(e) => setComp(i, "cantidad", e.target.value)} />
+                    <button type="button" className="btn-icon" onClick={() => quitarComp(i)}>
+                      <X size={15} />
+                    </button>
+                  </div>
+                ))}
+                {form.composicion.length === 0 && (
+                  <p className="text-gray-500 text-[13px]">Sin composición — no descontará inventario</p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
