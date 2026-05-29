@@ -617,6 +617,59 @@ Si la tarea califica, proponer los cambios concretos al CLAUDE.md antes de cerra
 
 ---
 
+## Flujo de trabajo Git (GitFlow)
+
+### Ramas permanentes
+| Rama | Propósito |
+|---|---|
+| `main` | Producción estable. Solo recibe merges de `release/*` y `hotfix/*`. Cada merge a main genera un release con tag `vX.Y.Z`. |
+| `develop` | Integración continua. Base de todo trabajo nuevo. Rama por defecto del repositorio. |
+
+### Ramas temporales
+| Tipo | Naming | Sale de | Vuelve a |
+|---|---|---|---|
+| Feature | `feature/nombre-corto` | `develop` | `develop` |
+| Release | `release/X.Y.Z` | `develop` | `main` + `develop` |
+| Hotfix | `hotfix/descripcion` | `main` | `main` + `develop` |
+
+### Comandos habituales
+
+```bash
+# Empezar una feature
+git checkout develop && git checkout -b feature/nueva-pantalla
+
+# Terminar una feature (merge a develop)
+git checkout develop && git merge --no-ff feature/nueva-pantalla && git branch -d feature/nueva-pantalla
+
+# Preparar un release
+git checkout develop && git checkout -b release/1.2.0
+# (ajustar version en package.json, últimos fixes)
+git checkout main && git merge --no-ff release/1.2.0 && git tag v1.2.0
+git checkout develop && git merge --no-ff release/1.2.0
+git branch -d release/1.2.0
+
+# Fix urgente en producción
+git checkout main && git checkout -b hotfix/fix-critico
+# (aplicar el fix)
+git checkout main && git merge --no-ff hotfix/fix-critico && git tag v1.1.1
+git checkout develop && git merge --no-ff hotfix/fix-critico
+git branch -d hotfix/fix-critico
+
+# Publicar release del instalador (desde main)
+git checkout main
+$env:GH_TOKEN = "ghp_token_write"
+cd Frontend && npm run publish:electron
+```
+
+### Reglas
+- **Nunca** hacer commits directos a `main`.
+- **Nunca** hacer commits directos a `develop` (excepto fixes triviales de una línea).
+- Todo trabajo nuevo va en `feature/*` primero.
+- Los releases del instalador Electron se publican **siempre desde `main`**.
+- El versionado sigue semver: `MAJOR.MINOR.PATCH` → cambios en `Frontend/package.json` antes de hacer el release.
+
+---
+
 ## Instrucción final para Claude Code
 
 Pensar siempre en un sistema real de operación diaria: rápido para cobrar, claro para revisar pendientes, confiable para dinero e inventario, y simple de mantener.
