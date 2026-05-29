@@ -2,7 +2,6 @@ package com.casaverde.backend.fachadaServices.services.pedidoService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,16 +18,11 @@ import com.casaverde.backend.fachadaServices.services.configuracionService.ITasa
 import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
-import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
-import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
-import com.casaverde.backend.capaAccesoADatos.models.entitys.MovimientoInventario;
-import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
-import com.casaverde.backend.capaAccesoADatos.models.enums.TipoMovimientoInventario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
+import com.casaverde.backend.fachadaServices.services.productoService.IInventarioService;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.ProductoComposicionInventario;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pago;
@@ -41,9 +35,7 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPagoRequest;
 import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
-import com.casaverde.backend.fachadaServices.dto.PagoDTO;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
-import com.casaverde.backend.fachadaServices.dto.PedidoDetalleDTO;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.mapper.PedidoMapper;
 import lombok.RequiredArgsConstructor;
@@ -55,8 +47,8 @@ public class PedidoServiceImpl implements IPedidoService {
     private final PedidoRepository pedidoRepo;
     private final ProductoRepository productoRepo;
     private final SalonRepository salonRepo;
-    private final InventarioRepository inventarioRepo;
-    private final MovimientoInventarioRepository movimientoRepo;
+    private final IInventarioService inventarioService;
+    private final IComprobanteService comprobanteService;
     private final ITasaCambioService tasaCambioService;
     private final ICajaMovimientoService cajaMovimientoService;
     private final IFondoService fondoService;
@@ -85,53 +77,7 @@ public class PedidoServiceImpl implements IPedidoService {
     @Transactional(readOnly = true)
     public String comprobanteTexto(Long id) {
         Pedido pedido = findOrThrow(id);
-        PedidoDTO dto = pedidoMapper.toDTO(pedido);
-        StringBuilder sb = new StringBuilder();
-        sb.append("ASADERO CASA VERDE").append(System.lineSeparator());
-        sb.append("Comprobante pedido #").append(dto.getId()).append(System.lineSeparator());
-        sb.append("--------------------------------").append(System.lineSeparator());
-        sb.append("Cliente: ").append(dto.getNombre()).append(System.lineSeparator());
-        sb.append("Estado: ").append(dto.getEstado()).append(System.lineSeparator());
-        if (dto.getSalonNombre() != null || dto.getMesa() != null) {
-            sb.append("Ubicacion: ")
-                    .append(dto.getSalonNombre() != null ? dto.getSalonNombre() : "")
-                    .append(dto.getMesa() != null ? " / Mesa " + dto.getMesa() : "")
-                    .append(System.lineSeparator());
-        }
-        if (dto.getFinalizadoEn() != null) {
-            sb.append("Cierre: ").append(dto.getFinalizadoEn().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
-                    .append(System.lineSeparator());
-        }
-        sb.append("--------------------------------").append(System.lineSeparator());
-        for (PedidoDetalleDTO detalle : dto.getDetalles()) {
-            sb.append(detalle.getCantidad()).append(" x ")
-                    .append(detalle.getNombreSnapshot())
-                    .append("  COP ").append(detalle.getSubtotalCop())
-                    .append(System.lineSeparator());
-        }
-        sb.append("--------------------------------").append(System.lineSeparator());
-        sb.append("Total COP: ").append(dto.getTotalCop()).append(System.lineSeparator());
-        sb.append("Abonado COP: ").append(dto.getTotalAbonado()).append(System.lineSeparator());
-        if (dto.getSaldoPendiente().compareTo(BigDecimal.ZERO) > 0) {
-            sb.append("Saldo pendiente COP: ").append(dto.getSaldoPendiente()).append(System.lineSeparator());
-        }
-        if (dto.getValorCambio().compareTo(BigDecimal.ZERO) > 0) {
-            sb.append("Cambio COP: ").append(dto.getValorCambio()).append(System.lineSeparator());
-        }
-        if (!dto.getPagos().isEmpty()) {
-            sb.append("--------------------------------").append(System.lineSeparator());
-            sb.append("Pagos").append(System.lineSeparator());
-            for (PagoDTO pago : dto.getPagos()) {
-                sb.append(pago.getMoneda()).append(" ")
-                        .append(pago.getMonto())
-                        .append(" = COP ").append(pago.getMontoCop());
-                if (pago.getTasaUsada() != null) {
-                    sb.append(" tasa ").append(pago.getTasaUsada());
-                }
-                sb.append(System.lineSeparator());
-            }
-        }
-        return sb.toString();
+        return comprobanteService.generar(pedidoMapper.toDTO(pedido));
     }
 
     @Transactional
@@ -369,7 +315,7 @@ public class PedidoServiceImpl implements IPedidoService {
             }
         }
 
-        descontarInventario(pedido);
+        inventarioService.descontarPorPedido(pedido);
         pedido.setEstado(EstadoPedido.FINALIZADO);
         pedido.setFinalizadoEn(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota")));
         Pedido guardado = pedidoRepo.save(pedido);
@@ -493,90 +439,6 @@ public class PedidoServiceImpl implements IPedidoService {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private void descontarInventario(Pedido pedido) {
-        Map<String, BigDecimal> consumos = calcularConsumosInventario(pedido);
-        validarStockDisponible(consumos);
-        for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
-            registrarMovimientoInventario(consumo.getKey(), TipoMovimientoInventario.SALIDA, consumo.getValue(),
-                    pedido.getId());
-        }
-    }
-
-    private Map<String, BigDecimal> calcularConsumosInventario(Pedido pedido) {
-        Map<String, BigDecimal> consumos = new LinkedHashMap<>();
-        for (PedidoDetalle detalle : pedido.getDetalles()) {
-            if (detalle.getComposicionSnapshot() == null || detalle.getComposicionSnapshot().isBlank())
-                continue;
-            for (Map<String, Object> item : leerComposicionSnapshot(detalle)) {
-                Object insumoRaw = item.get("insumo");
-                Object cantidadRaw = item.get("cantidad");
-                if (!(insumoRaw instanceof String insumo) || insumo.isBlank()
-                        || !(cantidadRaw instanceof Number)) {
-                    throw new ValidacionException(
-                            "Composicion de inventario invalida en el item: " + detalle.getNombreSnapshot());
-                }
-                BigDecimal cantPorUnidad = new BigDecimal(cantidadRaw.toString()).setScale(4, RoundingMode.HALF_UP);
-                if (cantPorUnidad.compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new ValidacionException("Cantidad de inventario invalida para " + insumo + " en el item: "
-                            + detalle.getNombreSnapshot());
-                }
-                consumos.merge(insumo.trim(), cantPorUnidad.multiply(BigDecimal.valueOf(detalle.getCantidad())),
-                        BigDecimal::add);
-            }
-        }
-        return consumos;
-    }
-
-    private List<Map<String, Object>> leerComposicionSnapshot(PedidoDetalle detalle) {
-        try {
-            return objectMapper.readValue(detalle.getComposicionSnapshot(), new TypeReference<>() {
-            });
-        } catch (Exception e) {
-            throw new ValidacionException(
-                    "No se pudo leer la composicion de inventario del item: " + detalle.getNombreSnapshot());
-        }
-    }
-
-    private void validarStockDisponible(Map<String, BigDecimal> consumos) {
-        for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
-            Inventario inv = inventarioRepo.findByInsumo(consumo.getKey())
-                    .orElseThrow(() -> new ValidacionException(
-                            "No existe inventario configurado para el insumo: " + consumo.getKey()));
-            if (inv.getStockActual().compareTo(consumo.getValue()) < 0) {
-                throw new ValidacionException("Stock insuficiente de " + consumo.getKey()
-                        + ". Disponible: " + inv.getStockActual()
-                        + ", requerido: " + consumo.getValue());
-            }
-        }
-    }
-
-    private void registrarMovimientoInventario(String insumo, TipoMovimientoInventario tipo, BigDecimal cantidad,
-            Long pedidoId) {
-        Inventario inv = inventarioRepo.findByInsumo(insumo)
-                .orElseThrow(
-                        () -> new ValidacionException("No existe inventario configurado para el insumo: " + insumo));
-        if (tipo == TipoMovimientoInventario.SALIDA && inv.getStockActual().compareTo(cantidad) < 0) {
-            throw new ValidacionException("Stock insuficiente de " + insumo
-                    + ". Disponible: " + inv.getStockActual()
-                    + ", requerido: " + cantidad);
-        }
-        BigDecimal nuevo = tipo == TipoMovimientoInventario.ENTRADA
-                ? inv.getStockActual().add(cantidad)
-                : inv.getStockActual().subtract(cantidad);
-        inv.setStockActual(nuevo);
-        inventarioRepo.save(inv);
-
-        String obs = tipo == TipoMovimientoInventario.ENTRADA
-                ? "Anulación pedido #" + pedidoId
-                : "Finalización pedido #" + pedidoId;
-
-        movimientoRepo.save(MovimientoInventario.builder()
-                .insumo(insumo).tipo(tipo.valor()).cantidad(cantidad)
-                .stockResultante(nuevo).referenciaTipo("pedido")
-                .referenciaId(pedidoId).observacion(obs)
-                .build());
     }
 
     /**
