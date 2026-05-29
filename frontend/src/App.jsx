@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, createHashRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -36,7 +36,7 @@ function NotFound() {
   );
 }
 
-const router = createBrowserRouter([
+const routes = [
   {
     path: "/",
     element: <AppLayout />,
@@ -52,7 +52,13 @@ const router = createBrowserRouter([
       { path: "*",             element: <NotFound /> },
     ],
   },
-]);
+];
+
+// En modo Electron la app corre desde file:// — createBrowserRouter no resuelve
+// rutas correctamente. createHashRouter usa /#/ruta que sí funciona con file://.
+const router = import.meta.env.VITE_ELECTRON
+  ? createHashRouter(routes)
+  : createBrowserRouter(routes);
 
 export default function App() {
   return (
