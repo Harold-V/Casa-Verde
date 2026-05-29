@@ -52,7 +52,10 @@ export default function FondosTab() {
   const ajustarMut = useMutation({
     mutationFn: ({ moneda, nuevoSaldo, motivo }) =>
       fondoService.ajustar(moneda, nuevoSaldo, motivo),
-    onSuccess: invalidarFondos,
+    onSuccess: () => {
+      invalidarFondos();
+      flash("success", "Ajuste aplicado");
+    },
   });
 
   return (
