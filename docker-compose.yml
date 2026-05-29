@@ -1,0 +1,54 @@
+services:
+
+  # ── Backend Spring Boot ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: casaverde-backend
+    ports:
+      - "5020:5020"
+    volumes:
+      - casaverde_db:/app/DataBase
+    environment:
+      - TZ=America/Bogota
+      - JAVA_OPTS=-Xmx512m -XX:+UseG1GC
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.0"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5020/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Frontend nginx ────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: casaverde-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  casaverde_db:
+    driver: local

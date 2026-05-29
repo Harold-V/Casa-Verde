@@ -1,0 +1,359 @@
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Download, RotateCcw, TrendingUp, TrendingDown,
+  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw,
+} from "lucide-react";
+import { fondoService } from "../../services/fondoService";
+import { tasaService } from "../../services/tasaService";
+import { exportacionService } from "../../services/exportacionService";
+import { formatCOP, formatFecha, formatHora, formatUSD } from "../../utils/format";
+import ModalEntrada from "../../components/fondos/ModalEntrada";
+import ModalTransferencia from "../../components/fondos/ModalTransferencia";
+
+/* ── helpers visuales ─────────────────────────────────────────────── */
+function getFondoLabel(fondo) {
+  if (fondo.moneda === "COP")  return "Pesos colombianos";
+  if (fondo.moneda === "USD")  return "Dólares estadounidenses";
+  if (fondo.moneda.startsWith("NEQUI"))
+    return `Nequi${fondo.alias ? ` — ${fondo.alias}` : ""}`;
+  return fondo.moneda;
+}
+
+function getColorCls(moneda) {
+  if (moneda === "COP") return "text-verde-claro";
+  if (moneda === "USD") return "text-[#1a6b3c]";
+  if (moneda.startsWith("NEQUI")) return "text-[#8c00ff]";
+  return "text-verde-oscuro";
+}
+
+function getBorderCls(moneda) {
+  if (moneda === "COP") return "border-l-verde-claro";
+  if (moneda === "USD") return "border-l-[#1a6b3c]";
+  if (moneda.startsWith("NEQUI")) return "border-l-[#8c00ff]";
+  return "border-l-verde-claro";
+}
+
+/** Agrupa todos los movimientos tipo "cobro" por día + moneda en una única fila "Venta del día". */
+function procesarHistorial(movs) {
+  const cobros = movs.filter((m) => m.tipo === "cobro");
+  const otros  = movs.filter((m) => m.tipo !== "cobro");
+
+  const grupos = {};
+  cobros.forEach((m) => {
+    const dia = m.fecha.substring(0, 10);
+    const key = `${dia}__${m.moneda}`;
+    if (!grupos[key]) grupos[key] = { dia, moneda: m.moneda, monto: 0, montoCop: 0 };
+    grupos[key].monto    += Number(m.monto);
+    grupos[key].montoCop += Number(m.montoCop);
+  });
+
+  const ventasDia = Object.values(grupos).map((g) => ({
+    id:          `venta-${g.dia}-${g.moneda}`,
+    tipo:        "cobro",
+    concepto:    "Venta del día",
+    moneda:      g.moneda,
+    monto:       g.monto,
+    montoCop:    g.montoCop,
+    fecha:       `${g.dia}T23:59:59`,
+    _esVentaDia: true,
+    _fechaNav:   g.dia,
+  }));
+
+  return [...ventasDia, ...otros].sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
+export default function FondosPage() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const [modalEntradaOpen, setModalEntradaOpen]         = useState(false);
+  const [modalTransferenciaMoneda, setModalTransferenciaMoneda] = useState(null);
+  const [filtroFecha, setFiltroFecha]   = useState("");
+  const [filtroMoneda, setFiltroMoneda] = useState("");
+  const [filtroTipo, setFiltroTipo]     = useState("");
+
+  const { data: fondos = [], isLoading: loadingFondos } = useQuery({
+    queryKey: ["fondos"],
+    queryFn: fondoService.listar,
+  });
+
+  const { data: historial = [], isLoading: loadingHistorial } = useQuery({
+    queryKey: ["fondos-historial", filtroFecha, filtroMoneda, filtroTipo],
+    queryFn: () => fondoService.historial({
+      ...(filtroFecha  ? { fecha: filtroFecha }   : {}),
+      ...(filtroMoneda ? { moneda: filtroMoneda } : {}),
+      ...(filtroTipo   ? { tipo: filtroTipo }     : {}),
+    }),
+  });
+
+  const { data: tasa } = useQuery({
+    queryKey: ["tasa-vigente"],
+    queryFn: tasaService.vigente,
+    retry: false,
+  });
+
+  const invalidarFondos = () => {
+    qc.invalidateQueries({ queryKey: ["fondos"] });
+    qc.invalidateQueries({ queryKey: ["fondos-historial"] });
+  };
+
+  const entradaMut = useMutation({
+    mutationFn: fondoService.registrarEntrada,
+    onSuccess: invalidarFondos,
+  });
+
+  const transferenciaMut = useMutation({
+    mutationFn: fondoService.registrarTransferencia,
+    onSuccess: () => {
+      invalidarFondos();
+      qc.invalidateQueries({ queryKey: ["nequi-estado-mes"] });
+    },
+  });
+
+  /* ── cálculos de totales ─────────────────────────────────────────── */
+  const saldoCop        = fondos.find((f) => f.moneda === "COP")?.saldo ?? 0;
+  const saldoUsd        = fondos.find((f) => f.moneda === "USD")?.saldo ?? 0;
+  const nequiFondos     = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
+  const saldoNequiTotal = nequiFondos.reduce((acc, f) => acc + Number(f.saldo ?? 0), 0);
+  const tasaValor       = tasa?.valorCop ?? null;
+  const usdEnCop        = tasaValor != null ? saldoUsd * tasaValor : null;
+  const capitalTotal    = tasaValor != null
+    ? saldoCop + saldoNequiTotal + usdEnCop
+    : saldoCop + saldoNequiTotal;
+
+  const historialProcesado = useMemo(() => procesarHistorial(historial), [historial]);
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1 className="page-title">Fondos</h1>
+      </div>
+
+      {/* Tarjeta capital neto */}
+      {!loadingFondos && (
+        <div className="card mb-5 border-l-4 border-l-verde-oscuro"
+          style={{ background: "linear-gradient(135deg, #1a4731 0%, #1a4a2e 100%)" }}>
+          <div className="p-[18px] flex justify-between items-center flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign size={18} className="text-white/70" />
+                <span className="text-[13px] text-white/75 font-medium">Capital neto acumulado</span>
+              </div>
+              <div className="text-[34px] font-black tracking-tight text-white">
+                {formatCOP(capitalTotal)}
+              </div>
+              <div className="text-[11px] text-white/55 mt-1">
+                COP {formatCOP(saldoCop)}
+                {" + "}
+                NEQUI {formatCOP(saldoNequiTotal)}{nequiFondos.length > 1 ? ` (${nequiFondos.length} cuentas)` : ""}
+                {usdEnCop != null
+                  ? ` + USD ${formatUSD(saldoUsd)} × ${formatCOP(tasaValor)} = ${formatCOP(usdEnCop)}`
+                  : ` + USD ${formatUSD(saldoUsd)} (tasa no configurada)`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tarjetas por fondo */}
+      {loadingFondos ? (
+        <div className="loading-center"><div className="spinner" /></div>
+      ) : (
+        <>
+          <div className="grid gap-[14px] mb-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+            {fondos.map((f) => {
+              const esNequi = f.moneda.startsWith("NEQUI");
+              const esUsd   = f.moneda === "USD";
+              return (
+                <div key={f.moneda} className={`card border-l-4 ${getBorderCls(f.moneda)}`}>
+                  <div className="p-[18px] flex flex-col gap-1">
+                    <div className="text-[13px] text-gray-500">{getFondoLabel(f)}</div>
+                    <div className={`text-[28px] font-extrabold ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
+                      {f.moneda === "USD"
+                        ? formatUSD(f.saldo ?? 0)
+                        : formatCOP(f.saldo ?? 0)}
+                    </div>
+                    <div className="flex items-end justify-between gap-2 mt-1">
+                      <div className="text-[11px] text-gray-500">
+                        {f.moneda}
+                        {f.moneda === "USD" && tasaValor != null && (
+                          <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
+                        )}
+                        {f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
+                      </div>
+                      {esNequi && (
+                        <button
+                          className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                          onClick={() => setModalTransferenciaMoneda(f.moneda)}
+                        >
+                          <ArrowUpRight size={13} /> Retiro
+                        </button>
+                      )}
+                      {esUsd && (
+                        <button
+                          className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
+                          onClick={() => setModalTransferenciaMoneda("USD")}
+                        >
+                          <RefreshCw size={13} /> Cambio
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        </>
+      )}
+
+      {/* Historial unificado */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Historial de movimientos</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button className="btn btn-primary btn-sm flex items-center gap-1" onClick={() => setModalEntradaOpen(true)}>
+              <Plus size={14} /> Nueva entrada
+            </button>
+            <a className="btn btn-secondary btn-sm" href={exportacionService.cajaUrl(filtroFecha)}>
+              <Download size={14} />
+              CSV caja
+            </a>
+          </div>
+        </div>
+        <div className="toolbar px-[18px] pt-4 mb-0">
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-500 mr-1">
+            <SlidersHorizontal size={15} />
+            <span>{historialProcesado.length} registros</span>
+          </div>
+          <input
+            type="date"
+            className="form-control w-40"
+            value={filtroFecha}
+            onChange={(e) => setFiltroFecha(e.target.value)}
+          />
+          <select className="form-control w-36" value={filtroMoneda} onChange={(e) => setFiltroMoneda(e.target.value)}>
+            <option value="">Todas</option>
+            <option value="COP">COP</option>
+            <option value="USD">USD</option>
+            {nequiFondos.map((f) => (
+              <option key={f.moneda} value={f.moneda}>
+                {f.alias ? `Nequi ${f.alias}` : f.moneda}
+              </option>
+            ))}
+          </select>
+          <select className="form-control w-36" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+            <option value="">Todo tipo</option>
+            <option value="cobro">Ventas</option>
+            <option value="entrada">Entradas</option>
+            <option value="salida">Salidas</option>
+            <option value="ajuste">Ajustes</option>
+            <option value="reverso">Reversos</option>
+          </select>
+          {(filtroFecha || filtroMoneda || filtroTipo) && (
+            <button className="btn btn-secondary btn-sm" onClick={() => { setFiltroFecha(""); setFiltroMoneda(""); setFiltroTipo(""); }}>
+              Limpiar
+            </button>
+          )}
+        </div>
+        <div className="table-wrap">
+          {loadingHistorial ? (
+            <div className="loading-center"><div className="spinner" /></div>
+          ) : historialProcesado.length === 0 ? (
+            <div className="empty-state"><p>Sin movimientos registrados</p></div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha / Hora</th>
+                  <th>Tipo</th>
+                  <th>Concepto</th>
+                  <th>Moneda</th>
+                  <th className="text-right">Monto</th>
+                  <th className="text-right">En COP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historialProcesado.map((m) => {
+                  const esVentaDia = !!m._esVentaDia;
+                  const esEntrada  = esVentaDia || m.tipo === "cobro" || m.tipo === "entrada";
+                  const esSalida   = m.tipo === "salida";
+                  const esReverso  = m.tipo === "reverso";
+                  const esCobro    = esEntrada;
+                  const Icon  = esEntrada ? TrendingUp : esSalida ? TrendingDown : esReverso ? RotateCcw : DollarSign;
+                  const badge = esEntrada ? "badge-success" : esSalida ? "badge-danger" : esReverso ? "badge-gray" : "badge-warning";
+                  const color = esEntrada ? "text-verde-claro" : esSalida ? "text-red-600" : "text-gray-600";
+                  // Etiqueta de moneda: si hay alias, mostrarlo
+                  const nequiFondo = fondos.find((f) => f.moneda === m.moneda);
+                  const monedaLabel = nequiFondo?.alias && m.moneda.startsWith("NEQUI")
+                    ? `Nequi ${nequiFondo.alias}`
+                    : m.moneda;
+                  return (
+                    <tr key={m.id}
+                      className={esVentaDia ? "cursor-pointer hover:bg-green-50 transition-colors font-medium" : ""}
+                      onClick={esVentaDia ? () => navigate("/resumen", { state: { fecha: m._fechaNav } }) : undefined}
+                      title={esVentaDia ? "Ver resumen del día" : undefined}
+                    >
+                      <td className="text-[12px] text-gray-500 whitespace-nowrap">
+                        {esVentaDia
+                          ? new Date(`${m._fechaNav}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })
+                          : formatFecha(m.fecha)
+                        }
+                      </td>
+                      <td>
+                        <span className={`badge gap-1 ${badge}`}>
+                          <Icon size={11} />
+                          {m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : ""}
+                        </span>
+                      </td>
+                      <td className="font-medium">{m.concepto}</td>
+                      <td><span className="badge badge-warning">{monedaLabel}</span></td>
+                      <td className={`text-right font-semibold ${color}`}>
+                        {esCobro ? "+" : "−"}
+                        {m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
+                      </td>
+                      <td className={`text-right ${color}`}>
+                        {esCobro ? "+" : "−"}{formatCOP(m.montoCop)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {modalEntradaOpen && (
+        <ModalEntrada
+          onClose={() => setModalEntradaOpen(false)}
+          onGuardar={(data) => entradaMut.mutateAsync(data)}
+        />
+      )}
+
+      {modalTransferenciaMoneda && (() => {
+        const esUsdModal   = modalTransferenciaMoneda === "USD";
+        const fondoNequi   = fondos.find((f) => f.moneda === modalTransferenciaMoneda);
+        const aliasNequi   = fondoNequi?.alias;
+        const tituloModal  = esUsdModal
+          ? "Cambio de dólares"
+          : `Retiro Nequi${aliasNequi ? ` — ${aliasNequi}` : ""}`;
+        const conceptoAuto = esUsdModal
+          ? "Cambio USD → COP"
+          : `Retiro Nequi${aliasNequi ? ` ${aliasNequi}` : ""}`;
+        return (
+          <ModalTransferencia
+            fondos={fondos}
+            monedaOrigenInicial={modalTransferenciaMoneda}
+            titulo={tituloModal}
+            conceptoFijo={conceptoAuto}
+            onClose={() => setModalTransferenciaMoneda(null)}
+            onGuardar={(data) => transferenciaMut.mutateAsync(data)}
+          />
+        );
+      })()}
+    </div>
+  );
+}
