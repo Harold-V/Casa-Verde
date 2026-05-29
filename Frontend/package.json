@@ -6,11 +6,12 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
+    "electron:dev": "concurrently \"npm run dev\" \"electron .\"",
     "build:react": "vite build",
-    "build:electron": "electron-builder",
-    "build": "npm run build:react && npm run build:electron",
+    "build:react:electron": "vite build --mode electron",
+    "build:electron": "npm run build:react:electron && electron-builder",
+    "build:web": "npm run build:react",
     "electron": "electron .",
-    "start": "concurrently \"npm run dev\" \"npm run electron\"",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
@@ -57,13 +58,23 @@
       "electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      { "from": "resources/backend.jar", "to": "backend.jar" },
+      { "from": "resources/jre", "to": "jre", "filter": ["**/*"] }
+    ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "dist-electron"
     },
     "win": {
       "target": "nsis",
-      "icon": "src/assets/icon.ico",
       "forceCodeSigning": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
