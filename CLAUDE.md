@@ -20,11 +20,12 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 ### Backend
 | Capa | Tecnología |
 |---|---|
-| Lenguaje / runtime | Java 17 + Spring Boot 3.4 |
+| Lenguaje / runtime | Java 17 + Spring Boot 3.4.7 |
 | ORM / Persistencia | Spring Data JPA + Hibernate + SQLiteDialect custom |
 | Base de datos | SQLite (local) |
 | Mapeo DTO | MapStruct 1.6.3 |
 | Boilerplate | Lombok (`@RequiredArgsConstructor`, `@Builder`, `@Data`, etc.) |
+| Seguridad / hashing | Spring Security Crypto (BCrypt para contraseñas) |
 | Puerto local | `5020` |
 
 ### Frontend
@@ -40,7 +41,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 | Iconos | lucide-react |
 | Fechas | date-fns |
 | Tests | Vitest + Testing Library (jsdom) |
-| Desktop (futuro) | Electron 37 — carpeta `electron/` existe pero no integrada aún |
+| Desktop | Electron 37.2.2 + electron-builder 26.0.12 — carpeta `electron/` existe, no integrada con el build Docker aún |
 | Puerto local | nginx `:80` → proxy `/api/*` → `backend:5020` |
 
 ### Despliegue (Docker Compose)
@@ -77,7 +78,7 @@ Casa-Verde/
 │   ├── models/
 │   │   ├── entitys/   ← 18 @Entity JPA
 │   │   └── enums/     ← 4 enums de dominio
-│   └── repositories/  ← 17 interfaces JpaRepository (sin @Repository)
+│   └── repositories/  ← 18 interfaces JpaRepository (sin @Repository)
 ├── capaControladores/ ← 15 @RestController
 ├── config/
 │   ├── DataSourceConfig.java      ← DataSource SQLite
@@ -90,7 +91,7 @@ Casa-Verde/
 │   └── dialect/
 │       └── SQLiteDialect.java
 └── fachadaServices/
-    ├── dto/      ← 33 DTOs y Requests
+    ├── dto/      ← 41 DTOs y Requests
     ├── mapper/   ← 12 @Mapper MapStruct
     └── services/
         ├── configuracionService/   ← IConfiguracionGeneralService, ITasaCambioService
@@ -161,9 +162,14 @@ Casa-Verde/
 ### Fondos — `/api/v1/fondos`
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/` | Saldo de los tres fondos (COP, USD, NEQUI) |
+| GET | `/` | Saldo de todos los fondos (COP, USD, NEQUI y cuentas NEQUI adicionales) |
 | GET | `/historial` | Historial libro de caja. Filtros: `fecha`, `moneda`, `tipo` |
 | PUT | `/{moneda}` | Ajustar saldo de un fondo manualmente |
+| POST | `/entrada` | Registrar entrada directa de capital a un fondo |
+| POST | `/transferencia` | Transferir saldo entre fondos (genera par TRANSFERENCIA_SALIDA/ENTRADA) |
+| GET | `/nequi/estado-mes` | Resumen de operaciones NEQUI del mes actual |
+| POST | `/nequi/cuentas` | Crear una cuenta NEQUI adicional (ej. NEQUI_HAROLD) |
+| DELETE | `/nequi/cuentas/{moneda}` | Eliminar una cuenta NEQUI adicional |
 
 ### Tasa de cambio — `/api/v1/tasa-cambio`
 | Método | Ruta | Descripción |
@@ -202,11 +208,19 @@ Casa-Verde/
 |---|---|---|
 | GET | `/` | Resumen completo. `?fecha=2025-01-15` (default: hoy) |
 
-### Usuarios y sesión
+### Usuarios — `/api/v1/usuarios`
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/api/v1/usuarios` | Lista usuarios activos |
-| POST | `/api/v1/sesion/login` | Login (`{usuarioId, password}`) |
+| GET | `/` | Lista usuarios activos |
+| POST | `/` | Crear operador (`{nombre, password}`) — solo rol OPERADOR desde UI |
+| PUT | `/{id}/toggle` | Activar / desactivar usuario |
+| PUT | `/{id}/password` | Cambiar contraseña de un usuario |
+| DELETE | `/{id}` | Eliminar usuario (solo OPERADOR) |
+
+### Sesión — `/api/v1/sesion`
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/login` | Login (`{usuarioId, password}`) — devuelve UsuarioDTO o 401 |
 
 ### Auditoría — `/api/v1/auditoria`
 | Método | Ruta | Descripción |
@@ -255,11 +269,13 @@ Casa-Verde/
 
 ### Fondo
 - PK = `moneda` (string: "COP", "USD", "NEQUI")
+- Soporta cuentas NEQUI adicionales con alias (ej. "NEQUI_HAROLD") — creadas dinámicamente vía API
+- `alias`: nombre legible del fondo para mostrar en UI
 - `@Version` para bloqueo optimista concurrente
 - El fondo se acredita **al finalizar un pedido**, no al registrar el pago
 
 ### CajaMovimiento
-- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO
+- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA
 - `referenciaTipo` + `referenciaId`: trazabilidad al origen del movimiento
 - Cada movimiento guarda `saldoResultante` en el momento del registro
 
@@ -289,7 +305,8 @@ Casa-Verde/
 ### Usuario
 - `rol`: ADMIN | OPERADOR
 - `requierePassword`: solo ADMIN requiere clave por defecto
-- Usuarios iniciales: un ADMIN (password: `admin123`, hasheado SHA-256) y un OPERADOR
+- Usuarios iniciales: un ADMIN (password: `admin123`, hasheado **BCrypt**) y un OPERADOR
+- Contraseñas almacenadas con BCrypt (Spring Security Crypto) — no SHA-256
 
 ### ConfiguracionGeneral
 - Parámetros clave-valor. Claves iniciales:
@@ -354,7 +371,8 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 4. Registra auditoría
 
 ### Moneda
-- Monedas válidas: `COP`, `USD`, `NEQUI` (validadas por `MonetaryService`)
+- Monedas base: `COP`, `USD`, `NEQUI` (validadas por `MonetaryService`)
+- Monedas NEQUI adicionales con prefijo `NEQUI_` (ej. `NEQUI_HAROLD`) — se crean vía API
 - COP y NEQUI: sin centavos (escala 0). USD: máximo 2 decimales
 - Conversión USD→COP usa la tasa vigente en `TasaCambio`
 - El cambio (vueltas) al cliente nunca se registra en el fondo
@@ -386,13 +404,14 @@ src/
 │   │   ├── AppLayout.jsx           ← Shell: guard de sesión → LoginScreen o layout
 │   │   ├── Sidebar.jsx             ← Nav lateral colapsable (Zustand)
 │   │   └── Topbar.jsx              ← Barra superior (fecha, tasa USD, usuario)
-│   ├── shared/                     ← KpiCard, ConfirmDialog, MoneyInput, ToggleChip
+│   ├── shared/                     ← KpiCard, ConfirmDialog, MoneyInput, ToggleChip, Pagination
 │   ├── pedidos/                    ← OrdenCard, ProductoRow, ModalCrearPedido,
 │   │                                  ModalDetallePedido, ModalCobrar, ModalAgregarItems
-│   ├── configuracion/              ← ModalProducto, ModalSalon, ModalHistorialPrecios
-│   ├── fondos/                     ← ModalAjuste
+│   ├── configuracion/              ← ModalProducto, ModalSalon, ModalHistorialPrecios,
+│   │                                  ModalCrearOperador, ModalCambiarPassword
+│   ├── fondos/                     ← ModalAjuste, ModalEntrada, ModalTransferencia
 │   ├── gastos/                     ← ModalGasto
-│   ├── inventario/                 ← ModalMovimiento
+│   ├── inventario/                 ← ModalMovimiento, ModalCompraInsumo
 │   └── resumen/                    ← CierreCajaPanel
 ├── pages/
 │   ├── dashboard/Dashboard.jsx     ← ✅ Implementado
@@ -402,16 +421,24 @@ src/
 │   ├── inventario/InventarioPage.jsx ← ✅ Implementado
 │   ├── resumen/ResumenPage.jsx     ← ✅ Implementado (incluye CierreCajaPanel)
 │   ├── configuracion/
-│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Salones, Tasa USD, General
-│   │   └── tabs/*.jsx              ← ✅ Los 4 tabs implementados
+│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Categorías, Salones, Usuarios, Tasa USD
+│   │   └── tabs/*.jsx              ← ✅ Los 5 tabs implementados
 │   └── Placeholder.jsx             ← Componente vacío para módulos pendientes
-├── services/                       ← Un archivo por dominio (pedidoService.js, etc.)
-├── store/useSessionStore.js        ← Zustand: { usuario, tasaUsd, sidebarColapsado }
-├── hooks/usePedidoMutations.js     ← Mutations TanStack Query para pedidos
+├── services/                       ← 13 archivos (un servicio por dominio)
+│   │  pedidoService, productoService, categoriaService, inventarioService,
+│   │  fondoService, gastoService, salonService, tasaService, cierreCajaService,
+│   │  resumenService, configuracionService, usuarioService,
+│   │  exportacionService, auditoriaService
+├── store/useSessionStore.js        ← Zustand: { usuario, sidebarColapsado }
+│   │  (la tasa USD viene de React Query, no de Zustand)
+├── hooks/
+│   ├── usePedidoMutations.js       ← Mutations TanStack Query para pedidos
+│   └── useModalKeyboard.js         ← Cierre de modales con tecla Escape
 └── utils/
-    ├── format.js                   ← formatCOP, formatDecimal, formatFecha, formatHora
-    ├── constants.js                ← Constantes (estados, monedas, etc.)
-    └── pedidoHelpers.js            ← Helpers de cálculo para pedidos
+    ├── format.js                   ← formatCOP, formatUSD, formatDecimal, formatFecha,
+    │                                  formatHora, formatCreadoEn
+    ├── constants.js                ← ESTADO_BADGE, CAT_BADGE y demás constantes de dominio
+    └── pedidoHelpers.js            ← esActivo, sortByReserva, calcularInsumos, formatInsumo
 ```
 
 ### Módulos pendientes de implementar (no tienen página en el router)
@@ -469,6 +496,8 @@ Clases utilitarias propias definidas en `@layer components`:
 - **Iconos**: lucide-react exclusivamente.
 - **No crear nuevos archivos CSS** — todo estilo va en clases Tailwind o en las clases del design system de `index.css`.
 - **Electron**: no tocar la carpeta `electron/` sin instrucción explícita.
+- **Zustand**: solo almacena `{ usuario, sidebarColapsado }`. La tasa USD y otros datos de la API se obtienen con React Query — no guardar datos de API en el store global.
+- **Paginación**: usar `Pagination` de `shared/` para tablas largas. No reimplementar lógica de páginas inline.
 
 ---
 
@@ -551,7 +580,7 @@ Admin panel de escritorio, no landing page.
 | Inventario | `/inventario` | ✅ Implementado |
 | Gastos | `/gastos` | ✅ Implementado |
 | Capital y fondos | `/fondos` | ✅ Implementado |
-| Configuración (Productos, Salones, Tasa USD, General) | `/configuracion` | ✅ Implementado |
+| Configuración (Productos, Categorías, Salones, Usuarios, Tasa USD) | `/configuracion` | ✅ Implementado |
 | Auditoría | — | ⏳ Pendiente — endpoint backend listo |
 | Backups | — | ⏳ Pendiente — endpoint backend listo |
 | Exportaciones CSV | — | ⏳ Pendiente — endpoints backend listos |

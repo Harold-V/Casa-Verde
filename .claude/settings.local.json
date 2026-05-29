@@ -1,4 +1,21 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "docker compose down && docker compose build && docker compose up -d",
+            "shell": "bash",
+            "async": true,
+            "statusMessage": "Rebuilding Docker...",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(git checkout *)",
@@ -37,7 +54,12 @@
       "Bash(mvn compile *)",
       "Bash(./mvnw.cmd compile *)",
       "Bash(npx acorn *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(del \"C:\\\\Users\\\\HaroldV\\\\Desktop\\\\Casa-Verde\\\\frontend\\\\src\\\\hooks\\\\useFormatos.js\")",
+      "Bash(del \"C:\\\\Users\\\\HaroldV\\\\Desktop\\\\Casa-Verde\\\\frontend\\\\src\\\\pages\\\\pedidos-pendientes\\\\PedidosPendientesPage.jsx\")"
     ]
+  },
+  "enabledPlugins": {
+    "code-simplifier@claude-plugins-official": true
   }
 }
