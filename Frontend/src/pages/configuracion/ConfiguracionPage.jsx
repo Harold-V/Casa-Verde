@@ -2,13 +2,13 @@ import { useState } from "react";
 import ProductosTab from "./tabs/ProductosTab";
 import SalonesTab from "./tabs/SalonesTab";
 import TasaUsdTab from "./tabs/TasaUsdTab";
-import GeneralTab from "./tabs/GeneralTab";
+import FondosTab from "./tabs/FondosTab";
 
 const TABS = [
   { id: "productos",  label: "Productos" },
   { id: "salones",    label: "Salones" },
   { id: "tasa",       label: "Tasa USD" },
-  { id: "general",    label: "General" },
+  { id: "fondos",     label: "Fondos" },
 ];
 
 export default function ConfiguracionPage() {
@@ -35,7 +35,7 @@ export default function ConfiguracionPage() {
       {tab === "productos"  && <ProductosTab />}
       {tab === "salones"    && <SalonesTab />}
       {tab === "tasa"       && <TasaUsdTab />}
-      {tab === "general"    && <GeneralTab />}
+      {tab === "fondos"     && <FondosTab />}
     </div>
   );
 }
