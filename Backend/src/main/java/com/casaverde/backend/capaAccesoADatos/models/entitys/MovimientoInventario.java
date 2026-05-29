@@ -1,0 +1,50 @@
+package com.casaverde.backend.capaAccesoADatos.models.entitys;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "movimiento_inventario")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class MovimientoInventario {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String insumo;
+
+    @Column(nullable = false)
+    private String tipo; // entrada | salida | ajuste
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal cantidad;
+
+    @Column(name = "stock_resultante", nullable = false, precision = 19, scale = 4)
+    private BigDecimal stockResultante;
+
+    @Column(name = "referencia_tipo")
+    private String referenciaTipo; // pedido | gasto | ajuste_manual
+
+    @Column(name = "referencia_id")
+    private Long referenciaId;
+
+    private String observacion;
+
+    @Column(name = "registrado_en")
+    private LocalDateTime registradoEn;
+
+    @PrePersist
+    void onCreate() {
+        registradoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
+    }
+}

@@ -19,6 +19,48 @@ export const formatHora = (isoString) => {
   return new Date(isoString).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
 };
 
+/**
+ * Muestra la fecha/hora de creación de un pedido de forma contextual:
+ * - Hoy          → "4:41 PM"
+ * - Ayer         → "Ayer a las 4:41 PM"
+ * - Este año     → "Miércoles 20 de mayo · 4:41 PM"
+ * - Año anterior → "Miércoles 20 de mayo de 2024 · 4:41 PM"
+ */
+export const formatCreadoEn = (isoString) => {
+  if (!isoString) return "—";
+  const tz  = sysTZ();
+  const d   = new Date(isoString);
+  const hora = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
+
+  // Fecha del evento y de hoy en zona local, como "YYYY-MM-DD"
+  const toLocalDate = (date) =>
+    date.toLocaleDateString("en-CA", { timeZone: tz }); // en-CA → YYYY-MM-DD
+
+  const hoy = new Date();
+  const ayer = new Date(hoy);
+  ayer.setDate(ayer.getDate() - 1);
+
+  const fechaEvento = toLocalDate(d);
+  const fechaHoy    = toLocalDate(hoy);
+  const fechaAyer   = toLocalDate(ayer);
+
+  if (fechaEvento === fechaHoy)  return hora;
+  if (fechaEvento === fechaAyer) return `Ayer a las ${hora}`;
+
+  const mismoAnio = d.getFullYear() === hoy.getFullYear();
+  const diaSemana = d.toLocaleDateString("es-CO", { weekday: "long", timeZone: tz });
+  const dia       = d.toLocaleDateString("es-CO", { day: "numeric",  timeZone: tz });
+  const mes       = d.toLocaleDateString("es-CO", { month: "long",   timeZone: tz });
+  const anio      = d.getFullYear();
+
+  const capFirst  = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const fechaStr  = mismoAnio
+    ? `${capFirst(diaSemana)} ${dia} de ${mes}`
+    : `${capFirst(diaSemana)} ${dia} de ${mes} de ${anio}`;
+
+  return `${fechaStr} · ${hora}`;
+};
+
 export const formatCOP = (valor) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -29,3 +71,6 @@ export const formatCOP = (valor) =>
 
 export const formatDecimal = (valor) =>
   typeof valor === "number" ? valor.toFixed(3).replace(/\.?0+$/, "") : "0";
+
+export const formatUSD = (valor) =>
+  `$${Number(valor ?? 0).toFixed(2)}`;

@@ -1,48 +1,62 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, AlertTriangle } from "lucide-react";
+import { ArrowRight, AlertTriangle, Calendar } from "lucide-react";
 import { resumenService } from "../../services/resumenService";
 import { pedidoService } from "../../services/pedidoService";
 import { inventarioService } from "../../services/inventarioService";
-import { formatCOP, formatDecimal } from "../../utils/format";
-import { useFormatos } from "../../hooks/useFormatos";
+import { formatCOP, formatDecimal, formatCreadoEn } from "../../utils/format";
+import { calcularInsumos, formatInsumo, formatReservaDisplay, sortByReserva } from "../../utils/pedidoHelpers";
+import KpiCard from "../../components/shared/KpiCard";
+import Pagination from "../../components/shared/Pagination";
 
-const HOY = new Date().toISOString().slice(0, 10);
+const PAGE_SIZE = 8;
 
-// color → Tailwind border-l + text classes
-const COLOR_CLS = {
-  "var(--warning)":        { border: "border-l-amber-500",   text: "text-amber-600" },
-  "var(--danger)":         { border: "border-l-red-600",     text: "text-red-600" },
-  "var(--verde-claro)":    { border: "border-l-verde-claro", text: "text-verde-claro" },
-  "var(--text-secondary)": { border: "border-l-gray-300",    text: "text-gray-400" },
-};
+function StockCard({ s, estimado = 0 }) {
+  const texto   = formatInsumo(s.insumo, s.stockActual) ?? "0";
+  const deficit = Math.max(0, estimado - s.stockActual);
 
-function KpiCard({ label, value, sub, color, dim }) {
-  const cls = COLOR_CLS[color] ?? {};
+  const borderCls = deficit > 0 || s.stockActual < 2
+    ? "border-l-red-600"
+    : s.stockActual < 5
+      ? "border-l-amber-500"
+      : "border-l-verde-claro";
+  const textCls = deficit > 0 || s.stockActual < 2
+    ? "text-red-600"
+    : s.stockActual < 5
+      ? "text-amber-600"
+      : "text-verde-claro";
+  const label = s.insumo.charAt(0).toUpperCase() + s.insumo.slice(1);
+
   return (
-    <div className={`kpi-card ${cls.border ?? ""} ${dim ? "opacity-50" : ""}`}>
-      <div className="kpi-label">{label}</div>
-      <div className={`kpi-value ${cls.text ?? ""}`}>{value}</div>
-      {sub && <div className="text-[12px] text-gray-500 mt-0.5">{sub}</div>}
+    <div className={`kpi-card ${borderCls}`}>
+      <div className="kpi-label">Stock {label}</div>
+      <div className={`font-bold text-[18px] leading-snug mt-1 ${textCls}`}>
+        {texto}{deficit > 0 && " ⚠️"}
+      </div>
+      {estimado > 0 && (
+        <div className="text-[12px] text-gray-500 mt-1.5 leading-snug">
+          Pedidos: {formatInsumo(s.insumo, estimado)}
+        </div>
+      )}
+      {deficit > 0 && (
+        <div className="text-[12px] font-semibold text-red-600 mt-0.5 leading-snug">
+          Falta: {formatInsumo(s.insumo, deficit)}
+        </div>
+      )}
     </div>
   );
 }
 
-const ESTADO_BADGE = {
-  PENDIENTE:       "badge-gray",
-  ABONADO_PARCIAL: "badge-warning",
-  PAGADO:          "badge-success",
-  FINALIZADO:      "badge-info",
-  ANULADO:         "badge-danger",
-};
-
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { formatHora } = useFormatos();
+  const [hoy, setHoy] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [soloReservas, setSoloReservas] = useState(false);
+  const [pagina, setPagina] = useState(0);
 
   const { data: resumen } = useQuery({
-    queryKey: ["resumen", HOY],
-    queryFn: () => resumenService.obtener(HOY),
+    queryKey: ["resumen", hoy],
+    queryFn: () => resumenService.obtener(hoy),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
@@ -58,10 +72,46 @@ export default function Dashboard() {
     queryKey: ["inventario-stock"],
     queryFn: inventarioService.listarStock,
     staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 
+  // Actualiza "hoy" exactamente a medianoche para que el resumen cambie de día
+  useEffect(() => {
+    const now    = new Date();
+    const mañana = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const t = setTimeout(() => setHoy(new Date().toLocaleDateString("en-CA")), mañana.getTime() - now.getTime() + 100);
+    return () => clearTimeout(t);
+  }, [hoy]);
+
+  // Re-render exactamente cuando la próxima reserva alcanza su hora
+  const [, setReservasTick] = useState(0);
+  useEffect(() => {
+    const now   = Date.now();
+    const today = new Date().toLocaleDateString("en-CA");
+    const proximoFlip = pedidosActivos
+      .filter((p) => p.horaReserva)
+      .map((p) => new Date(`${p.fechaReserva ?? today}T${p.horaReserva}`).getTime())
+      .filter((t) => t > now)
+      .sort((a, b) => a - b)[0];
+    if (!proximoFlip) return;
+    const timer = setTimeout(() => setReservasTick((n) => n + 1), proximoFlip - now + 500);
+    return () => clearTimeout(timer);
+  }, [pedidosActivos]);
+
   const r = resumen;
-  const porCobrar = pedidosActivos.reduce((s, p) => s + (p.saldoPendiente ?? 0), 0);
+  const porCobrar      = pedidosActivos.reduce((s, p) => s + (p.saldoPendiente ?? 0), 0);
+  const insumosActivos = calcularInsumos(pedidosActivos.flatMap((p) => p.detalles ?? []));
+  const reservasCount = pedidosActivos.filter((p) => !!(p.fechaReserva || p.horaReserva)).length;
+
+  const listaFiltrada = sortByReserva(
+    soloReservas
+      ? pedidosActivos.filter((p) => !!(p.fechaReserva || p.horaReserva))
+      : pedidosActivos
+  );
+
+  const totalPaginas = Math.max(1, Math.ceil(listaFiltrada.length / PAGE_SIZE));
+  const paginaActual = Math.min(pagina, totalPaginas - 1);
+  const listaPagina = listaFiltrada.slice(paginaActual * PAGE_SIZE, (paginaActual + 1) * PAGE_SIZE);
 
   return (
     <div>
@@ -76,10 +126,10 @@ export default function Dashboard() {
       <div className="font-semibold text-verde-oscuro mb-2 text-[13px]">Operaciones del día</div>
       <div className="kpi-grid mb-5">
         <KpiCard
-          label="Pedidos activos"
+          label="Pedidos pendientes"
           value={pedidosActivos.length}
           color={pedidosActivos.length > 0 ? "var(--warning)" : "var(--verde-claro)"}
-          sub={pedidosActivos.length > 0 ? "activos ahora" : "ninguno activo"}
+          sub={pedidosActivos.length > 0 ? "pendientes ahora" : "ninguno pendiente"}
         />
         <KpiCard
           label="Por cobrar"
@@ -89,7 +139,6 @@ export default function Dashboard() {
         <KpiCard
           label="Pedidos finalizados hoy"
           value={r?.pedidosFinalizados ?? "—"}
-          sub={r ? `de ${r.pedidosTotales} creados` : undefined}
         />
         <KpiCard
           label="Cobrado hoy"
@@ -108,69 +157,111 @@ export default function Dashboard() {
         <>
           <div className="font-semibold text-verde-oscuro mb-2 text-[13px]">Inventario</div>
           <div className="kpi-grid mb-6">
-            {stock.map((s) => (
-              <KpiCard
-                key={s.insumo}
-                label={`Stock ${s.insumo}`}
-                value={formatDecimal(s.stockActual)}
-                sub={s.unidad}
-                color={s.stockActual < 2 ? "var(--danger)" : s.stockActual < 5 ? "var(--warning)" : "var(--verde-claro)"}
-              />
-            ))}
+            {stock.map((s) => <StockCard key={s.insumo} s={s} estimado={insumosActivos[s.insumo] ?? 0} />)}
           </div>
         </>
       )}
 
-      {/* ---- Pedidos abiertos ---- */}
+      {/* ---- Pedidos pendientes ---- */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Pedidos activos</span>
-          <button
-            className="btn btn-secondary btn-sm flex items-center gap-1"
-            onClick={() => navigate("/pedidos")}
-          >
-            Ver todos <ArrowRight size={13} />
-          </button>
+          <span className="card-title shrink-0">Pedidos pendientes</span>
+
+          {/* Paginación centrada */}
+          <div className="flex-1 flex justify-center">
+            {listaFiltrada.length > PAGE_SIZE && (
+              <Pagination pagina={paginaActual} totalItems={listaFiltrada.length} pageSize={PAGE_SIZE} onChange={setPagina} />
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {reservasCount > 0 && (
+              <button
+                className={`btn btn-sm flex items-center gap-1.5 ${soloReservas ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => { setSoloReservas((v) => !v); setPagina(0); }}
+                title="Filtrar por reservas"
+              >
+                <Calendar size={13} />
+                Reservas
+                <span className={`rounded-full px-1.5 py-0 text-[10px] font-bold leading-4 ${soloReservas ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>
+                  {reservasCount}
+                </span>
+              </button>
+            )}
+            <button
+              className="btn btn-secondary btn-sm flex items-center gap-1"
+              onClick={() => navigate("/pedidos")}
+            >
+              Ver todos <ArrowRight size={13} />
+            </button>
+          </div>
         </div>
         <div className="table-wrap">
           {pedidosActivos.length === 0 ? (
-            <div className="empty-state"><p>No hay pedidos activos en este momento</p></div>
+            <div className="empty-state"><p>No hay pedidos pendientes en este momento</p></div>
+          ) : listaFiltrada.length === 0 ? (
+            <div className="empty-state"><p>No hay reservas activas</p></div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Cliente</th>
-                  <th>Salón / Mesa</th>
-                  <th>Ítems</th>
-                  <th className="text-right">Total</th>
-                  <th className="text-right">Saldo</th>
-                  <th>Hora</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidosActivos.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate("/pedidos")}
-                    title="Ir a Pedidos"
-                  >
-                    <td className="font-bold text-gray-500 text-[12px]">#{p.id}</td>
-                    <td className="font-semibold">{p.nombre ?? "—"}</td>
-                    <td className="text-[13px] text-gray-500">
-                      {[p.salonNombre, p.mesa].filter(Boolean).join(" / ") || "—"}
-                    </td>
-                    <td className="text-center">{p.detalles?.length ?? 0}</td>
-                    <td className="text-right font-semibold">{formatCOP(p.totalCop)}</td>
-                    <td className={`text-right font-bold ${p.saldoPendiente > 0 ? "text-red-600" : "text-verde-claro"}`}>
-                      {formatCOP(p.saldoPendiente)}
-                    </td>
-                    <td className="text-[12px] text-gray-500">{formatHora(p.creadoEn)}</td>
+            <>
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Cliente</th>
+                    <th>Productos</th>
+                    <th className="text-right">Total</th>
+                    <th className="text-right">Saldo</th>
+                    <th>Fecha/Hora</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {listaPagina.map((p) => {
+                    const insumos = calcularInsumos(p.detalles ?? []);
+                    const gallina = insumos["gallina"];
+                    const cuy = insumos["cuy"];
+                    const tieneReserva = !!(p.fechaReserva || p.horaReserva);
+                    return (
+                    <tr
+                      key={p.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate("/pedidos", { state: { abrirPedidoId: p.id } })}
+                      title="Ver pedido"
+                    >
+                      <td className="font-bold text-gray-500 text-[12px]">#{p.id}</td>
+                      <td className="font-semibold">
+                        <span>{p.nombre ?? "—"}</span>
+                        {tieneReserva && (
+                          <Calendar size={11} className="inline ml-1.5 text-amber-500" />
+                        )}
+                      </td>
+                      <td>
+                        {(gallina || cuy) ? (
+                          <div className="flex gap-2 flex-wrap text-[12px] font-semibold text-gray-700">
+                            {gallina && <span>🐔 {formatInsumo("gallina", gallina)}</span>}
+                            {cuy && <span>🐹 {formatInsumo("cuy", cuy)}</span>}
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-gray-500">
+                            {p.detalles?.slice(0, 2).map((d) => d.nombreSnapshot ?? d.nombre).filter(Boolean).join(", ") || "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-right font-semibold">{formatCOP(p.totalCop)}</td>
+                      <td className={`text-right font-bold ${p.saldoPendiente > 0 ? "text-red-600" : "text-verde-claro"}`}>
+                        {p.saldoPendiente > 0 ? formatCOP(p.saldoPendiente) : "Pagado"}
+                      </td>
+                      <td className="text-[12px]">
+                        {tieneReserva
+                          ? <span className="text-amber-600">{formatReservaDisplay(p.fechaReserva, p.horaReserva)}</span>
+                          : <span className="text-gray-500">{formatCreadoEn(p.creadoEn)}</span>
+                        }
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       </div>

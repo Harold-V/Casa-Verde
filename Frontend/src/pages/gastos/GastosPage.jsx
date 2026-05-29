@@ -1,120 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { gastoService } from "../../services/gastoService";
-import { formatCOP } from "../../utils/format";
-import { useFormatos } from "../../hooks/useFormatos";
-
-const CATEGORIAS = ["insumos", "servicios", "equipos", "otros"];
-
-const CAT_BADGE = {
-  insumos:   "badge-success",
-  servicios: "badge-warning",
-  equipos:   "badge-gray",
-  otros:     "badge-gray",
-};
-
-const HOY = new Date().toISOString().slice(0, 10);
-
-function ModalGasto({ onClose, onGuardar }) {
-  const [form, setForm] = useState({
-    concepto: "", categoria: "insumos", moneda: "COP", monto: "", observacion: "",
-  });
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSaving(true);
-    try {
-      await onGuardar({ ...form, monto: Number(form.monto) });
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.mensaje ?? err.message);
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal max-w-[480px]">
-        <div className="modal-header">
-          <span className="modal-title">Registrar gasto</span>
-          <button className="btn-icon" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            {error && <div className="alert alert-error">{error}</div>}
-
-            <div className="form-group">
-              <label className="form-label">Concepto</label>
-              <input
-                className="form-control" autoFocus
-                value={form.concepto}
-                onChange={(e) => set("concepto", e.target.value)}
-                placeholder="ej. Compra 10 gallinas"
-              />
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Categoría</label>
-                <select className="form-control" value={form.categoria} onChange={(e) => set("categoria", e.target.value)}>
-                  {CATEGORIAS.map((c) => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Moneda</label>
-                <select className="form-control" value={form.moneda} onChange={(e) => set("moneda", e.target.value)}>
-                  <option value="COP">COP — Pesos</option>
-                  <option value="USD">USD — Dólares</option>
-                  <option value="NEQUI">NEQUI</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Monto {form.moneda === "USD" ? "(en dólares)" : "(en pesos)"}
-              </label>
-              <input
-                className="form-control" type="number" min="0" step="0.01"
-                value={form.monto}
-                onChange={(e) => set("monto", e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Observación (opcional)</label>
-              <input
-                className="form-control"
-                value={form.observacion}
-                onChange={(e) => set("observacion", e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Guardando…" : "Registrar gasto"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+import { formatCOP, formatFecha, formatUSD } from "../../utils/format";
+import { CAT_BADGE } from "../../utils/constants";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import ModalGasto from "../../components/gastos/ModalGasto";
 
 export default function GastosPage() {
   const qc = useQueryClient();
-  const { formatFecha } = useFormatos();
+  const hoy = new Date().toLocaleDateString("en-CA");
   const [modalOpen, setModalOpen] = useState(false);
-  const [filtroFecha, setFiltroFecha] = useState(HOY);
+  const [filtroFecha, setFiltroFecha] = useState(hoy);
+  const [confirmEliminar, setConfirmEliminar] = useState(null); // { id, concepto }
+  const [errorEliminar, setErrorEliminar] = useState("");
 
   const { data: gastos = [], isLoading } = useQuery({
     queryKey: ["gastos", filtroFecha],
@@ -128,12 +27,15 @@ export default function GastosPage() {
 
   const eliminarMut = useMutation({
     mutationFn: gastoService.eliminar,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["gastos"] }),
+    onSuccess: () => {
+      setErrorEliminar("");
+      qc.invalidateQueries({ queryKey: ["gastos"] });
+    },
+    onError: (err) => setErrorEliminar(err.message),
   });
 
   const handleEliminar = (id, concepto) => {
-    if (!window.confirm(`¿Eliminar el gasto "${concepto}"? Se revertirá el fondo.`)) return;
-    eliminarMut.mutate(id);
+    setConfirmEliminar({ id, concepto });
   };
 
   const totalHoy   = gastos.reduce((s, g) => s + (g.montoCop ?? 0), 0);
@@ -180,7 +82,7 @@ export default function GastosPage() {
         {totalUsd > 0 && (
           <div className="kpi-card">
             <div className="kpi-label">USD</div>
-            <div className="kpi-value">${totalUsd.toFixed(2)}</div>
+            <div className="kpi-value">{formatUSD(totalUsd)}</div>
           </div>
         )}
         {totalNequi > 0 && (
@@ -228,13 +130,13 @@ export default function GastosPage() {
                     <td className="text-[12px] text-gray-500 whitespace-nowrap">{formatFecha(g.registradoEn)}</td>
                     <td className="font-medium">{g.concepto}</td>
                     <td>
-                      <span className={`badge ${CAT_BADGE[g.categoria] ?? "badge-gray"}`}>{g.categoria}</span>
+                      <span className={`badge ${CAT_BADGE[g.categoria] ?? "badge-gray"}`}>{g.categoria ? g.categoria.charAt(0).toUpperCase() + g.categoria.slice(1) : ""}</span>
                     </td>
                     <td>
                       <span className="badge badge-warning">{g.moneda}</span>
                     </td>
                     <td className="text-right font-semibold">
-                      {g.moneda === "USD" ? `$${g.monto.toFixed(2)}` : formatCOP(g.monto)}
+                      {g.moneda === "USD" ? formatUSD(g.monto) : formatCOP(g.monto)}
                     </td>
                     <td className="text-right">{formatCOP(g.montoCop)}</td>
                     <td className="text-[12px] text-gray-500">{g.observacion ?? "—"}</td>
@@ -255,10 +157,26 @@ export default function GastosPage() {
         </div>
       </div>
 
+      {errorEliminar && (
+        <div className="alert alert-error mt-4">{errorEliminar}</div>
+      )}
+
       {modalOpen && (
         <ModalGasto
           onClose={() => setModalOpen(false)}
           onGuardar={(data) => registrarMut.mutateAsync(data)}
+        />
+      )}
+
+      {confirmEliminar && (
+        <ConfirmDialog
+          emoji="🗑️"
+          titulo="¿Eliminar gasto?"
+          descripcion={`Se eliminará "${confirmEliminar.concepto}" y se revertirá el fondo correspondiente.`}
+          labelOk="Sí, eliminar"
+          peligro
+          onOk={() => { eliminarMut.mutate(confirmEliminar.id); setConfirmEliminar(null); }}
+          onCancelar={() => setConfirmEliminar(null)}
         />
       )}
     </div>

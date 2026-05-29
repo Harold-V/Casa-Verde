@@ -1,17 +1,28 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { tasaService } from "../../../services/tasaService";
-import { formatCOP } from "../../../utils/format";
-import { useFormatos } from "../../../hooks/useFormatos";
+import { configuracionService } from "../../../services/configuracionService";
+import { formatCOP, formatFecha } from "../../../utils/format";
 
 export default function TasaUsdTab() {
   const qc = useQueryClient();
-  const { formatFecha } = useFormatos();
   const [nuevaTasa, setNuevaTasa] = useState("");
   const [msg, setMsg] = useState(null);
 
-  const { data: vigente } = useQuery({ queryKey: ["tasa-vigente"], queryFn: tasaService.vigente });
-  const { data: historial = [] } = useQuery({ queryKey: ["tasa-historial"], queryFn: tasaService.historial });
+  const { data: vigente } = useQuery({
+    queryKey: ["tasa-vigente"],
+    queryFn: tasaService.vigente,
+  });
+  const { data: historial = [] } = useQuery({
+    queryKey: ["tasa-historial"],
+    queryFn: tasaService.historial,
+  });
+  const { data: configs = [] } = useQuery({
+    queryKey: ["configuracion"],
+    queryFn: configuracionService.listar,
+  });
+
+  const mostrarTasa = configs.find((c) => c.clave === "mostrar_tasa_dolar")?.valor === "1";
 
   const mutRegistrar = useMutation({
     mutationFn: () => tasaService.registrar(parseFloat(nuevaTasa)),
@@ -23,6 +34,11 @@ export default function TasaUsdTab() {
       setTimeout(() => setMsg(null), 3000);
     },
     onError: (err) => setMsg({ tipo: "error", texto: err.message }),
+  });
+
+  const mutToggleTasa = useMutation({
+    mutationFn: (valor) => configuracionService.actualizarValor("mostrar_tasa_dolar", valor),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["configuracion"] }),
   });
 
   const handleGuardar = (e) => {
@@ -78,7 +94,7 @@ export default function TasaUsdTab() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card mb-5">
         <div className="card-header"><span className="card-title">Historial de tasas</span></div>
         <div className="table-wrap">
           {historial.length === 0 ? (
@@ -98,6 +114,33 @@ export default function TasaUsdTab() {
               </tbody>
             </table>
           )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><span className="card-title">Visualización</span></div>
+        <div className="card-body">
+          <div className="form-group mb-0">
+            <label className="form-label">Mostrar tasa USD en la barra superior</label>
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={mostrarTasa}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                  mostrarTasa ? "bg-verde-claro" : "bg-gray-300"
+                }`}
+                onClick={() => mutToggleTasa.mutate(mostrarTasa ? "0" : "1")}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  mostrarTasa ? "translate-x-6" : "translate-x-1"
+                }`} />
+              </button>
+              <span className="text-[13px] text-gray-700 font-medium">
+                {mostrarTasa ? "Visible" : "Oculta"}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

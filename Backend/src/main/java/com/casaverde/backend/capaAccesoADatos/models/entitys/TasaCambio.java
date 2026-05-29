@@ -1,0 +1,39 @@
+package com.casaverde.backend.capaAccesoADatos.models.entitys;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "tasa_cambio")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TasaCambio {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "valor_cop", nullable = false)
+    private BigDecimal valorCop;
+
+    @Column(name = "vigente_desde", nullable = false)
+    private LocalDateTime vigenteDesde;
+
+    @Column(name = "creado_en")
+    private LocalDateTime creadoEn;
+
+    @PrePersist
+    void onCreate() {
+        creadoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
+        if (vigenteDesde == null) {
+            vigenteDesde = LocalDateTime.now(ZoneId.of("America/Bogota"));
+        }
+    }
+}

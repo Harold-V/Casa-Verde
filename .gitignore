@@ -1,2 +1,13 @@
 .vscode/
 /DataBase
+Backend/DataBase/
+Backend/Backups/
+*.db
+*.db-shm
+*.db-wal
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
+
+# Test coverage output
+Frontend/coverage/
