@@ -152,11 +152,14 @@ export default function FondosPage() {
         <h1 className="page-title">Fondos</h1>
       </div>
 
-      {/* Tarjeta capital neto */}
-      {!loadingFondos && (
-        <div className="card mb-5 border-l-4 border-l-verde-oscuro"
-          style={{ background: "linear-gradient(135deg, #1a4731 0%, #1a4a2e 100%)" }}>
-          <div className="p-[18px] flex justify-between items-center flex-wrap gap-3">
+      {/* Card unificada: capital total + fondos individuales */}
+      {loadingFondos ? (
+        <div className="loading-center"><div className="spinner" /></div>
+      ) : (
+        <div className="card mb-5 overflow-hidden border-l-4 border-l-verde-oscuro">
+          {/* Header oscuro — capital total */}
+          <div className="p-[18px] flex justify-between items-center flex-wrap gap-3"
+            style={{ background: "linear-gradient(135deg, #1a4731 0%, #1a4a2e 100%)" }}>
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign size={18} className="text-white/70" />
@@ -175,28 +178,22 @@ export default function FondosPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Tarjetas por fondo */}
-      {loadingFondos ? (
-        <div className="loading-center"><div className="spinner" /></div>
-      ) : (
-        <>
-          <div className="grid gap-[14px] mb-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-            {fondos.map((f) => {
-              const esNequi = f.moneda.startsWith("NEQUI");
-              const esUsd   = f.moneda === "USD";
-              return (
-                <div key={f.moneda} className={`card border-l-4 ${getBorderCls(f.moneda)}`}>
-                  <div className="p-[18px] flex flex-col h-full">
-                    <div className="text-[13px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
-                    <div className={`text-[28px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
+          {/* Fondos individuales — sección blanca */}
+          <div className="p-4 bg-white">
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              {fondos.map((f) => {
+                const esNequi = f.moneda.startsWith("NEQUI");
+                const esUsd   = f.moneda === "USD";
+                return (
+                  <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`}>
+                    <div className="text-[12px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
+                    <div className={`text-[22px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
                       {f.moneda === "USD"
                         ? formatUSD(f.saldo ?? 0)
                         : formatCOP(f.saldo ?? 0)}
                     </div>
-                    <div className="flex items-center justify-between gap-2 mt-3">
+                    <div className="flex items-center justify-between gap-2 mt-2">
                       <div className="text-[11px] text-gray-500 flex flex-col gap-0.5">
                         <span>
                           {f.moneda}
@@ -208,7 +205,7 @@ export default function FondosPage() {
                           <span>act. {formatHora(f.actualizadoEn)}</span>
                         )}
                       </div>
-                      <div className="h-[30px] flex items-center">
+                      <div className="h-[28px] flex items-center">
                         {esNequi && (
                           <button
                             className="btn btn-secondary btn-sm flex items-center gap-1"
@@ -228,12 +225,12 @@ export default function FondosPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-
-        </>
+        </div>
       )}
 
       {/* Historial unificado */}
