@@ -93,7 +93,7 @@ class CasaVerdeBusinessRulesTests {
                 cuy.setStockActual(BigDecimal.ZERO);
                 inventarioRepository.save(cuy);
 
-                Producto productoCuy = productoRepository.findAllByOrderByNombreAsc().stream()
+                Producto productoCuy = productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
                                 .filter(p -> "Cuy".equals(p.getNombre()))
                                 .findFirst()
                                 .orElseThrow();
@@ -295,7 +295,7 @@ class CasaVerdeBusinessRulesTests {
 
         @Test
         void cambioDePrecioQuedaEnHistorial() {
-                Producto producto = productoRepository.findAllByOrderByNombreAsc().stream()
+                Producto producto = productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
                                 .filter(p -> "Gaseosa".equals(p.getNombre()))
                                 .findFirst()
                                 .orElseThrow();
