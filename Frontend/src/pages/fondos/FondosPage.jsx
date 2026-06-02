@@ -201,14 +201,6 @@ export default function FondosPage() {
               <div className="text-[34px] font-black tracking-tight text-white">
                 {formatCOP(capitalTotal)}
               </div>
-              <div className="text-[11px] text-white/55 mt-1">
-                COP {formatCOP(saldoCop)}
-                {" + "}
-                NEQUI {formatCOP(saldoNequiTotal)}{nequiFondos.length > 1 ? ` (${nequiFondos.length} cuentas)` : ""}
-                {usdEnCop != null
-                  ? ` + USD ${formatUSD(saldoUsd)} × ${formatCOP(tasaValor)} = ${formatCOP(usdEnCop)}`
-                  : ` + USD ${formatUSD(saldoUsd)} (tasa no configurada)`}
-              </div>
             </div>
             <ChevronDown
               size={20}
