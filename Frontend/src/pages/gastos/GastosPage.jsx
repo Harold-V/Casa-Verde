@@ -121,7 +121,6 @@ export default function GastosPage() {
                   <th>Moneda</th>
                   <th className="text-right">Monto</th>
                   <th className="text-right">En COP</th>
-                  <th>Obs.</th>
                   <th></th>
                 </tr>
               </thead>
@@ -140,7 +139,6 @@ export default function GastosPage() {
                       {g.moneda === "USD" ? formatUSD(g.monto) : formatCOP(g.monto)}
                     </td>
                     <td className="text-right">{formatCOP(g.montoCop)}</td>
-                    <td className="text-[12px] text-gray-500">{g.observacion ?? "—"}</td>
                     <td>
                       <button
                         className="btn-icon"
