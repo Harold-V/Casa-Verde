@@ -18,6 +18,7 @@ export default function GastosPage() {
   const { data: gastos = [], isLoading } = useQuery({
     queryKey: ["gastos", filtroFecha],
     queryFn: () => gastoService.listar(filtroFecha || undefined),
+    staleTime: 0,
   });
 
   const registrarMut = useMutation({
