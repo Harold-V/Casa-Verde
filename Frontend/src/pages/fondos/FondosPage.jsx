@@ -182,9 +182,8 @@ export default function FondosPage() {
                           {f.moneda === "USD" && tasaValor != null && (
                             <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
                           )}
-                          {f.moneda !== "USD" && f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
                         </span>
-                        {f.moneda === "USD" && f.actualizadoEn && (
+                        {f.actualizadoEn && (
                           <span>act. {formatHora(f.actualizadoEn)}</span>
                         )}
                       </div>
