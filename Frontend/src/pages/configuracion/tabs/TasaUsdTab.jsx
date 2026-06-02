@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { tasaService } from "../../../services/tasaService";
 import { configuracionService } from "../../../services/configuracionService";
-import { formatCOP, formatFecha } from "../../../utils/format";
+import { formatCOP, formatCreadoEn } from "../../../utils/format";
 
 export default function TasaUsdTab() {
   const qc = useQueryClient();
@@ -65,7 +65,7 @@ export default function TasaUsdTab() {
                 <span className="text-sm text-gray-500 font-normal">COP / USD</span>
               </div>
               <div className="text-gray-500 text-[13px] mt-1">
-                Vigente desde: {formatFecha(vigente.vigentDesde)}
+                Vigente desde: {formatCreadoEn(vigente.vigenteDesde)}
               </div>
             </div>
           ) : (
@@ -108,7 +108,7 @@ export default function TasaUsdTab() {
                 {historial.map((t, i) => (
                   <tr key={t.id}>
                     <td className={i === 0 ? "font-bold" : ""}>{formatCOP(t.valorCop)}</td>
-                    <td className="text-gray-500">{formatFecha(t.vigentDesde)}</td>
+                    <td className="text-gray-500">{formatCreadoEn(t.vigenteDesde)}</td>
                   </tr>
                 ))}
               </tbody>
