@@ -18,4 +18,6 @@ public interface SalonRepository extends JpaRepository<Salon, Long> {
     boolean existsByNombreAndIdNotAndEliminadoFalse(String nombre, Long id);
 
     Optional<Salon> findByNombreAndEliminadoTrue(String nombre);
+
+    Optional<Salon> findByIdAndEliminadoFalse(Long id);
 }

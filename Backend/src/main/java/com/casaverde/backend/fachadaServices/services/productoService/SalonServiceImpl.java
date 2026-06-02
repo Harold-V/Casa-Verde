@@ -117,7 +117,7 @@ public class SalonServiceImpl implements ISalonService {
     }
 
     private Salon findOrThrow(Long id) {
-        return repo.findById(id)
+        return repo.findByIdAndEliminadoFalse(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Salón no encontrado: " + id));
     }
 }
