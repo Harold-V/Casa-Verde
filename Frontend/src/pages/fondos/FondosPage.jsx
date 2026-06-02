@@ -225,7 +225,6 @@ export default function FondosPage() {
                       </div>
                     </div>
                   </div>
-                  </div>
                 );
               })}
             </div>
