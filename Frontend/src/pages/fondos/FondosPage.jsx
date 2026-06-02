@@ -317,15 +317,12 @@ export default function FondosPage() {
                       title={esVentaDia ? "Ver resumen del día" : undefined}
                     >
                       <td className="text-[12px] text-gray-500 whitespace-nowrap">
-                        {esVentaDia
-                          ? new Date(`${m._fechaNav}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })
-                          : formatFecha(m.fecha)
-                        }
+                        {formatFecha(m.fecha)}
                       </td>
                       <td>
                         <span className={`badge gap-1 ${badge}`}>
                           <Icon size={11} />
-                          {m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : ""}
+                          {m.tipo === "cobro" ? "Entrada" : m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : ""}
                         </span>
                       </td>
                       <td className="font-medium">{m.concepto}</td>
