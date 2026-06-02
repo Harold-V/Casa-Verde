@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { inventarioService } from "../../../services/inventarioService";
 import { formatDecimal } from "../../../utils/format";
 import { capFirst } from "../../../utils/pedidoHelpers";
+import ConfirmDialog from "../../../components/shared/ConfirmDialog";
 
 export default function InventarioTab() {
   const qc = useQueryClient();
@@ -41,6 +42,7 @@ export default function InventarioTab() {
 function InsumoRow({ insumo, onAjustado }) {
   const [cantidad, setCantidad] = useState("");
   const [msg, setMsg] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   const mut = useMutation({
     mutationFn: () =>
@@ -48,7 +50,7 @@ function InsumoRow({ insumo, onAjustado }) {
         insumo: insumo.insumo,
         tipo: "ajuste",
         cantidad: parseFloat(cantidad),
-        observacion: "ajuste manual desde configuración",
+        observacion: "Ajuste manual desde configuración",
       }),
     onSuccess: () => {
       setCantidad("");
@@ -67,41 +69,59 @@ function InsumoRow({ insumo, onAjustado }) {
       return;
     }
     setMsg(null);
+    setConfirmando(true);
+  };
+
+  const handleConfirmar = () => {
+    setConfirmando(false);
     mut.mutate();
   };
 
   return (
-    <div className="flex items-center gap-4 py-3 border-b last:border-0">
-      <div className="w-36 shrink-0">
-        <div className="font-semibold text-verde-oscuro">{capFirst(insumo.insumo)}</div>
-        <div className="text-sm text-gray-500">
-          Stock actual: <strong>{formatDecimal(insumo.stockActual)}</strong>
+    <>
+      <div className="flex items-center gap-4 py-3 border-b last:border-0">
+        <div className="w-36 shrink-0">
+          <div className="font-semibold text-verde-oscuro">{capFirst(insumo.insumo)}</div>
+          <div className="text-sm text-gray-500">
+            Stock actual: <strong>{formatDecimal(insumo.stockActual)}</strong>
+          </div>
         </div>
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-1">
+          <input
+            className="form-control w-36"
+            type="number"
+            step="0.001"
+            min="0"
+            placeholder="Nuevo stock"
+            value={cantidad}
+            onChange={(e) => { setCantidad(e.target.value); setMsg(null); }}
+            aria-label={`Nuevo stock de ${insumo.insumo}`}
+          />
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            disabled={mut.isPending}
+          >
+            {mut.isPending ? "Guardando…" : "Ajustar"}
+          </button>
+          {msg && (
+            <span className={`text-sm font-medium ${msg.tipo === "ok" ? "text-verde-claro" : "text-red-600"}`}>
+              {msg.texto}
+            </span>
+          )}
+        </form>
       </div>
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-1">
-        <input
-          className="form-control w-36"
-          type="number"
-          step="0.001"
-          min="0"
-          placeholder="Nuevo stock"
-          value={cantidad}
-          onChange={(e) => { setCantidad(e.target.value); setMsg(null); }}
-          aria-label={`Nuevo stock de ${insumo.insumo}`}
+
+      {confirmando && (
+        <ConfirmDialog
+          emoji="📦"
+          titulo={`Ajustar stock de ${capFirst(insumo.insumo)}`}
+          descripcion={`El stock pasará de ${formatDecimal(insumo.stockActual)} a ${parseFloat(cantidad)}. Este cambio queda registrado en el historial de inventario.`}
+          labelOk="Sí, ajustar"
+          onOk={handleConfirmar}
+          onCancelar={() => setConfirmando(false)}
         />
-        <button
-          type="submit"
-          className="btn btn-primary btn-sm"
-          disabled={mut.isPending}
-        >
-          {mut.isPending ? "Guardando…" : "Ajustar"}
-        </button>
-        {msg && (
-          <span className={`text-sm font-medium ${msg.tipo === "ok" ? "text-verde-claro" : "text-red-600"}`}>
-            {msg.texto}
-          </span>
-        )}
-      </form>
-    </div>
+      )}
+    </>
   );
 }

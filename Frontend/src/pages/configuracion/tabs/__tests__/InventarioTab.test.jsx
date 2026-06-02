@@ -58,15 +58,15 @@ describe("InventarioTab", () => {
 
     const input = await screen.findByLabelText(/nuevo stock de gallina/i);
     await userEvent.type(input, "10");
-    const botones = screen.getAllByRole("button", { name: /ajustar/i });
-    await userEvent.click(botones[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: /ajustar/i })[0]);
+    await userEvent.click(await screen.findByRole("button", { name: /sí, ajustar/i }));
 
     await waitFor(() =>
       expect(inventarioService.registrarMovimiento).toHaveBeenCalledWith({
         insumo: "gallina",
         tipo: "ajuste",
         cantidad: 10,
-        observacion: "ajuste manual desde configuración",
+        observacion: "Ajuste manual desde configuración",
       })
     );
   });
@@ -78,6 +78,7 @@ describe("InventarioTab", () => {
     const input = await screen.findByLabelText(/nuevo stock de gallina/i);
     await userEvent.type(input, "10");
     await userEvent.click(screen.getAllByRole("button", { name: /ajustar/i })[0]);
+    await userEvent.click(await screen.findByRole("button", { name: /sí, ajustar/i }));
 
     await screen.findByText("Stock actualizado");
   });
@@ -89,6 +90,7 @@ describe("InventarioTab", () => {
     const input = await screen.findByLabelText(/nuevo stock de gallina/i);
     await userEvent.type(input, "10");
     await userEvent.click(screen.getAllByRole("button", { name: /ajustar/i })[0]);
+    await userEvent.click(await screen.findByRole("button", { name: /sí, ajustar/i }));
 
     await waitFor(() => expect(input).toHaveValue(null));
   });
@@ -107,6 +109,7 @@ describe("InventarioTab", () => {
     const input = await screen.findByLabelText(/nuevo stock de gallina/i);
     await userEvent.type(input, "10");
     await userEvent.click(screen.getAllByRole("button", { name: /ajustar/i })[0]);
+    await userEvent.click(await screen.findByRole("button", { name: /sí, ajustar/i }));
 
     await screen.findByText("Error de servidor");
   });
