@@ -9,7 +9,17 @@ import { fondoService } from "../../services/fondoService";
 import { gastoService } from "../../services/gastoService";
 import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
-import { formatCOP, formatFecha, formatHora, formatUSD } from "../../utils/format";
+import { formatCOP, formatHora, formatUSD } from "../../utils/format";
+
+const sysTZ = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } };
+const formatFechaFondos = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const tz = sysTZ();
+  const fecha = d.toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: tz });
+  const hora  = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
+  return `${fecha} · ${hora}`;
+};
 import ModalEntrada from "../../components/fondos/ModalEntrada";
 import ModalTransferencia from "../../components/fondos/ModalTransferencia";
 import ModalGasto from "../../components/gastos/ModalGasto";
@@ -312,12 +322,12 @@ export default function FondosPage() {
                     : m.moneda;
                   return (
                     <tr key={m.id}
-                      className={esVentaDia ? "cursor-pointer hover:bg-green-50 transition-colors font-medium" : ""}
+                      className={esVentaDia ? "cursor-pointer hover:bg-green-50 transition-colors" : ""}
                       onClick={esVentaDia ? () => navigate("/resumen", { state: { fecha: m._fechaNav } }) : undefined}
                       title={esVentaDia ? "Ver resumen del día" : undefined}
                     >
                       <td className="text-[12px] text-gray-500 whitespace-nowrap">
-                        {formatFecha(m.fecha)}
+                        {formatFechaFondos(m.fecha)}
                       </td>
                       <td>
                         <span className={`badge gap-1 ${badge}`}>
@@ -325,7 +335,7 @@ export default function FondosPage() {
                           {m.tipo === "cobro" ? "Entrada" : m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : ""}
                         </span>
                       </td>
-                      <td className="font-medium">{m.concepto}</td>
+                      <td className={esVentaDia ? "font-medium" : ""}>{m.concepto}</td>
                       <td><span className="badge badge-warning">{monedaLabel}</span></td>
                       <td className={`text-right font-semibold ${color}`}>
                         {esCobro ? "+" : "−"}
