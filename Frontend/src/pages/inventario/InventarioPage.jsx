@@ -93,7 +93,6 @@ export default function InventarioPage() {
                   <th>Tipo</th>
                   <th>Cantidad</th>
                   <th>Stock resultante</th>
-                  <th>Referencia</th>
                   <th>Observación</th>
                 </tr>
               </thead>
@@ -101,16 +100,11 @@ export default function InventarioPage() {
                 {movimientosPag.map((m) => {
                   const conf = TIPO_CONFIG[m.tipo] ?? { label: m.tipo, badge: "badge-gray", icono: null };
                   const esSalidaPedido = m.tipo === "salida" && m.referenciaTipo === "pedido" && m.referenciaId;
-                  const esGasto = m.referenciaTipo === "gasto" && m.referenciaId;
                   return (
                     <tr key={m.id}
-                      className={(esSalidaPedido || esGasto) ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""}
-                      title={esSalidaPedido ? "Ver pedido en historial" : esGasto ? "Ver en módulo de gastos" : undefined}
-                      onClick={
-                        esSalidaPedido ? () => navigate("/pedidos", { state: { abrirPedidoId: Number(m.referenciaId), irAHistorial: true } })
-                        : esGasto ? () => navigate("/gastos")
-                        : undefined
-                      }
+                      className={esSalidaPedido ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""}
+                      title={esSalidaPedido ? "Ver pedido en historial" : undefined}
+                      onClick={esSalidaPedido ? () => navigate("/pedidos", { state: { abrirPedidoId: Number(m.referenciaId), irAHistorial: true } }) : undefined}
                     >
                       <td className="text-gray-500 text-[12px] whitespace-nowrap">{formatFecha(m.registradoEn)}</td>
                       <td className="font-medium">{capFirst(m.insumo)}</td>
@@ -124,9 +118,6 @@ export default function InventarioPage() {
                         {formatInsumo(m.insumo, Math.abs(m.cantidad)) ?? "0"}
                       </td>
                       <td>{formatInsumo(m.insumo, m.stockResultante) ?? "0"}</td>
-                      <td className="text-gray-500 text-[12px]">
-                        {m.referenciaTipo ? `${capFirst(m.referenciaTipo.replace(/_/g, " "))}${m.referenciaId ? " #" + m.referenciaId : ""}` : "—"}
-                      </td>
                       <td className="text-gray-500">{m.observacion ?? "—"}</td>
                     </tr>
                   );
