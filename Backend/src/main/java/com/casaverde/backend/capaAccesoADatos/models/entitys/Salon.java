@@ -25,7 +25,7 @@ public class Salon {
     @Builder.Default
     private Boolean activo = true;
 
-    @Column(nullable = false)
+    @Column(columnDefinition = "BOOLEAN NOT NULL DEFAULT 0")
     @Builder.Default
     private Boolean eliminado = false;
 }

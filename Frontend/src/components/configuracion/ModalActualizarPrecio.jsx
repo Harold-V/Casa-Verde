@@ -5,7 +5,6 @@ import { formatCOP } from "../../utils/format";
 
 export default function ModalActualizarPrecio({ producto, onClose, onSave }) {
   const [precio, setPrecio] = useState("");
-  const [motivo, setMotivo] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -20,7 +19,7 @@ export default function ModalActualizarPrecio({ producto, onClose, onSave }) {
     }
     setSaving(true);
     try {
-      await onSave({ id: producto.id, precio: val, motivo: motivo.trim() || null });
+      await onSave({ id: producto.id, precio: val, motivo: null });
       onClose();
     } catch (err) {
       setError(err.message);
@@ -44,7 +43,7 @@ export default function ModalActualizarPrecio({ producto, onClose, onSave }) {
               Precio actual:{" "}
               <span className="font-semibold text-gray-700">{formatCOP(producto.precio)}</span>
             </p>
-            <div className="form-group">
+            <div className="form-group mb-0">
               <label className="form-label">Nuevo precio (COP) *</label>
               <input
                 className="form-control"
@@ -55,16 +54,6 @@ export default function ModalActualizarPrecio({ producto, onClose, onSave }) {
                 value={precio}
                 onChange={(e) => { setPrecio(e.target.value); setError(""); }}
                 autoFocus
-              />
-            </div>
-            <div className="form-group mb-0">
-              <label className="form-label">Motivo (opcional)</label>
-              <input
-                className="form-control"
-                type="text"
-                placeholder="Ej: Ajuste inflación"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
               />
             </div>
           </div>

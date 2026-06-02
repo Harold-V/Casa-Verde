@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { History, Plus, Pencil, Power, Search } from "lucide-react";
+import { History, Plus, Pencil, Power, Search, Trash2 } from "lucide-react";
 import { productoService, categoriaService } from "../../../services/productoService";
 import { formatCOP } from "../../../utils/format";
 import { formatFraccion } from "../../../utils/pedidoHelpers";
 import ModalProducto from "../../../components/configuracion/ModalProducto";
 import ModalHistorialPrecios from "../../../components/configuracion/ModalHistorialPrecios";
 import ModalActualizarPrecio from "../../../components/configuracion/ModalActualizarPrecio";
+import ConfirmDialog from "../../../components/shared/ConfirmDialog";
 
 export default function ProductosTab() {
   const qc = useQueryClient();
@@ -16,6 +17,7 @@ export default function ProductosTab() {
   const [creando, setCreando] = useState(false);
   const [historialDe, setHistorialDe] = useState(null);
   const [precioModal, setPrecioModal] = useState(null);
+  const [eliminandoId, setEliminandoId] = useState(null);
 
   const { data: productos = [], isLoading } = useQuery({
     queryKey: ["productos", soloActivos],
@@ -49,6 +51,14 @@ export default function ProductosTab() {
   const mutToggle = useMutation({
     mutationFn: productoService.toggle,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["productos"] }),
+  });
+
+  const mutEliminar = useMutation({
+    mutationFn: productoService.eliminar,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["productos"] });
+      setEliminandoId(null);
+    },
   });
 
   const mutPrecio = useMutation({
@@ -153,6 +163,13 @@ export default function ProductosTab() {
                         >
                           <Power size={15} className={p.activo ? "text-green-600" : "text-red-600"} />
                         </button>
+                        <button
+                          className="btn-icon text-red-500"
+                          title="Eliminar producto"
+                          onClick={() => setEliminandoId(p.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -188,6 +205,20 @@ export default function ProductosTab() {
           onSave={(data) => mutPrecio.mutateAsync(data)}
         />
       )}
+
+      {eliminandoId !== null && (() => {
+        const p = productos.find((x) => x.id === eliminandoId);
+        return p ? (
+          <ConfirmDialog
+            emoji="🗑️"
+            titulo={`Eliminar ${p.nombre}`}
+            descripcion="El producto se eliminará permanentemente. Los pedidos históricos conservan el nombre y precio registrados al momento de la venta."
+            labelOk="Sí, eliminar"
+            onOk={() => mutEliminar.mutate(eliminandoId)}
+            onCancelar={() => setEliminandoId(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

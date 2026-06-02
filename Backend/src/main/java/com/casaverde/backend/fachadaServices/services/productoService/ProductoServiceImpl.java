@@ -42,13 +42,13 @@ public class ProductoServiceImpl implements IProductoService {
 
     @Transactional(readOnly = true)
     public List<ProductoDTO> listarTodos() {
-        return productoRepo.findAllByOrderByNombreAsc().stream()
+        return productoRepo.findByEliminadoFalseOrderByNombreAsc().stream()
                 .map(productoMapper::toDTO).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ProductoDTO> listarActivos() {
-        return productoRepo.findByActivoTrueOrderByNombreAsc().stream()
+        return productoRepo.findByActivoTrueAndEliminadoFalseOrderByNombreAsc().stream()
                 .map(productoMapper::toDTO).collect(Collectors.toList());
     }
 
@@ -159,6 +159,19 @@ public class ProductoServiceImpl implements IProductoService {
         return productoMapper.toDTO(guardado);
     }
 
+    @Transactional
+    public void eliminar(Long id) {
+        Producto producto = findOrThrow(id);
+        String nombreOriginal = producto.getNombre();
+        // Renombramos para liberar el slot del unique constraint en nombre
+        producto.setNombre(nombreOriginal + " [X-" + id + "]");
+        producto.setActivo(false);
+        producto.setEliminado(true);
+        productoRepo.save(producto);
+        auditoriaService.registrar("producto", id, "ELIMINAR",
+                "Producto eliminado: " + nombreOriginal);
+    }
+
     /**
      * Actualiza precioUnitarioCop en todos los PedidoDetalle de pedidos abiertos
      * que referencian el producto dado. Se llama dentro de la misma transacción
@@ -180,8 +193,8 @@ public class ProductoServiceImpl implements IProductoService {
             throw new ValidacionException("El nombre del producto es obligatorio");
         }
         boolean existe = idExcluir == null
-                ? productoRepo.existsByNombre(nombre.trim())
-                : productoRepo.existsByNombreAndIdNot(nombre.trim(), idExcluir);
+                ? productoRepo.existsByNombreAndEliminadoFalse(nombre.trim())
+                : productoRepo.existsByNombreAndIdNotAndEliminadoFalse(nombre.trim(), idExcluir);
         if (existe) {
             throw new ValidacionException("Ya existe un producto con el nombre: " + nombre.trim());
         }
@@ -215,7 +228,7 @@ public class ProductoServiceImpl implements IProductoService {
     }
 
     private Producto findOrThrow(Long id) {
-        return productoRepo.findById(id)
+        return productoRepo.findByIdAndEliminadoFalse(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Producto no encontrado: " + id));
     }
 

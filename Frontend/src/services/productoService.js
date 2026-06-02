@@ -9,6 +9,7 @@ export const productoService = {
   actualizarPrecio: (id, precio, motivo) =>
     api.put(`/productos/${id}/precio`, { precio, motivo }).then((r) => r.data),
   toggle: (id) => api.put(`/productos/${id}/toggle`).then((r) => r.data),
+  eliminar: (id) => api.delete(`/productos/${id}`).then((r) => r.data),
 };
 
 export const categoriaService = {

@@ -45,6 +45,10 @@ public class Producto {
     @Builder.Default
     private Boolean activo = true;
 
+    @Column(columnDefinition = "BOOLEAN NOT NULL DEFAULT 0")
+    @Builder.Default
+    private Boolean eliminado = false;
+
     @Column(name = "creado_en")
     private LocalDateTime creadoEn;
 

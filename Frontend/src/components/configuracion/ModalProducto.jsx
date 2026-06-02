@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { Plus, X, AlertTriangle } from "lucide-react";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
+import { formatCOP } from "../../utils/format";
+
+const FRACCIONES = [
+  { valor: 0.125, label: "⅛" },
+  { valor: 0.25,  label: "¼" },
+  { valor: 0.5,   label: "½" },
+  { valor: 0.75,  label: "¾" },
+  { valor: 1,     label: "1 entero" },
+  { valor: 2,     label: "2 enteros" },
+];
 
 export default function ModalProducto({ producto, categorias, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -18,7 +28,7 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const agregarComp = () =>
-    setForm((f) => ({ ...f, composicion: [...f.composicion, { insumo: "gallina", cantidad: 1 }] }));
+    setForm((f) => ({ ...f, composicion: [...f.composicion, { insumo: "gallina", cantidad: 0.5 }] }));
 
   const quitarComp = (i) =>
     setForm((f) => ({ ...f, composicion: f.composicion.filter((_, idx) => idx !== i) }));
@@ -72,12 +82,20 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Precio (COP)</label>
+                <label className="form-label">
+                  Precio (COP)
+                  {producto && (
+                    <span className="ml-2 text-[12px] font-normal text-gray-400">
+                      actual: {formatCOP(producto.precio)}
+                    </span>
+                  )}
+                </label>
                 <input
                   className="form-control"
                   type="number"
                   min="0"
                   step="1"
+                  placeholder="Ej: 25000"
                   value={form.precio}
                   onChange={(e) => set("precio", e.target.value)}
                 />
@@ -149,15 +167,15 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
                           <option value="gallina">Gallina</option>
                           <option value="cuy">Cuy</option>
                         </select>
-                        <input
-                          className="form-control w-[110px]"
-                          type="number"
-                          step="0.001"
-                          min="0"
-                          placeholder="Cantidad"
+                        <select
+                          className="form-control w-[120px]"
                           value={c.cantidad}
-                          onChange={(e) => setComp(i, "cantidad", e.target.value)}
-                        />
+                          onChange={(e) => setComp(i, "cantidad", parseFloat(e.target.value))}
+                        >
+                          {FRACCIONES.map((f) => (
+                            <option key={f.valor} value={f.valor}>{f.label}</option>
+                          ))}
+                        </select>
                         <button
                           type="button"
                           className="btn-icon shrink-0"

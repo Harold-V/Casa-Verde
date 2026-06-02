@@ -56,4 +56,10 @@ public class ProductoController {
     public ProductoDTO toggleActivo(@PathVariable Long id) {
         return service.toggleActivo(id);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        service.eliminar(id);
+        return ResponseEntity.noContent().build();
+    }
 }
