@@ -68,7 +68,7 @@ public class GastoServiceImpl implements IGastoService {
 
         Gasto gasto = Gasto.builder()
                 .concepto(req.getConcepto().trim())
-                .categoria(req.getCategoria())
+                .categoria(req.getCategoria() != null ? req.getCategoria() : "—")
                 .moneda(moneda)
                 .monto(monto)
                 .montoCop(montoCop)
