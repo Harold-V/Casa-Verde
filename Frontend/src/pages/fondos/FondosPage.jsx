@@ -281,10 +281,10 @@ export default function FondosPage() {
                   const esEntrada  = esVentaDia || m.tipo === "cobro" || m.tipo === "entrada";
                   const esSalida   = m.tipo === "salida";
                   const esReverso  = m.tipo === "reverso";
-                  const esCobro    = esEntrada;
+                  const esCobro    = esEntrada || esReverso;
                   const Icon  = esEntrada ? TrendingUp : esSalida ? TrendingDown : esReverso ? RotateCcw : DollarSign;
-                  const badge = esEntrada ? "badge-success" : esSalida ? "badge-danger" : esReverso ? "badge-gray" : "badge-warning";
-                  const color = esEntrada ? "text-verde-claro" : esSalida ? "text-red-600" : "text-gray-600";
+                  const badge = esEntrada || esReverso ? "badge-success" : esSalida ? "badge-danger" : "badge-warning";
+                  const color = esEntrada || esReverso ? "text-verde-claro" : esSalida ? "text-red-600" : "text-gray-600";
                   // Etiqueta de moneda: si hay alias, mostrarlo
                   const nequiFondo = fondos.find((f) => f.moneda === m.moneda);
                   const monedaLabel = nequiFondo?.alias && m.moneda.startsWith("NEQUI")
