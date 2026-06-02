@@ -399,13 +399,11 @@ export default function FondosPage() {
                       <td>
                         <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
                       </td>
-                      <td className={`text-right font-semibold ${color}`}>
-                        <div>{esCobro ? "+" : "−"}{m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}</div>
-                        {m.moneda === "USD" && m.montoCop != null && (
-                          <div className="text-[11px] text-gray-400 font-normal">
-                            ≈ {esCobro ? "+" : "−"}{formatCOP(m.montoCop)}
-                          </div>
-                        )}
+                      <td
+                        className={`text-right font-semibold ${color}`}
+                        title={m.moneda === "USD" && m.montoCop != null ? `≈ ${esCobro ? "+" : "−"}${formatCOP(m.montoCop)} COP` : undefined}
+                      >
+                        {esCobro ? "+" : "−"}{m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
                       </td>
                     </tr>
                   );
