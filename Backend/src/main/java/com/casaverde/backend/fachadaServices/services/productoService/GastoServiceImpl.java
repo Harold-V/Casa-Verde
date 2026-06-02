@@ -161,7 +161,7 @@ public class GastoServiceImpl implements IGastoService {
                 .stockResultante(nuevoStock)
                 .referenciaTipo("gasto")
                 .referenciaId(gasto.getId())
-                .observacion("Compra inventariable: " + gasto.getConcepto())
+                .observacion(gasto.getConcepto())
                 .build());
     }
 
