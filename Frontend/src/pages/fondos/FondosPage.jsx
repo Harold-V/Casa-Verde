@@ -186,58 +186,75 @@ export default function FondosPage() {
             />
           </div>
 
-          {/* Fondos individuales — sección blanca (desplegable) */}
-          {fondosExpandidos && (
-          <div className="p-4 bg-white">
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-              {fondos.map((f) => {
-                const esNequi = f.moneda.startsWith("NEQUI");
-                const esUsd   = f.moneda === "USD";
-                return (
-                  <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`}>
-                    <div className="text-[12px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
-                    <div className={`text-[22px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
-                      {f.moneda === "USD"
-                        ? formatUSD(f.saldo ?? 0)
-                        : formatCOP(f.saldo ?? 0)}
-                    </div>
-                    <div className="flex items-center justify-between gap-2 mt-2">
-                      <div className="text-[11px] text-gray-500 flex flex-col gap-0.5">
-                        <span>
-                          {f.moneda}
-                          {f.moneda === "USD" && tasaValor != null && (
-                            <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
+          {/* Franja inferior — visible solo cuando está colapsado */}
+          {!fondosExpandidos && (
+            <div
+              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none"
+              style={{ background: "rgba(0,0,0,0.25)" }}
+              onClick={() => setFondosExpandidos(true)}
+            >
+              <span className="text-[11px] text-white/50">
+                {fondos.map((f) => f.moneda).join(" · ")}
+              </span>
+              <ChevronDown size={12} className="text-white/40" />
+            </div>
+          )}
+
+          {/* Fondos individuales — sección blanca con animación */}
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{ maxHeight: fondosExpandidos ? "600px" : "0px" }}
+          >
+            <div className="p-4 bg-white">
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+                {fondos.map((f) => {
+                  const esNequi = f.moneda.startsWith("NEQUI");
+                  const esUsd   = f.moneda === "USD";
+                  return (
+                    <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`}>
+                      <div className="text-[12px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
+                      <div className={`text-[22px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
+                        {f.moneda === "USD"
+                          ? formatUSD(f.saldo ?? 0)
+                          : formatCOP(f.saldo ?? 0)}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-2">
+                        <div className="text-[11px] text-gray-500 flex flex-col gap-0.5">
+                          <span>
+                            {f.moneda}
+                            {f.moneda === "USD" && tasaValor != null && (
+                              <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
+                            )}
+                          </span>
+                          {f.actualizadoEn && (
+                            <span>act. {formatHora(f.actualizadoEn)}</span>
                           )}
-                        </span>
-                        {f.actualizadoEn && (
-                          <span>act. {formatHora(f.actualizadoEn)}</span>
-                        )}
-                      </div>
-                      <div className="h-[28px] flex items-center">
-                        {esNequi && (
-                          <button
-                            className="btn btn-secondary btn-sm flex items-center gap-1"
-                            onClick={() => setModalTransferenciaMoneda(f.moneda)}
-                          >
-                            <ArrowUpRight size={13} /> Retiro
-                          </button>
-                        )}
-                        {esUsd && (
-                          <button
-                            className="btn btn-secondary btn-sm flex items-center gap-1"
-                            onClick={() => setModalTransferenciaMoneda("USD")}
-                          >
-                            <RefreshCw size={13} /> Cambio
-                          </button>
-                        )}
+                        </div>
+                        <div className="h-[28px] flex items-center">
+                          {esNequi && (
+                            <button
+                              className="btn btn-secondary btn-sm flex items-center gap-1"
+                              onClick={(e) => { e.stopPropagation(); setModalTransferenciaMoneda(f.moneda); }}
+                            >
+                              <ArrowUpRight size={13} /> Retiro
+                            </button>
+                          )}
+                          {esUsd && (
+                            <button
+                              className="btn btn-secondary btn-sm flex items-center gap-1"
+                              onClick={(e) => { e.stopPropagation(); setModalTransferenciaMoneda("USD"); }}
+                            >
+                              <RefreshCw size={13} /> Cambio
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
-          )}
         </div>
       )}
 
