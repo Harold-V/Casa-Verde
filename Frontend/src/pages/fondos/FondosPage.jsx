@@ -10,8 +10,14 @@ import { gastoService } from "../../services/gastoService";
 import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
 import { formatCOP, formatHora, formatUSD } from "../../utils/format";
+import Pagination from "../../components/shared/Pagination";
+import ModalEntrada from "../../components/fondos/ModalEntrada";
+import ModalTransferencia from "../../components/fondos/ModalTransferencia";
+import ModalGasto from "../../components/gastos/ModalGasto";
 
+/* ── helpers de formato ──────────────────────────────────────────── */
 const sysTZ = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } };
+
 const formatFechaFondos = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -20,9 +26,15 @@ const formatFechaFondos = (iso) => {
   const hora  = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
   return `${fecha} · ${hora}`;
 };
-import ModalEntrada from "../../components/fondos/ModalEntrada";
-import ModalTransferencia from "../../components/fondos/ModalTransferencia";
-import ModalGasto from "../../components/gastos/ModalGasto";
+
+/** Formato compacto para la franja colapsada: $18.1M, $500K, $0 */
+const formatSaldoCompacto = (saldo, moneda) => {
+  if (moneda === "USD") return formatUSD(saldo ?? 0);
+  const n = Math.abs(Number(saldo ?? 0));
+  if (n >= 1_000_000) return `$${(Number(saldo ?? 0) / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `$${(Number(saldo ?? 0) / 1_000).toFixed(0)}K`;
+  return formatCOP(saldo ?? 0);
+};
 
 /* ── helpers visuales ─────────────────────────────────────────────── */
 function getFondoLabel(fondo) {
@@ -45,6 +57,13 @@ function getBorderCls(moneda) {
   if (moneda === "USD") return "border-l-[#1a6b3c]";
   if (moneda.startsWith("NEQUI")) return "border-l-[#8c00ff]";
   return "border-l-verde-claro";
+}
+
+function getMonedaBadge(moneda) {
+  if (moneda === "COP") return { cls: "badge", style: { background: "#e8f4ec", color: "#2d6a4f" } };
+  if (moneda === "USD") return { cls: "badge", style: { background: "#e6f0e8", color: "#1a6b3c" } };
+  if (moneda.startsWith("NEQUI")) return { cls: "badge", style: { background: "#f0e6ff", color: "#8c00ff" } };
+  return { cls: "badge badge-gray", style: {} };
 }
 
 /** Agrupa todos los movimientos tipo "cobro" por día + moneda en una única fila "Venta del día". */
@@ -76,6 +95,8 @@ function procesarHistorial(movs) {
   return [...ventasDia, ...otros].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 
+const PAGE_SIZE = 25;
+
 export default function FondosPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -84,9 +105,10 @@ export default function FondosPage() {
   const [modalEntradaOpen, setModalEntradaOpen]         = useState(false);
   const [modalSalidaOpen,  setModalSalidaOpen]          = useState(false);
   const [modalTransferenciaMoneda, setModalTransferenciaMoneda] = useState(null);
-  const [filtroFecha, setFiltroFecha]   = useState("");
+  const [filtroFecha,  setFiltroFecha]  = useState(() => new Date().toLocaleDateString("en-CA"));
   const [filtroMoneda, setFiltroMoneda] = useState("");
-  const [filtroTipo, setFiltroTipo]     = useState("");
+  const [filtroTipo,   setFiltroTipo]   = useState("");
+  const [pagina, setPagina] = useState(0);
 
   const { data: fondos = [], isLoading: loadingFondos } = useQuery({
     queryKey: ["fondos"],
@@ -100,6 +122,7 @@ export default function FondosPage() {
       ...(filtroMoneda ? { moneda: filtroMoneda } : {}),
       ...(filtroTipo   ? { tipo: filtroTipo }     : {}),
     }),
+    staleTime: 0,
   });
 
   const { data: tasa } = useQuery({
@@ -134,7 +157,7 @@ export default function FondosPage() {
     },
   });
 
-  /* ── cálculos de totales ─────────────────────────────────────────── */
+  /* ── cálculos ─────────────────────────────────────────────────── */
   const saldoCop        = fondos.find((f) => f.moneda === "COP")?.saldo ?? 0;
   const saldoUsd        = fondos.find((f) => f.moneda === "USD")?.saldo ?? 0;
   const nequiFondos     = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
@@ -146,6 +169,12 @@ export default function FondosPage() {
     : saldoCop + saldoNequiTotal;
 
   const historialProcesado = useMemo(() => procesarHistorial(historial), [historial]);
+  const totalPaginas  = Math.max(1, Math.ceil(historialProcesado.length / PAGE_SIZE));
+  const paginaActual  = Math.min(pagina, totalPaginas - 1);
+  const historialPag  = historialProcesado.slice(paginaActual * PAGE_SIZE, (paginaActual + 1) * PAGE_SIZE);
+
+  const hayFiltro = filtroFecha || filtroMoneda || filtroTipo;
+  const limpiarFiltros = () => { setFiltroFecha(""); setFiltroMoneda(""); setFiltroTipo(""); setPagina(0); };
 
   return (
     <div>
@@ -158,10 +187,12 @@ export default function FondosPage() {
         <div className="loading-center"><div className="spinner" /></div>
       ) : (
         <div className="card mb-5 overflow-hidden border-l-4 border-l-verde-oscuro">
-          {/* Header oscuro — capital total (clickeable para expandir) */}
-          <div className="p-[18px] flex justify-between items-center flex-wrap gap-3 cursor-pointer select-none"
+          {/* Header oscuro — toggle expand/collapse */}
+          <div
+            className="p-[18px] flex justify-between items-center flex-wrap gap-3 cursor-pointer select-none"
             style={{ background: "linear-gradient(135deg, #1a4731 0%, #1a4a2e 100%)" }}
-            onClick={() => setFondosExpandidos((v) => !v)}>
+            onClick={() => setFondosExpandidos((v) => !v)}
+          >
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign size={18} className="text-white/70" />
@@ -186,39 +217,30 @@ export default function FondosPage() {
             />
           </div>
 
-          {/* Franja inferior — visible solo cuando está colapsado */}
+          {/* Franja inferior — solo cuando está colapsado, muestra saldos compactos */}
           {!fondosExpandidos && (
-            <div
-              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none border-t border-gray-100 bg-white"
-              onClick={() => setFondosExpandidos(true)}
-            >
+            <div className="px-[18px] py-2 flex items-center gap-1.5 border-t border-gray-100 bg-white">
               <span className="text-[11px] text-verde-oscuro/60">
-                {fondos.map((f) => f.moneda).join(" · ")}
+                {fondos.map((f) => `${f.moneda} ${formatSaldoCompacto(f.saldo, f.moneda)}`).join(" · ")}
               </span>
-              <ChevronDown size={12} className="text-verde-oscuro/50" />
             </div>
           )}
 
-          {/* Fondos individuales — sección blanca con animación */}
+          {/* Fondos individuales — animación max-height + opacity */}
           <div
             className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{
-              maxHeight: fondosExpandidos ? "600px" : "0px",
-              opacity:   fondosExpandidos ? 1 : 0,
-            }}
+            style={{ maxHeight: fondosExpandidos ? "600px" : "0px", opacity: fondosExpandidos ? 1 : 0 }}
           >
-            <div className="p-4 bg-white cursor-pointer select-none" onClick={() => setFondosExpandidos(false)}>
+            <div className="p-4 bg-white">
               <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
                 {fondos.map((f) => {
                   const esNequi = f.moneda.startsWith("NEQUI");
                   const esUsd   = f.moneda === "USD";
                   return (
-                    <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`} onClick={(e) => e.stopPropagation()}>
+                    <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`}>
                       <div className="text-[12px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
                       <div className={`text-[22px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
-                        {f.moneda === "USD"
-                          ? formatUSD(f.saldo ?? 0)
-                          : formatCOP(f.saldo ?? 0)}
+                        {f.moneda === "USD" ? formatUSD(f.saldo ?? 0) : formatCOP(f.saldo ?? 0)}
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-2">
                         <div className="text-[11px] text-gray-500 flex flex-col gap-0.5">
@@ -228,9 +250,7 @@ export default function FondosPage() {
                               <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
                             )}
                           </span>
-                          {f.actualizadoEn && (
-                            <span>act. {formatHora(f.actualizadoEn)}</span>
-                          )}
+                          {f.actualizadoEn && <span>act. {formatHora(f.actualizadoEn)}</span>}
                         </div>
                         <div className="h-[28px] flex items-center">
                           {esNequi && (
@@ -260,10 +280,10 @@ export default function FondosPage() {
         </div>
       )}
 
-      {/* Historial unificado */}
+      {/* Libro de caja */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Historial de movimientos</span>
+          <span className="card-title">Libro de caja</span>
           <div className="flex items-center gap-2 ml-auto">
             <button className="btn btn-primary btn-sm flex items-center gap-1" onClick={() => setModalEntradaOpen(true)}>
               <Plus size={14} /> Nueva entrada
@@ -271,12 +291,12 @@ export default function FondosPage() {
             <button className="btn btn-danger btn-sm flex items-center gap-1" onClick={() => setModalSalidaOpen(true)}>
               <Minus size={14} /> Nueva salida
             </button>
-            <a className="btn btn-secondary btn-sm" href={exportacionService.cajaUrl(filtroFecha)}>
-              <Download size={14} />
-              CSV caja
+            <a className="btn btn-secondary btn-sm flex items-center gap-1" href={exportacionService.cajaUrl(filtroFecha)}>
+              <Download size={14} /> CSV
             </a>
           </div>
         </div>
+
         <div className="toolbar px-[18px] pt-4 mb-0">
           <div className="flex items-center gap-1.5 text-[13px] text-gray-500 mr-1">
             <SlidersHorizontal size={15} />
@@ -286,9 +306,9 @@ export default function FondosPage() {
             type="date"
             className="form-control w-40"
             value={filtroFecha}
-            onChange={(e) => setFiltroFecha(e.target.value)}
+            onChange={(e) => { setFiltroFecha(e.target.value); setPagina(0); }}
           />
-          <select className="form-control w-36" value={filtroMoneda} onChange={(e) => setFiltroMoneda(e.target.value)}>
+          <select className="form-control w-36" value={filtroMoneda} onChange={(e) => { setFiltroMoneda(e.target.value); setPagina(0); }}>
             <option value="">Todas</option>
             <option value="COP">COP</option>
             <option value="USD">USD</option>
@@ -298,7 +318,7 @@ export default function FondosPage() {
               </option>
             ))}
           </select>
-          <select className="form-control w-36" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+          <select className="form-control w-36" value={filtroTipo} onChange={(e) => { setFiltroTipo(e.target.value); setPagina(0); }}>
             <option value="">Todo tipo</option>
             <option value="cobro">Ventas</option>
             <option value="entrada">Entradas</option>
@@ -306,17 +326,43 @@ export default function FondosPage() {
             <option value="ajuste">Ajustes</option>
             <option value="reverso">Reversos</option>
           </select>
-          {(filtroFecha || filtroMoneda || filtroTipo) && (
-            <button className="btn btn-secondary btn-sm" onClick={() => { setFiltroFecha(""); setFiltroMoneda(""); setFiltroTipo(""); }}>
-              Limpiar
-            </button>
-          )}
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ visibility: hayFiltro ? "visible" : "hidden" }}
+            onClick={limpiarFiltros}
+          >
+            Limpiar
+          </button>
         </div>
+
+        {/* Paginación en el header si hay más de una página */}
+        {historialProcesado.length > PAGE_SIZE && (
+          <div className="flex justify-center py-2 border-b border-gray-100">
+            <Pagination
+              pagina={paginaActual}
+              totalItems={historialProcesado.length}
+              pageSize={PAGE_SIZE}
+              onChange={setPagina}
+            />
+          </div>
+        )}
+
         <div className="table-wrap">
           {loadingHistorial ? (
             <div className="loading-center"><div className="spinner" /></div>
           ) : historialProcesado.length === 0 ? (
-            <div className="empty-state"><p>Sin movimientos registrados</p></div>
+            <div className="empty-state">
+              <p>
+                {hayFiltro
+                  ? `Sin movimientos${filtroFecha ? ` para el ${filtroFecha}` : ""}${filtroMoneda ? ` en ${filtroMoneda}` : ""}${filtroTipo ? ` de tipo ${filtroTipo}` : ""}.`
+                  : "Sin movimientos registrados."}
+              </p>
+              {hayFiltro && (
+                <button className="btn btn-secondary btn-sm mt-3" onClick={limpiarFiltros}>
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
           ) : (
             <table>
               <thead>
@@ -330,7 +376,7 @@ export default function FondosPage() {
                 </tr>
               </thead>
               <tbody>
-                {historialProcesado.map((m) => {
+                {historialPag.map((m) => {
                   const esVentaDia = !!m._esVentaDia;
                   const esEntrada  = esVentaDia || m.tipo === "cobro" || m.tipo === "entrada";
                   const esSalida   = m.tipo === "salida";
@@ -339,34 +385,35 @@ export default function FondosPage() {
                   const Icon  = esEntrada ? TrendingUp : esSalida ? TrendingDown : esReverso ? RotateCcw : DollarSign;
                   const badge = esEntrada || esReverso ? "badge-success" : esSalida ? "badge-danger" : "badge-warning";
                   const color = esEntrada || esReverso ? "text-verde-claro" : esSalida ? "text-red-600" : "text-gray-600";
-                  // Etiqueta de moneda: si hay alias, mostrarlo
-                  const nequiFondo = fondos.find((f) => f.moneda === m.moneda);
+                  const nequiFondo  = fondos.find((f) => f.moneda === m.moneda);
                   const monedaLabel = nequiFondo?.alias && m.moneda.startsWith("NEQUI")
                     ? `Nequi ${nequiFondo.alias}`
                     : m.moneda;
+                  const { cls: monedaCls, style: monedaStyle } = getMonedaBadge(m.moneda);
+                  const labelTipo = m.tipo === "cobro" ? "Venta" : m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : "";
                   return (
-                    <tr key={m.id}
-                      className={esVentaDia ? "cursor-pointer hover:bg-green-50 transition-colors" : ""}
+                    <tr
+                      key={m.id}
+                      className={`transition-colors ${esVentaDia ? "bg-[#f0faf4] cursor-pointer hover:bg-[#e6f4ec]" : "hover:bg-gray-50"}`}
                       onClick={esVentaDia ? () => navigate("/resumen", { state: { fecha: m._fechaNav } }) : undefined}
                       title={esVentaDia ? "Ver resumen del día" : undefined}
                     >
-                      <td className="text-[12px] text-gray-500 whitespace-nowrap">
-                        {formatFechaFondos(m.fecha)}
-                      </td>
+                      <td className="text-[12px] text-gray-500 whitespace-nowrap">{formatFechaFondos(m.fecha)}</td>
                       <td>
                         <span className={`badge gap-1 ${badge}`}>
-                          <Icon size={11} />
-                          {m.tipo === "cobro" ? "Entrada" : m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : ""}
+                          <Icon size={11} />{labelTipo}
                         </span>
                       </td>
                       <td className={esVentaDia ? "font-medium" : ""}>{m.concepto}</td>
-                      <td><span className="badge badge-warning">{monedaLabel}</span></td>
+                      <td>
+                        <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
+                      </td>
                       <td className={`text-right font-semibold ${color}`}>
                         {esCobro ? "+" : "−"}
                         {m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
                       </td>
                       <td className={`text-right ${color}`}>
-                        {esCobro ? "+" : "−"}{formatCOP(m.montoCop)}
+                        {m.moneda === "COP" ? "—" : `${esCobro ? "+" : "−"}${formatCOP(m.montoCop)}`}
                       </td>
                     </tr>
                   );

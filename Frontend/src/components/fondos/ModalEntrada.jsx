@@ -7,7 +7,7 @@ import MoneyInput from "../shared/MoneyInput";
 
 export default function ModalEntrada({ onClose, onGuardar }) {
   const [form, setForm] = useState({
-    concepto: "", moneda: "COP", monto: "", observacion: "",
+    concepto: "", moneda: "COP", monto: "",
   });
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
@@ -81,14 +81,7 @@ export default function ModalEntrada({ onClose, onGuardar }) {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Observación (opcional)</label>
-              <input
-                className="form-control"
-                value={form.observacion}
-                onChange={(e) => set("observacion", e.target.value)}
-              />
-            </div>
+
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
