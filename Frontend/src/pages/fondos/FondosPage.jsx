@@ -405,7 +405,7 @@ export default function FondosPage() {
                         {m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
                       </td>
                       <td className={`text-right ${color}`}>
-                        {m.moneda === "COP" ? "—" : `${esCobro ? "+" : "−"}${formatCOP(m.montoCop)}`}
+                        {m.moneda !== "USD" ? "—" : `${esCobro ? "+" : "−"}${formatCOP(m.montoCop)}`}
                       </td>
                     </tr>
                   );
