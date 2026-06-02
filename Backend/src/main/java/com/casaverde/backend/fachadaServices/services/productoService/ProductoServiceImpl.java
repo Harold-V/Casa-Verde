@@ -131,7 +131,7 @@ public class ProductoServiceImpl implements IProductoService {
     }
 
     @Transactional
-    public ProductoDTO actualizarPrecio(Long id, BigDecimal precio) {
+    public ProductoDTO actualizarPrecio(Long id, BigDecimal precio, String motivo) {
         precio = monetaryService.normalizarPrecioCop(precio);
         Producto producto = findOrThrow(id);
         BigDecimal precioAnterior = producto.getPrecio();
@@ -140,7 +140,8 @@ public class ProductoServiceImpl implements IProductoService {
         }
         producto.setPrecio(precio);
         Producto guardado = productoRepo.save(producto);
-        registrarPrecio(guardado, precioAnterior, precio, "ACTUALIZAR_PRECIO");
+        String motivoFinal = (motivo != null && !motivo.isBlank()) ? motivo : "ACTUALIZAR_PRECIO";
+        registrarPrecio(guardado, precioAnterior, precio, motivoFinal);
         int afectados = propagarPrecioAPedidosAbiertos(id, precio);
         auditoriaService.registrar("producto", guardado.getId(), "ACTUALIZAR_PRECIO",
                 "Precio actualizado de COP " + precioAnterior + " a COP " + precio

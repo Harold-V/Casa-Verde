@@ -300,7 +300,7 @@ class CasaVerdeBusinessRulesTests {
                                 .findFirst()
                                 .orElseThrow();
 
-                productoService.actualizarPrecio(producto.getId(), BigDecimal.valueOf(3500));
+                productoService.actualizarPrecio(producto.getId(), BigDecimal.valueOf(3500), null);
 
                 assertThat(precioHistorialRepository.findByProductoIdOrderByRegistradoEnDesc(producto.getId()))
                                 .anySatisfy(h -> {

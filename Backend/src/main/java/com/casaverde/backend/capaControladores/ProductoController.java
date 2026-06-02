@@ -49,7 +49,7 @@ public class ProductoController {
 
     @PutMapping("/{id}/precio")
     public ProductoDTO actualizarPrecio(@PathVariable Long id, @Valid @RequestBody ActualizarPrecioRequest req) {
-        return service.actualizarPrecio(id, req.getPrecio());
+        return service.actualizarPrecio(id, req.getPrecio(), req.getMotivo());
     }
 
     @PutMapping("/{id}/toggle")

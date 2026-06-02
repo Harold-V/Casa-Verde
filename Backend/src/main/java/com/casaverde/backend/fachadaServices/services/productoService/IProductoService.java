@@ -21,7 +21,7 @@ public interface IProductoService {
 
     ProductoDTO actualizar(Long id, ProductoRequest req);
 
-    ProductoDTO actualizarPrecio(Long id, BigDecimal precio);
+    ProductoDTO actualizarPrecio(Long id, BigDecimal precio, String motivo);
 
     ProductoDTO toggleActivo(Long id);
 }
