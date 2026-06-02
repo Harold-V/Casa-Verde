@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.casaverde.backend.fachadaServices.dto.SalonDTO;
 import com.casaverde.backend.fachadaServices.services.productoService.ISalonService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -29,12 +30,12 @@ public class SalonController {
     }
 
     @PostMapping
-    public ResponseEntity<SalonDTO> crear(@RequestBody SalonDTO dto) {
+    public ResponseEntity<SalonDTO> crear(@Valid @RequestBody SalonDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.crear(dto));
     }
 
     @PutMapping("/{id}")
-    public SalonDTO actualizar(@PathVariable Long id, @RequestBody SalonDTO dto) {
+    public SalonDTO actualizar(@PathVariable Long id, @Valid @RequestBody SalonDTO dto) {
         return service.actualizar(id, dto);
     }
 
