@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { formatCOP, formatUSD } from "../../utils/format";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 import MoneyInput from "../shared/MoneyInput";
+import ConfirmDialog from "../shared/ConfirmDialog";
 
 /** Modal de ajuste manual de fondo. Extraído de FondosPage. */
 export default function ModalAjuste({ fondo, onClose, onAjustar }) {
@@ -10,16 +11,22 @@ export default function ModalAjuste({ fondo, onClose, onAjustar }) {
   const [motivo, setMotivo]         = useState("");
   const [error, setError]           = useState("");
   const [saving, setSaving]         = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
 
   useModalKeyboard({ onEscape: onClose });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setError("");
     if (nuevoSaldo === "" || isNaN(Number(nuevoSaldo))) {
       setError("Ingresa un saldo válido");
       return;
     }
+    setConfirmando(true);
+  };
+
+  const handleConfirmar = async () => {
+    setConfirmando(false);
     setSaving(true);
     try {
       await onAjustar(fondo.moneda, Number(nuevoSaldo), motivo);
@@ -31,6 +38,7 @@ export default function ModalAjuste({ fondo, onClose, onAjustar }) {
   };
 
   const diferencia = Number(nuevoSaldo) - (fondo.saldo ?? 0);
+  const fmtSaldo = (v) => fondo.moneda === "USD" ? `${formatUSD(v)} USD` : formatCOP(v);
 
   return (
     <div className="modal-overlay">
@@ -85,6 +93,17 @@ export default function ModalAjuste({ fondo, onClose, onAjustar }) {
           </div>
         </form>
       </div>
+
+      {confirmando && (
+        <ConfirmDialog
+          emoji="⚖️"
+          titulo={`Ajustar fondo ${fondo.moneda}`}
+          descripcion={`El saldo pasará de ${fmtSaldo(fondo.saldo ?? 0)} a ${fmtSaldo(Number(nuevoSaldo))} (${diferencia >= 0 ? "+" : ""}${fmtSaldo(diferencia)}). Este movimiento queda registrado en el libro de caja.`}
+          labelOk="Sí, aplicar ajuste"
+          onOk={handleConfirmar}
+          onCancelar={() => setConfirmando(false)}
+        />
+      )}
     </div>
   );
 }

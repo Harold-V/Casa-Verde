@@ -442,7 +442,7 @@ export default function ModalDetallePedido({
                           onClick={() => handleGuardarDetalle(d.id)} disabled={loading}>Guardar</button>
                         <button type="button" className="btn-icon text-red-500 shrink-0" title="Eliminar ítem"
                           disabled={loading}
-                          onClick={() => run(async () => { await onQuitarDetalle(d.id); setEditandoDetalleId(null); })}>
+                          onClick={() => setConfirm({ tipo: "quitar-detalle", id: d.id, nombre: d.nombreSnapshot })}>
                           <Trash2 size={14} />
                         </button>
                         <button type="button" className="btn-icon text-gray-400 shrink-0"
@@ -536,7 +536,7 @@ export default function ModalDetallePedido({
                             onClick={() => handleGuardarPago(p.id)} disabled={loading}>Guardar</button>
                           <button type="button" className="btn-icon text-red-500 shrink-0"
                             title="Eliminar cobro" disabled={loading}
-                            onClick={() => run(async () => { await onQuitarPago(p.id); setEditandoPagoId(null); })}>
+                            onClick={() => setConfirm({ tipo: "quitar-pago", id: p.id, moneda: p.moneda, monto: p.montoCop })}>
                             <Trash2 size={14} />
                           </button>
                           <button type="button" className="btn-icon text-gray-400"
@@ -603,10 +603,16 @@ export default function ModalDetallePedido({
 
       {confirm && (
         <ConfirmDialog
-          emoji={confirm.tipo === "anular" ? "🚫" : confirm.tipo === "anular-sin-items" ? "⚠️" : "✅"}
+          emoji={
+            confirm.tipo === "anular" || confirm.tipo === "quitar-detalle" || confirm.tipo === "quitar-pago" ? "🗑️"
+            : confirm.tipo === "anular-sin-items" ? "⚠️"
+            : "✅"
+          }
           titulo={
             confirm.tipo === "anular"           ? "¿Anular el pedido?"
             : confirm.tipo === "anular-sin-items" ? "Pedido sin ítems"
+            : confirm.tipo === "quitar-detalle"  ? `¿Quitar "${confirm.nombre}"?`
+            : confirm.tipo === "quitar-pago"     ? "¿Eliminar este cobro?"
             : "¿Finalizar el pedido?"
           }
           descripcion={
@@ -614,12 +620,28 @@ export default function ModalDetallePedido({
               ? "Esta acción no se puede deshacer."
               : confirm.tipo === "anular-sin-items"
               ? "Quitaste el último ítem. ¿Deseas anular el pedido? Puedes cancelar y agregar ítems primero."
+              : confirm.tipo === "quitar-detalle"
+              ? "El ítem se eliminará del pedido."
+              : confirm.tipo === "quitar-pago"
+              ? `El cobro de ${formatCOP(confirm.monto)} (${confirm.moneda}) se eliminará del pedido.`
               : "Se descontará el inventario correspondiente al cerrar el pedido."
           }
-          labelOk={confirm.tipo !== "finalizar" ? "Sí, anular" : "Sí, finalizar"}
+          labelOk={
+            confirm.tipo === "finalizar" ? "Sí, finalizar"
+            : confirm.tipo === "quitar-detalle" || confirm.tipo === "quitar-pago" ? "Sí, eliminar"
+            : "Sí, anular"
+          }
           peligro={confirm.tipo !== "finalizar"}
           onOk={() => {
-            run(confirm.tipo === "finalizar" ? onFinalizar : onAnular);
+            if (confirm.tipo === "finalizar") {
+              run(onFinalizar);
+            } else if (confirm.tipo === "anular" || confirm.tipo === "anular-sin-items") {
+              run(onAnular);
+            } else if (confirm.tipo === "quitar-detalle") {
+              run(async () => { await onQuitarDetalle(confirm.id); setEditandoDetalleId(null); });
+            } else if (confirm.tipo === "quitar-pago") {
+              run(async () => { await onQuitarPago(confirm.id); setEditandoPagoId(null); });
+            }
             setConfirm(null);
           }}
           onCancelar={() => setConfirm(null)}

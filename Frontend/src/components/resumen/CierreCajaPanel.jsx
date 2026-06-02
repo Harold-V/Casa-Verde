@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download, LockKeyhole } from "lucide-react";
 import { exportacionService } from "../../services/exportacionService";
+import ConfirmDialog from "../shared/ConfirmDialog";
 
 /** Panel de cierre de caja diario. Extraído de ResumenPage. */
 export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, saving, usuario }) {
@@ -8,6 +9,8 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
   const [contadoUsd, setContadoUsd]     = useState("");
   const [contadoNequi, setContadoNequi] = useState("");
   const [observacion, setObservacion]   = useState("");
+  const [confirmando, setConfirmando]   = useState(false);
+  const [datosConfirm, setDatosConfirm] = useState(null);
 
   useEffect(() => {
     const saldo = (moneda) => resumen.fondos?.find((f) => f.moneda === moneda)?.saldo ?? 0;
@@ -22,14 +25,15 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
 
   const submit = (e) => {
     e.preventDefault();
-    onCerrar({
+    setDatosConfirm({
       fecha,
-      usuarioId: usuario?.id,
+      usuarioId:    usuario?.id,
       contadoCop:   numeroONull(contadoCop),
       contadoUsd:   numeroONull(contadoUsd),
       contadoNequi: numeroONull(contadoNequi),
       observacion,
     });
+    setConfirmando(true);
   };
 
   return (
@@ -85,6 +89,17 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
           </form>
         )}
       </div>
+
+      {confirmando && (
+        <ConfirmDialog
+          emoji="🔒"
+          titulo="¿Cerrar la caja del día?"
+          descripcion="Esta acción es irreversible. Se registrará el cierre, se bloqueará el día y se creará un backup automático."
+          labelOk="Sí, cerrar caja"
+          onOk={() => { setConfirmando(false); onCerrar(datosConfirm); }}
+          onCancelar={() => setConfirmando(false)}
+        />
+      )}
     </div>
   );
 }
