@@ -385,7 +385,7 @@ export default function FondosPage() {
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors hover:bg-gray-50 ${esVentaDia ? "cursor-pointer" : ""}`}
+                      className={`transition-colors hover:bg-gray-50 ${esVentaDia ? "cursor-pointer" : ""} ${m.moneda === "USD" ? "group" : ""}`}
                       onClick={esVentaDia ? () => navigate("/resumen", { state: { fecha: m._fechaNav } }) : undefined}
                       title={esVentaDia ? "Ver resumen del día" : undefined}
                     >
@@ -399,11 +399,15 @@ export default function FondosPage() {
                       <td>
                         <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
                       </td>
-                      <td
-                        className={`text-right font-semibold ${color}`}
-                        title={m.moneda === "USD" && m.montoCop != null ? `≈ ${esCobro ? "+" : "−"}${formatCOP(m.montoCop)} COP` : undefined}
-                      >
-                        {esCobro ? "+" : "−"}{m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
+                      <td className={`text-right font-semibold ${color}`}>
+                        {m.moneda === "USD" && m.montoCop != null ? (
+                          <>
+                            <span className="group-hover:hidden">{esCobro ? "+" : "−"}{formatUSD(m.monto)}</span>
+                            <span className="hidden group-hover:inline">{esCobro ? "+" : "−"}{formatCOP(m.montoCop)}</span>
+                          </>
+                        ) : (
+                          `${esCobro ? "+" : "−"}${formatCOP(m.monto)}`
+                        )}
                       </td>
                     </tr>
                   );
