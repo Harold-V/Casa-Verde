@@ -213,6 +213,18 @@ export function esEnCursoPedido(pedido) {
   return hh * 60 + mm <= now.getHours() * 60 + now.getMinutes();
 }
 
+export const formatFraccion = (cantidad) => {
+  if (cantidad === 1)      return "1";
+  if (cantidad === 0.5)    return "½";
+  if (cantidad === 0.25)   return "¼";
+  if (cantidad === 0.125)  return "⅛";
+  if (cantidad === 0.75)   return "¾";
+  if (cantidad === 0.375)  return "⅜";
+  if (cantidad === 0.625)  return "⅝";
+  if (cantidad === 0.875)  return "⅞";
+  return String(cantidad);
+};
+
 // ── Ordenación de pedidos por reserva ────────────────────────────────────────
 /**
  * Grupo A (aparecen primero, orden cronológico asc):
