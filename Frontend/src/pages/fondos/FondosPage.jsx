@@ -189,21 +189,24 @@ export default function FondosPage() {
           {/* Franja inferior — visible solo cuando está colapsado */}
           {!fondosExpandidos && (
             <div
-              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none border-t border-white/10"
-              style={{ background: "linear-gradient(135deg, #132920 0%, #132920 100%)" }}
+              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none border-t border-gray-100"
+              style={{ background: "#f0faf4" }}
               onClick={() => setFondosExpandidos(true)}
             >
-              <span className="text-[11px] text-white/50">
+              <span className="text-[11px] text-verde-oscuro/60">
                 {fondos.map((f) => f.moneda).join(" · ")}
               </span>
-              <ChevronDown size={12} className="text-white/40" />
+              <ChevronDown size={12} className="text-verde-oscuro/50" />
             </div>
           )}
 
           {/* Fondos individuales — sección blanca con animación */}
           <div
             className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{ maxHeight: fondosExpandidos ? "600px" : "0px" }}
+            style={{
+              maxHeight: fondosExpandidos ? "600px" : "0px",
+              opacity:   fondosExpandidos ? 1 : 0,
+            }}
           >
             <div className="p-4 bg-white">
               <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>

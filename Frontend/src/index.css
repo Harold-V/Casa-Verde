@@ -166,8 +166,8 @@
   .form-row-3  { @apply grid grid-cols-3 gap-4; }
 
   /* Modal */
-  .modal-overlay { @apply fixed inset-0 bg-black/45 flex items-center justify-center z-[1000] p-4; }
-  .modal         { @apply bg-white rounded-lg shadow-xl w-full max-w-[540px] max-h-[90vh] flex flex-col; }
+  .modal-overlay { @apply fixed inset-0 bg-black/45 flex items-center justify-center z-[1000] p-4; animation: var(--animate-fade-in); }
+  .modal         { @apply bg-white rounded-lg shadow-xl w-full max-w-[540px] max-h-[90vh] flex flex-col; animation: var(--animate-slide-up); }
   .modal-lg      { @apply max-w-[720px]; }
   .modal-header  { @apply px-5 py-4 border-b border-gray-200 flex items-center justify-between; }
   .modal-title   { @apply font-bold text-[15px]; }
