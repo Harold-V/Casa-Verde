@@ -105,7 +105,7 @@ export default function FondosPage() {
   const [modalEntradaOpen, setModalEntradaOpen]         = useState(false);
   const [modalSalidaOpen,  setModalSalidaOpen]          = useState(false);
   const [modalTransferenciaMoneda, setModalTransferenciaMoneda] = useState(null);
-  const [filtroFecha,  setFiltroFecha]  = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [filtroFecha,  setFiltroFecha]  = useState("");
   const [filtroMoneda, setFiltroMoneda] = useState("");
   const [filtroTipo,   setFiltroTipo]   = useState("");
   const [pagina, setPagina] = useState(0);
@@ -386,7 +386,7 @@ export default function FondosPage() {
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${esVentaDia ? "bg-[#f0faf4] cursor-pointer hover:bg-[#e6f4ec]" : "hover:bg-gray-50"}`}
+                      className={`transition-colors hover:bg-gray-50 ${esVentaDia ? "cursor-pointer" : ""}`}
                       onClick={esVentaDia ? () => navigate("/resumen", { state: { fecha: m._fechaNav } }) : undefined}
                       title={esVentaDia ? "Ver resumen del día" : undefined}
                     >
@@ -396,7 +396,7 @@ export default function FondosPage() {
                           <Icon size={11} />{labelTipo}
                         </span>
                       </td>
-                      <td className={esVentaDia ? "font-medium" : ""}>{m.concepto}</td>
+                      <td>{m.concepto}</td>
                       <td>
                         <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
                       </td>
