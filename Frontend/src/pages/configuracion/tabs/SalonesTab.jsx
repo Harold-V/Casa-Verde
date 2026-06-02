@@ -1,27 +1,32 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Power } from "lucide-react";
+import { Plus, Pencil, Power, Trash2 } from "lucide-react";
 import { salonService } from "../../../services/salonService";
 import ModalSalon from "../../../components/configuracion/ModalSalon";
+import ConfirmDialog from "../../../components/shared/ConfirmDialog";
 
 export default function SalonesTab() {
   const qc = useQueryClient();
   const [editando, setEditando] = useState(null);
   const [creando, setCreando] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState(null);
 
   const { data: salones = [], isLoading } = useQuery({
     queryKey: ["salones"],
     queryFn: salonService.listar,
   });
 
-  const mutCreate  = useMutation({ mutationFn: salonService.crear,    onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
-  const mutUpdate  = useMutation({ mutationFn: ({ id, data }) => salonService.actualizar(id, data), onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
-  const mutToggle  = useMutation({ mutationFn: salonService.toggle,   onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
+  const mutCreate   = useMutation({ mutationFn: salonService.crear,    onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
+  const mutUpdate   = useMutation({ mutationFn: ({ id, data }) => salonService.actualizar(id, data), onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
+  const mutToggle   = useMutation({ mutationFn: salonService.toggle,   onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
+  const mutEliminar = useMutation({ mutationFn: salonService.eliminar, onSuccess: () => qc.invalidateQueries({ queryKey: ["salones"] }) });
 
   const handleSave = async (data) => {
     if (editando) await mutUpdate.mutateAsync({ id: editando.id, data });
     else await mutCreate.mutateAsync(data);
   };
+
+  const salonEliminando = salones.find((s) => s.id === eliminandoId);
 
   return (
     <div>
@@ -55,9 +60,14 @@ export default function SalonesTab() {
                     </td>
                     <td>
                       <div className="flex gap-1">
-                        <button className="btn-icon" onClick={() => setEditando(s)}><Pencil size={15} /></button>
-                        <button className="btn-icon" onClick={() => mutToggle.mutate(s.id)}>
+                        <button className="btn-icon" title="Editar" onClick={() => setEditando(s)}>
+                          <Pencil size={15} />
+                        </button>
+                        <button className="btn-icon" title={s.activo ? "Desactivar" : "Activar"} onClick={() => mutToggle.mutate(s.id)}>
                           <Power size={15} className={s.activo ? "text-green-600" : "text-red-600"} />
+                        </button>
+                        <button className="btn-icon" title="Eliminar" onClick={() => setEliminandoId(s.id)}>
+                          <Trash2 size={15} className="text-red-500" />
                         </button>
                       </div>
                     </td>
@@ -74,6 +84,17 @@ export default function SalonesTab() {
           salon={editando}
           onClose={() => { setCreando(false); setEditando(null); }}
           onSave={handleSave}
+        />
+      )}
+
+      {eliminandoId && salonEliminando && (
+        <ConfirmDialog
+          emoji="🗑️"
+          titulo={`Eliminar "${salonEliminando.nombre}"`}
+          descripcion="El salón se eliminará. Los pedidos históricos conservarán el salón registrado."
+          labelOk="Sí, eliminar"
+          onOk={() => { mutEliminar.mutate(eliminandoId); setEliminandoId(null); }}
+          onCancelar={() => setEliminandoId(null)}
         />
       )}
     </div>
