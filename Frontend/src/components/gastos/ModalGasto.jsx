@@ -35,9 +35,9 @@ export default function ModalGasto({ onClose, onGuardar }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal max-w-[480px]">
+      <div className="modal max-w-[440px]">
         <div className="modal-header">
-          <span className="modal-title">Registrar gasto</span>
+          <span className="modal-title">Nueva salida</span>
           <button className="btn-icon" onClick={onClose}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -50,7 +50,7 @@ export default function ModalGasto({ onClose, onGuardar }) {
                 className="form-control" autoFocus
                 value={form.concepto}
                 onChange={(e) => set("concepto", e.target.value)}
-                placeholder="Ej. Compra Carbón"
+                placeholder="ej. Pago servicios, Compra carbón…"
               />
             </div>
 
@@ -68,26 +68,23 @@ export default function ModalGasto({ onClose, onGuardar }) {
                   ))}
                 </select>
               </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Monto {form.moneda === "USD" ? "(en dólares)" : "(en pesos)"}
+                </label>
+                <MoneyInput
+                  className="form-control"
+                  moneda={form.moneda}
+                  value={form.monto}
+                  onChange={(v) => set("monto", v)}
+                />
+              </div>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Monto {form.moneda === "USD" ? "(en dólares)" : "(en pesos)"}
-              </label>
-              <MoneyInput
-                className="form-control"
-                moneda={form.moneda}
-                value={form.monto}
-                onChange={(v) => set("monto", v)}
-              />
-            </div>
-
-
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Guardando…" : "Registrar gasto"}
+              {saving ? "Guardando…" : "Registrar salida"}
             </button>
           </div>
         </form>
