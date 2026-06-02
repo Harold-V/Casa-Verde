@@ -6,8 +6,8 @@ export const productoService = {
   historialPrecios: (id) => api.get(`/productos/${id}/precios`).then((r) => r.data),
   crear: (data) => api.post("/productos", data).then((r) => r.data),
   actualizar: (id, data) => api.put(`/productos/${id}`, data).then((r) => r.data),
-  actualizarPrecio: (id, precio) =>
-    api.put(`/productos/${id}/precio`, { precio }).then((r) => r.data),
+  actualizarPrecio: (id, precio, motivo) =>
+    api.put(`/productos/${id}/precio`, { precio, motivo }).then((r) => r.data),
   toggle: (id) => api.put(`/productos/${id}/toggle`).then((r) => r.data),
 };
 
