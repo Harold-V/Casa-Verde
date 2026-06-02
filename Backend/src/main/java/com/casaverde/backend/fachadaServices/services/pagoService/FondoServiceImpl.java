@@ -173,7 +173,7 @@ public class FondoServiceImpl implements IFondoService {
                         gmf,
                         null,
                         null,
-                        null));
+                        "4x1000 sobre retiro de " + origen));
                 montoOrigenEfectivo = req.getMontoOrigen().subtract(gmf);
             }
         }

@@ -51,6 +51,7 @@ export default function ModalCompraInsumo({ insumos, onClose }) {
         monto,
         insumoInventario:   form.insumo,
         cantidadInventario: cantidad,
+        observacion:        "Registrado desde módulo de inventario",
       });
       queryClient.invalidateQueries({ queryKey: ["inventario-stock"]       });
       queryClient.invalidateQueries({ queryKey: ["inventario-movimientos"] });
