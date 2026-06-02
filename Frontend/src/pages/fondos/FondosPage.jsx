@@ -407,7 +407,14 @@ export default function FondosPage() {
                         )}
                       </td>
                       <td>
-                        <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
+                        {m.moneda === "USD" ? (
+                          <>
+                            <span className={`${monedaCls} group-hover:hidden`} style={monedaStyle}>{monedaLabel}</span>
+                            <span className="badge hidden group-hover:inline" style={{ background: "#e8f4ec", color: "#2d6a4f" }}>COP</span>
+                          </>
+                        ) : (
+                          <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
+                        )}
                       </td>
                     </tr>
                   );
