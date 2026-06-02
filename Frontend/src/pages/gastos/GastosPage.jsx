@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { gastoService } from "../../services/gastoService";
-import { formatCOP, formatFecha, formatUSD } from "../../utils/format";
+import { formatCOP, formatFecha, formatFechaLabel, formatUSD } from "../../utils/format";
 import { CAT_BADGE } from "../../utils/constants";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import ModalGasto from "../../components/gastos/ModalGasto";
@@ -98,7 +98,7 @@ export default function GastosPage() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">
-            {filtroFecha ? `Gastos del ${filtroFecha}` : "Todos los gastos"}
+            {filtroFecha ? `Gastos ${formatFechaLabel(filtroFecha)}` : "Todos los gastos"}
           </span>
           <span className="text-[13px] text-gray-500">
             {gastos.length} registro{gastos.length !== 1 ? "s" : ""}

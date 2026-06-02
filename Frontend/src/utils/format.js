@@ -4,6 +4,24 @@ const sysTZ = () => {
   catch { return undefined; }
 };
 
+/**
+ * Formatea una fecha YYYY-MM-DD para encabezados de tabla.
+ * Ejemplos: "hoy · 1 de junio", "ayer · 31 de mayo", "15 de marzo", "15 de marzo de 2024"
+ */
+export const formatFechaLabel = (fechaStr) => {
+  if (!fechaStr) return "";
+  const hoy  = new Date().toLocaleDateString("en-CA");
+  const ayer = new Date(Date.now() - 86_400_000).toLocaleDateString("en-CA");
+  const d    = new Date(fechaStr + "T12:00:00");
+  const opts = d.getFullYear() === new Date().getFullYear()
+    ? { day: "numeric", month: "long" }
+    : { day: "numeric", month: "long", year: "numeric" };
+  const etiqueta = d.toLocaleDateString("es-CO", opts);
+  if (fechaStr === hoy)  return `hoy · ${etiqueta}`;
+  if (fechaStr === ayer) return `ayer · ${etiqueta}`;
+  return etiqueta;
+};
+
 export const formatFecha = (isoString) => {
   if (!isoString) return "—";
   const d  = new Date(isoString);

@@ -6,7 +6,7 @@ import { resumenService } from "../../services/resumenService";
 import { cierreCajaService } from "../../services/cierreCajaService";
 import { tasaService } from "../../services/tasaService";
 import { useSessionStore } from "../../store/useSessionStore";
-import { formatCOP, formatHora, formatUSD } from "../../utils/format";
+import { formatCOP, formatFechaLabel, formatHora, formatUSD } from "../../utils/format";
 import { ESTADO_BADGE, CAT_BADGE } from "../../utils/constants";
 import { calcularInsumos, formatInsumo } from "../../utils/pedidoHelpers";
 import KpiCard from "../../components/shared/KpiCard";
@@ -163,8 +163,7 @@ export default function ResumenPage() {
             const pedidosRealizados = r.pedidos
               .filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO")
               .sort((a, b) => b.id - a.id);
-            const fechaLabel = new Date(fecha + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "long" });
-            const fechaDisplay = fecha === hoy ? `hoy · ${fechaLabel}` : fechaLabel;
+            const fechaDisplay = formatFechaLabel(fecha);
             const totalPaginasPedidos = Math.max(1, Math.ceil(pedidosRealizados.length / PAGE_SIZE));
             const paginaActualPedidos = Math.min(paginaPedidos, totalPaginasPedidos - 1);
             const listaPaginaPedidos = pedidosRealizados.slice(paginaActualPedidos * PAGE_SIZE, (paginaActualPedidos + 1) * PAGE_SIZE);
@@ -257,7 +256,7 @@ export default function ResumenPage() {
             return (
               <div className="card">
                 <div className="card-header">
-                  <span className="card-title shrink-0">Gastos del {fecha}</span>
+                  <span className="card-title shrink-0">Gastos {formatFechaLabel(fecha)}</span>
                   <div className="flex-1 flex justify-center">
                     {r.gastos.length > PAGE_SIZE && (
                       <Pagination
