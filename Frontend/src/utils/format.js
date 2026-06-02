@@ -8,9 +8,12 @@ export const formatFecha = (isoString) => {
   if (!isoString) return "—";
   const d  = new Date(isoString);
   const tz = sysTZ();
-  const hora  = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
-  const fecha = d.toLocaleDateString("es-CO",  { day: "numeric", month: "numeric", year: "numeric", timeZone: tz });
-  return `${hora} · ${fecha}`;
+  const weekday = d.toLocaleDateString("es-CO", { weekday: "long", timeZone: tz });
+  const day     = d.toLocaleDateString("es-CO", { day: "numeric", timeZone: tz });
+  const month   = d.toLocaleDateString("es-CO", { month: "long", timeZone: tz });
+  const hora    = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
+  const fecha   = `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} ${day} de ${month}`;
+  return `${fecha} · ${hora}`;
 };
 
 export const formatHora = (isoString) => {

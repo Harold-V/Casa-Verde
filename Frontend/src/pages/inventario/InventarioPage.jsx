@@ -100,11 +100,16 @@ export default function InventarioPage() {
                 {movimientosPag.map((m) => {
                   const conf = TIPO_CONFIG[m.tipo] ?? { label: m.tipo, badge: "badge-gray", icono: null };
                   const esSalidaPedido = m.tipo === "salida" && m.referenciaTipo === "pedido" && m.referenciaId;
+                  const esGasto = m.referenciaTipo === "gasto" && m.referenciaId;
                   return (
                     <tr key={m.id}
-                      className={esSalidaPedido ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""}
-                      title={esSalidaPedido ? "Ver pedido en historial" : undefined}
-                      onClick={esSalidaPedido ? () => navigate("/pedidos", { state: { abrirPedidoId: Number(m.referenciaId), irAHistorial: true } }) : undefined}
+                      className={(esSalidaPedido || esGasto) ? "cursor-pointer hover:bg-gray-50 transition-colors" : ""}
+                      title={esSalidaPedido ? "Ver pedido en historial" : esGasto ? "Ver en módulo de gastos" : undefined}
+                      onClick={
+                        esSalidaPedido ? () => navigate("/pedidos", { state: { abrirPedidoId: Number(m.referenciaId), irAHistorial: true } })
+                        : esGasto ? () => navigate("/gastos")
+                        : undefined
+                      }
                     >
                       <td className="text-gray-500 text-[12px] whitespace-nowrap">{formatFecha(m.registradoEn)}</td>
                       <td className="font-medium">{capFirst(m.insumo)}</td>

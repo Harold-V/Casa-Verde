@@ -122,6 +122,7 @@ describe("ModalCompraInsumo", () => {
         monto: 150000,
         insumoInventario: "gallina",
         cantidadInventario: 5,
+        observacion: "Registrado desde módulo de inventario",
       })
     );
   });

@@ -76,9 +76,9 @@ describe("formatFecha", () => {
     expect(resultado).toMatch(/AM|PM/);
   });
 
-  it("la parte de fecha contiene el año", () => {
+  it("la parte de fecha contiene el día de la semana y el mes", () => {
     const resultado = formatFecha("2024-06-15T10:30:00Z");
-    expect(resultado).toContain("2024");
+    expect(resultado).toMatch(/de \w+/);
   });
 });
 
