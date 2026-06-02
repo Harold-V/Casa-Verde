@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Download, RotateCcw, TrendingUp, TrendingDown,
-  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw,
+  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw, Minus,
 } from "lucide-react";
 import { fondoService } from "../../services/fondoService";
+import { gastoService } from "../../services/gastoService";
 import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
-import { formatCOP, formatFecha, formatHora, formatUSD } from "../../utils/format";
+import { formatCOP, formatFecha, formatFechaLabel, formatHora, formatUSD } from "../../utils/format";
 import ModalEntrada from "../../components/fondos/ModalEntrada";
 import ModalTransferencia from "../../components/fondos/ModalTransferencia";
+import ModalGasto from "../../components/gastos/ModalGasto";
 
 /* ── helpers visuales ─────────────────────────────────────────────── */
 function getFondoLabel(fondo) {
@@ -69,6 +71,7 @@ export default function FondosPage() {
   const qc = useQueryClient();
 
   const [modalEntradaOpen, setModalEntradaOpen]         = useState(false);
+  const [modalSalidaOpen,  setModalSalidaOpen]          = useState(false);
   const [modalTransferenciaMoneda, setModalTransferenciaMoneda] = useState(null);
   const [filtroFecha, setFiltroFecha]   = useState("");
   const [filtroMoneda, setFiltroMoneda] = useState("");
@@ -94,10 +97,25 @@ export default function FondosPage() {
     retry: false,
   });
 
+  const { data: gastosPeriodo = [] } = useQuery({
+    queryKey: ["gastos", filtroFecha],
+    queryFn: () => gastoService.listar(filtroFecha),
+    enabled: !!filtroFecha,
+    staleTime: 0,
+  });
+
   const invalidarFondos = () => {
     qc.invalidateQueries({ queryKey: ["fondos"] });
     qc.invalidateQueries({ queryKey: ["fondos-historial"] });
   };
+
+  const gastoMut = useMutation({
+    mutationFn: gastoService.registrar,
+    onSuccess: () => {
+      invalidarFondos();
+      qc.invalidateQueries({ queryKey: ["gastos"] });
+    },
+  });
 
   const entradaMut = useMutation({
     mutationFn: fondoService.registrarEntrada,
@@ -124,6 +142,16 @@ export default function FondosPage() {
     : saldoCop + saldoNequiTotal;
 
   const historialProcesado = useMemo(() => procesarHistorial(historial), [historial]);
+
+  const totalVentasPeriodo = useMemo(
+    () => historial.filter((m) => m.tipo === "cobro").reduce((s, m) => s + Number(m.montoCop ?? 0), 0),
+    [historial]
+  );
+  const totalGastosPeriodo = useMemo(
+    () => gastosPeriodo.reduce((s, g) => s + Number(g.montoCop ?? 0), 0),
+    [gastosPeriodo]
+  );
+  const netoPeriodo = totalVentasPeriodo - totalGastosPeriodo;
 
   return (
     <div>
@@ -215,6 +243,32 @@ export default function FondosPage() {
         </>
       )}
 
+      {/* KPIs del período — solo cuando hay filtro de fecha activo */}
+      {filtroFecha && (
+        <div className="grid gap-[14px] mb-5" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="card border-l-4 border-l-verde-claro">
+            <div className="p-[18px]">
+              <div className="text-[12px] text-gray-500 mb-1">Ventas {formatFechaLabel(filtroFecha)}</div>
+              <div className="text-[22px] font-extrabold text-verde-claro">+{formatCOP(totalVentasPeriodo)}</div>
+            </div>
+          </div>
+          <div className="card border-l-4 border-l-red-500">
+            <div className="p-[18px]">
+              <div className="text-[12px] text-gray-500 mb-1">Gastos {formatFechaLabel(filtroFecha)}</div>
+              <div className="text-[22px] font-extrabold text-red-600">−{formatCOP(totalGastosPeriodo)}</div>
+            </div>
+          </div>
+          <div className={`card border-l-4 ${netoPeriodo >= 0 ? "border-l-verde-claro" : "border-l-red-500"}`}>
+            <div className="p-[18px]">
+              <div className="text-[12px] text-gray-500 mb-1">Neto {formatFechaLabel(filtroFecha)}</div>
+              <div className={`text-[22px] font-extrabold ${netoPeriodo >= 0 ? "text-verde-claro" : "text-red-600"}`}>
+                {netoPeriodo >= 0 ? "+" : "−"}{formatCOP(Math.abs(netoPeriodo))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Historial unificado */}
       <div className="card">
         <div className="card-header">
@@ -222,6 +276,9 @@ export default function FondosPage() {
           <div className="flex items-center gap-2 ml-auto">
             <button className="btn btn-primary btn-sm flex items-center gap-1" onClick={() => setModalEntradaOpen(true)}>
               <Plus size={14} /> Nueva entrada
+            </button>
+            <button className="btn btn-danger btn-sm flex items-center gap-1" onClick={() => setModalSalidaOpen(true)}>
+              <Minus size={14} /> Nueva salida
             </button>
             <a className="btn btn-secondary btn-sm" href={exportacionService.cajaUrl(filtroFecha)}>
               <Download size={14} />
@@ -331,6 +388,13 @@ export default function FondosPage() {
           )}
         </div>
       </div>
+
+      {modalSalidaOpen && (
+        <ModalGasto
+          onClose={() => setModalSalidaOpen(false)}
+          onGuardar={(data) => gastoMut.mutateAsync(data)}
+        />
+      )}
 
       {modalEntradaOpen && (
         <ModalEntrada
