@@ -168,14 +168,14 @@ export default function FondosPage() {
               const esUsd   = f.moneda === "USD";
               return (
                 <div key={f.moneda} className={`card border-l-4 ${getBorderCls(f.moneda)}`}>
-                  <div className="p-[18px] flex flex-col gap-1">
-                    <div className="text-[13px] text-gray-500">{getFondoLabel(f)}</div>
-                    <div className={`text-[28px] font-extrabold ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
+                  <div className="p-[18px] flex flex-col h-full">
+                    <div className="text-[13px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
+                    <div className={`text-[28px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
                       {f.moneda === "USD"
                         ? formatUSD(f.saldo ?? 0)
                         : formatCOP(f.saldo ?? 0)}
                     </div>
-                    <div className="flex items-end justify-between gap-2 mt-1">
+                    <div className="flex items-center justify-between gap-2 mt-3">
                       <div className="text-[11px] text-gray-500">
                         {f.moneda}
                         {f.moneda === "USD" && tasaValor != null && (
@@ -183,22 +183,24 @@ export default function FondosPage() {
                         )}
                         {f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
                       </div>
-                      {esNequi && (
-                        <button
-                          className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
-                          onClick={() => setModalTransferenciaMoneda(f.moneda)}
-                        >
-                          <ArrowUpRight size={13} /> Retiro
-                        </button>
-                      )}
-                      {esUsd && (
-                        <button
-                          className="btn btn-secondary btn-sm flex items-center gap-1 shrink-0"
-                          onClick={() => setModalTransferenciaMoneda("USD")}
-                        >
-                          <RefreshCw size={13} /> Cambio
-                        </button>
-                      )}
+                      <div className="h-[30px] flex items-center">
+                        {esNequi && (
+                          <button
+                            className="btn btn-secondary btn-sm flex items-center gap-1"
+                            onClick={() => setModalTransferenciaMoneda(f.moneda)}
+                          >
+                            <ArrowUpRight size={13} /> Retiro
+                          </button>
+                        )}
+                        {esUsd && (
+                          <button
+                            className="btn btn-secondary btn-sm flex items-center gap-1"
+                            onClick={() => setModalTransferenciaMoneda("USD")}
+                          >
+                            <RefreshCw size={13} /> Cambio
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
