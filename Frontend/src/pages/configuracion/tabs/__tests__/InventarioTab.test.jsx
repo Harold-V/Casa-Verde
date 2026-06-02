@@ -45,10 +45,11 @@ describe("InventarioTab", () => {
     expect(screen.getByText("Cuy")).toBeInTheDocument();
   });
 
-  it("muestra el stock actual de gallina (12)", async () => {
+  it("renderiza el input de nuevo stock para cada insumo", async () => {
     render(<InventarioTab />, { wrapper });
     await screen.findByText("Gallina");
     expect(screen.getByLabelText(/nuevo stock de gallina/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/nuevo stock de cuy/i)).toBeInTheDocument();
   });
 
   it("llama registrarMovimiento con tipo 'ajuste' al guardar gallina", async () => {

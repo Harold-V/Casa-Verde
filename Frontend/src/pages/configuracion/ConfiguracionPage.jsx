@@ -1,16 +1,18 @@
 import { useState } from "react";
-import ProductosTab from "./tabs/ProductosTab";
-import SalonesTab   from "./tabs/SalonesTab";
-import TasaUsdTab   from "./tabs/TasaUsdTab";
-import FondosTab    from "./tabs/FondosTab";
-import UsuariosTab  from "./tabs/UsuariosTab";
+import ProductosTab  from "./tabs/ProductosTab";
+import SalonesTab    from "./tabs/SalonesTab";
+import TasaUsdTab    from "./tabs/TasaUsdTab";
+import FondosTab     from "./tabs/FondosTab";
+import UsuariosTab   from "./tabs/UsuariosTab";
+import InventarioTab from "./tabs/InventarioTab";
 
 const TABS = [
-  { id: "productos", label: "Productos" },
-  { id: "salones",   label: "Salones"   },
-  { id: "tasa",      label: "Tasa USD"  },
-  { id: "fondos",    label: "Fondos"    },
-  { id: "usuarios",  label: "Usuarios"  },
+  { id: "productos",  label: "Productos"  },
+  { id: "salones",    label: "Salones"    },
+  { id: "tasa",       label: "Tasa USD"   },
+  { id: "fondos",     label: "Fondos"     },
+  { id: "usuarios",   label: "Usuarios"   },
+  { id: "inventario", label: "Inventario" },
 ];
 
 export default function ConfiguracionPage() {
@@ -34,11 +36,12 @@ export default function ConfiguracionPage() {
         ))}
       </div>
 
-      {tab === "productos" && <ProductosTab />}
-      {tab === "salones"   && <SalonesTab />}
-      {tab === "tasa"      && <TasaUsdTab />}
-      {tab === "fondos"    && <FondosTab />}
-      {tab === "usuarios"  && <UsuariosTab />}
+      {tab === "productos"  && <ProductosTab />}
+      {tab === "salones"    && <SalonesTab />}
+      {tab === "tasa"       && <TasaUsdTab />}
+      {tab === "fondos"     && <FondosTab />}
+      {tab === "usuarios"   && <UsuariosTab />}
+      {tab === "inventario" && <InventarioTab />}
     </div>
   );
 }
