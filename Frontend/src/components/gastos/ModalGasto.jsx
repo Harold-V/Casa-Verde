@@ -10,7 +10,7 @@ const CATEGORIAS = ["insumos", "servicios", "equipos", "otros"];
 /** Modal para registrar un gasto. Extraído de GastosPage. */
 export default function ModalGasto({ onClose, onGuardar }) {
   const [form, setForm] = useState({
-    concepto: "", categoria: "insumos", moneda: "COP", monto: "", observacion: "",
+    concepto: "", categoria: "insumos", moneda: "COP", monto: "",
   });
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
@@ -92,14 +92,7 @@ export default function ModalGasto({ onClose, onGuardar }) {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Observación (opcional)</label>
-              <input
-                className="form-control"
-                value={form.observacion}
-                onChange={(e) => set("observacion", e.target.value)}
-              />
-            </div>
+
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
