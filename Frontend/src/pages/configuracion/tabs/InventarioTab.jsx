@@ -92,7 +92,7 @@ function InsumoRow({ insumo, onAjustado }) {
             type="number"
             step="0.001"
             min="0"
-            placeholder="Nuevo stock"
+            placeholder="Ej: 0.5"
             value={cantidad}
             onChange={(e) => { setCantidad(e.target.value); setMsg(null); }}
             aria-label={`Nuevo stock de ${insumo.insumo}`}
@@ -116,7 +116,7 @@ function InsumoRow({ insumo, onAjustado }) {
         <ConfirmDialog
           emoji="📦"
           titulo={`Ajustar stock de ${capFirst(insumo.insumo)}`}
-          descripcion={`El stock pasará de ${formatDecimal(insumo.stockActual)} a ${parseFloat(cantidad)}. Este cambio queda registrado en el historial de inventario.`}
+          descripcion={`El stock pasará de ${formatDecimal(insumo.stockActual)} a ${formatDecimal(parseFloat(cantidad))}. Este cambio queda registrado en el historial de inventario.`}
           labelOk="Sí, ajustar"
           onOk={handleConfirmar}
           onCancelar={() => setConfirmando(false)}
