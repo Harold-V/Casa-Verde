@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Download, RotateCcw, TrendingUp, TrendingDown,
-  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw, Minus,
+  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw, Minus, ChevronDown,
 } from "lucide-react";
 import { fondoService } from "../../services/fondoService";
 import { gastoService } from "../../services/gastoService";
@@ -80,6 +80,7 @@ export default function FondosPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const [fondosExpandidos, setFondosExpandidos]         = useState(false);
   const [modalEntradaOpen, setModalEntradaOpen]         = useState(false);
   const [modalSalidaOpen,  setModalSalidaOpen]          = useState(false);
   const [modalTransferenciaMoneda, setModalTransferenciaMoneda] = useState(null);
@@ -157,9 +158,10 @@ export default function FondosPage() {
         <div className="loading-center"><div className="spinner" /></div>
       ) : (
         <div className="card mb-5 overflow-hidden border-l-4 border-l-verde-oscuro">
-          {/* Header oscuro — capital total */}
-          <div className="p-[18px] flex justify-between items-center flex-wrap gap-3"
-            style={{ background: "linear-gradient(135deg, #1a4731 0%, #1a4a2e 100%)" }}>
+          {/* Header oscuro — capital total (clickeable para expandir) */}
+          <div className="p-[18px] flex justify-between items-center flex-wrap gap-3 cursor-pointer select-none"
+            style={{ background: "linear-gradient(135deg, #1a4731 0%, #1a4a2e 100%)" }}
+            onClick={() => setFondosExpandidos((v) => !v)}>
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign size={18} className="text-white/70" />
@@ -177,9 +179,15 @@ export default function FondosPage() {
                   : ` + USD ${formatUSD(saldoUsd)} (tasa no configurada)`}
               </div>
             </div>
+            <ChevronDown
+              size={20}
+              className="text-white/60 shrink-0 transition-transform duration-200"
+              style={{ transform: fondosExpandidos ? "rotate(180deg)" : "rotate(0deg)" }}
+            />
           </div>
 
-          {/* Fondos individuales — sección blanca */}
+          {/* Fondos individuales — sección blanca (desplegable) */}
+          {fondosExpandidos && (
           <div className="p-4 bg-white">
             <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
               {fondos.map((f) => {
@@ -229,6 +237,7 @@ export default function FondosPage() {
               })}
             </div>
           </div>
+          )}
         </div>
       )}
 
