@@ -189,8 +189,7 @@ export default function FondosPage() {
           {/* Franja inferior — visible solo cuando está colapsado */}
           {!fondosExpandidos && (
             <div
-              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none border-t border-gray-100"
-              style={{ background: "#f0faf4" }}
+              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none border-t border-gray-100 bg-white"
               onClick={() => setFondosExpandidos(true)}
             >
               <span className="text-[11px] text-verde-oscuro/60">
@@ -208,13 +207,13 @@ export default function FondosPage() {
               opacity:   fondosExpandidos ? 1 : 0,
             }}
           >
-            <div className="p-4 bg-white">
+            <div className="p-4 bg-white cursor-pointer select-none" onClick={() => setFondosExpandidos(false)}>
               <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
                 {fondos.map((f) => {
                   const esNequi = f.moneda.startsWith("NEQUI");
                   const esUsd   = f.moneda === "USD";
                   return (
-                    <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`}>
+                    <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`} onClick={(e) => e.stopPropagation()}>
                       <div className="text-[12px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
                       <div className={`text-[22px] font-extrabold flex-1 ${(f.saldo ?? 0) < 0 ? "text-red-600" : getColorCls(f.moneda)}`}>
                         {f.moneda === "USD"
