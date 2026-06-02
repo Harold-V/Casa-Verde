@@ -3,14 +3,19 @@ import { Plus, X, AlertTriangle } from "lucide-react";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 import { formatCOP } from "../../utils/format";
 
-const FRACCIONES = [
-  { valor: 0.125, label: "⅛" },
-  { valor: 0.25,  label: "¼" },
-  { valor: 0.5,   label: "½" },
-  { valor: 0.75,  label: "¾" },
-  { valor: 1,     label: "1 entero" },
-  { valor: 2,     label: "2 enteros" },
-];
+const FRACCIONES = {
+  gallina: [
+    { valor: 0.125, label: "⅛ gallina" },
+    { valor: 0.25,  label: "¼ gallina" },
+    { valor: 0.5,   label: "½ gallina" },
+    { valor: 1,     label: "1 gallina entera" },
+  ],
+  cuy: [
+    { valor: 0.25,  label: "¼ cuy" },
+    { valor: 0.5,   label: "½ cuy" },
+    { valor: 1,     label: "1 cuy entero" },
+  ],
+};
 
 export default function ModalProducto({ producto, categorias, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -28,7 +33,7 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const agregarComp = () =>
-    setForm((f) => ({ ...f, composicion: [...f.composicion, { insumo: "gallina", cantidad: 0.5 }] }));
+    setForm((f) => ({ ...f, composicion: [...f.composicion, { insumo: "gallina", cantidad: 0.125 }] }));
 
   const quitarComp = (i) =>
     setForm((f) => ({ ...f, composicion: f.composicion.filter((_, idx) => idx !== i) }));
@@ -36,7 +41,12 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
   const setComp = (i, k, v) =>
     setForm((f) => {
       const comp = [...f.composicion];
-      comp[i] = { ...comp[i], [k]: v };
+      if (k === "insumo") {
+        const primerValor = FRACCIONES[v]?.[0]?.valor ?? 0.5;
+        comp[i] = { ...comp[i], insumo: v, cantidad: primerValor };
+      } else {
+        comp[i] = { ...comp[i], [k]: v };
+      }
       return { ...f, composicion: comp };
     });
 
@@ -168,11 +178,11 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
                           <option value="cuy">Cuy</option>
                         </select>
                         <select
-                          className="form-control w-[120px]"
+                          className="form-control w-[140px]"
                           value={c.cantidad}
                           onChange={(e) => setComp(i, "cantidad", parseFloat(e.target.value))}
                         >
-                          {FRACCIONES.map((f) => (
+                          {(FRACCIONES[c.insumo] ?? []).map((f) => (
                             <option key={f.valor} value={f.valor}>{f.label}</option>
                           ))}
                         </select>
