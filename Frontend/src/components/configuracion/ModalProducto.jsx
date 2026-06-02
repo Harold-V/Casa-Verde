@@ -1,15 +1,14 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, AlertTriangle } from "lucide-react";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 
-/** Modal para crear/editar un producto del catálogo. Extraído de ProductosTab. */
 export default function ModalProducto({ producto, categorias, onClose, onSave }) {
   const [form, setForm] = useState({
-    nombre:          producto?.nombre          ?? "",
-    precio:          producto?.precio          ?? 0,
-    categoriaId:     producto?.categoriaId     ?? "",
+    nombre:           producto?.nombre           ?? "",
+    precio:           producto?.precio           ?? 0,
+    categoriaId:      producto?.categoriaId      ?? "",
     afectaInventario: producto?.afectaInventario ?? false,
-    composicion:     producto?.composicion     ?? [],
+    composicion:      producto?.composicion      ?? [],
   });
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,64 +61,122 @@ export default function ModalProducto({ producto, categorias, onClose, onSave })
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             {error && <div className="alert alert-error">{error}</div>}
+
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Nombre *</label>
-                <input className="form-control" value={form.nombre}
-                  onChange={(e) => set("nombre", e.target.value)} />
+                <input
+                  className="form-control"
+                  value={form.nombre}
+                  onChange={(e) => set("nombre", e.target.value)}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Precio (COP)</label>
-                <input className="form-control" type="number" min="0" value={form.precio}
-                  onChange={(e) => set("precio", e.target.value)} />
+                <input
+                  className="form-control"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.precio}
+                  onChange={(e) => set("precio", e.target.value)}
+                />
               </div>
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Categoría</label>
-                <select className="form-control" value={form.categoriaId}
-                  onChange={(e) => set("categoriaId", e.target.value)}>
-                  <option value="">— Sin categoría —</option>
-                  {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-              </div>
-              <div className="form-group flex items-center gap-2.5 pt-[22px]">
-                <input type="checkbox" id="afecta" checked={form.afectaInventario}
-                  onChange={(e) => set("afectaInventario", e.target.checked)} />
-                <label htmlFor="afecta" className="cursor-pointer font-medium">Afecta inventario</label>
+
+            <div className="form-group">
+              <label className="form-label">Categoría</label>
+              <select
+                className="form-control"
+                value={form.categoriaId}
+                onChange={(e) => set("categoriaId", e.target.value)}
+              >
+                <option value="">— Sin categoría —</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <div className="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  id="afecta"
+                  checked={form.afectaInventario}
+                  onChange={(e) => set("afectaInventario", e.target.checked)}
+                />
+                <label htmlFor="afecta" className="cursor-pointer font-medium">
+                  ¿Este producto descuenta inventario al venderse?
+                </label>
               </div>
             </div>
 
             {form.afectaInventario && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="form-label mb-0">Composición de inventario</label>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={agregarComp}>
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <p className="font-semibold text-[13px] text-verde-oscuro">
+                      ¿Qué se descuenta al vender 1 unidad?
+                    </p>
+                    <p className="text-[12px] text-gray-500">
+                      Cada cantidad se descuenta proporcional a las unidades vendidas.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm shrink-0"
+                    onClick={agregarComp}
+                  >
                     <Plus size={13} /> Agregar insumo
                   </button>
                 </div>
-                {form.composicion.map((c, i) => (
-                  <div key={i} className="composicion-row">
-                    <select className="form-control flex-1" value={c.insumo}
-                      onChange={(e) => setComp(i, "insumo", e.target.value)}>
-                      <option value="gallina">Gallina</option>
-                      <option value="cuy">Cuy</option>
-                    </select>
-                    <input className="form-control w-[100px]" type="number" step="0.001" min="0"
-                      value={c.cantidad} onChange={(e) => setComp(i, "cantidad", e.target.value)} />
-                    <button type="button" className="btn-icon" onClick={() => quitarComp(i)}>
-                      <X size={15} />
-                    </button>
+
+                {form.composicion.length === 0 ? (
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-[12px] text-yellow-800">
+                    <AlertTriangle size={14} className="shrink-0" />
+                    Sin insumos — no se descontará inventario aunque esté marcado
                   </div>
-                ))}
-                {form.composicion.length === 0 && (
-                  <p className="text-gray-500 text-[13px]">Sin composición — no descontará inventario</p>
+                ) : (
+                  <div className="flex flex-col gap-1.5 mt-2">
+                    {form.composicion.map((c, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <select
+                          className="form-control flex-1"
+                          value={c.insumo}
+                          onChange={(e) => setComp(i, "insumo", e.target.value)}
+                        >
+                          <option value="gallina">Gallina</option>
+                          <option value="cuy">Cuy</option>
+                        </select>
+                        <input
+                          className="form-control w-[110px]"
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          placeholder="Cantidad"
+                          value={c.cantidad}
+                          onChange={(e) => setComp(i, "cantidad", e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn-icon shrink-0"
+                          onClick={() => quitarComp(i)}
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
           </div>
+
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancelar
+            </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? "Guardando…" : "Guardar"}
             </button>
