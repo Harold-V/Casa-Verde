@@ -61,7 +61,7 @@ function getBorderCls(moneda) {
 
 function getMonedaBadge(moneda) {
   if (moneda === "COP") return { cls: "badge", style: { background: "#e8f4ec", color: "#2d6a4f" } };
-  if (moneda === "USD") return { cls: "badge", style: { background: "#e6f0e8", color: "#1a6b3c" } };
+  if (moneda === "USD") return { cls: "badge", style: { background: "#dbeafe", color: "#1e40af" } };
   if (moneda.startsWith("NEQUI")) return { cls: "badge", style: { background: "#f0e6ff", color: "#8c00ff" } };
   return { cls: "badge badge-gray", style: {} };
 }
