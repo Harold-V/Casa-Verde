@@ -364,7 +364,6 @@ export default function FondosPage() {
                   <th>Concepto</th>
                   <th>Moneda</th>
                   <th className="text-right">Monto</th>
-                  <th className="text-right">En COP</th>
                 </tr>
               </thead>
               <tbody>
@@ -401,11 +400,12 @@ export default function FondosPage() {
                         <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
                       </td>
                       <td className={`text-right font-semibold ${color}`}>
-                        {esCobro ? "+" : "−"}
-                        {m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}
-                      </td>
-                      <td className={`text-right ${color}`}>
-                        {m.moneda !== "USD" ? "—" : `${esCobro ? "+" : "−"}${formatCOP(m.montoCop)}`}
+                        <div>{esCobro ? "+" : "−"}{m.moneda === "USD" ? formatUSD(m.monto) : formatCOP(m.monto)}</div>
+                        {m.moneda === "USD" && m.montoCop != null && (
+                          <div className="text-[11px] text-gray-400 font-normal">
+                            ≈ {esCobro ? "+" : "−"}{formatCOP(m.montoCop)}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
