@@ -362,8 +362,8 @@ export default function FondosPage() {
                   <th>Fecha / Hora</th>
                   <th>Tipo</th>
                   <th>Concepto</th>
-                  <th>Moneda</th>
                   <th className="text-right">Monto</th>
+                  <th>Moneda</th>
                 </tr>
               </thead>
               <tbody>
@@ -396,9 +396,6 @@ export default function FondosPage() {
                         </span>
                       </td>
                       <td>{m.concepto}</td>
-                      <td>
-                        <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
-                      </td>
                       <td className={`text-right font-semibold ${color}`}>
                         {m.moneda === "USD" && m.montoCop != null ? (
                           <>
@@ -408,6 +405,9 @@ export default function FondosPage() {
                         ) : (
                           `${esCobro ? "+" : "−"}${formatCOP(m.monto)}`
                         )}
+                      </td>
+                      <td>
+                        <span className={monedaCls} style={monedaStyle}>{monedaLabel}</span>
                       </td>
                     </tr>
                   );
