@@ -189,8 +189,8 @@ export default function FondosPage() {
           {/* Franja inferior — visible solo cuando está colapsado */}
           {!fondosExpandidos && (
             <div
-              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none"
-              style={{ background: "rgba(0,0,0,0.25)" }}
+              className="px-[18px] py-2 flex items-center gap-1.5 cursor-pointer select-none border-t border-white/10"
+              style={{ background: "linear-gradient(135deg, #132920 0%, #132920 100%)" }}
               onClick={() => setFondosExpandidos(true)}
             >
               <span className="text-[11px] text-white/50">
