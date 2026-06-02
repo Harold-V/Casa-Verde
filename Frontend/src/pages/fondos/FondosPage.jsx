@@ -176,12 +176,17 @@ export default function FondosPage() {
                         : formatCOP(f.saldo ?? 0)}
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-3">
-                      <div className="text-[11px] text-gray-500">
-                        {f.moneda}
-                        {f.moneda === "USD" && tasaValor != null && (
-                          <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
+                      <div className="text-[11px] text-gray-500 flex flex-col gap-0.5">
+                        <span>
+                          {f.moneda}
+                          {f.moneda === "USD" && tasaValor != null && (
+                            <span> · ≈ {formatCOP(Number(f.saldo ?? 0) * tasaValor)} COP</span>
+                          )}
+                          {f.moneda !== "USD" && f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
+                        </span>
+                        {f.moneda === "USD" && f.actualizadoEn && (
+                          <span>act. {formatHora(f.actualizadoEn)}</span>
                         )}
-                        {f.actualizadoEn && ` · act. ${formatHora(f.actualizadoEn)}`}
                       </div>
                       <div className="h-[30px] flex items-center">
                         {esNequi && (
