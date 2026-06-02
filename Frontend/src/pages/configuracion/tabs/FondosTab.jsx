@@ -3,7 +3,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/rea
 import { Plus, Trash2, X } from "lucide-react";
 import { fondoService } from "../../../services/fondoService";
 import { configuracionService } from "../../../services/configuracionService";
-import { formatCOP, formatFecha, formatUSD } from "../../../utils/format";
+import { formatCOP, formatUSD } from "../../../utils/format";
 import ModalAjuste from "../../../components/fondos/ModalAjuste";
 
 export default function FondosTab() {

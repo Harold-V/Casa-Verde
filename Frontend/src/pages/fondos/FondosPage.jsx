@@ -9,7 +9,7 @@ import { fondoService } from "../../services/fondoService";
 import { gastoService } from "../../services/gastoService";
 import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
-import { formatCOP, formatFecha, formatFechaLabel, formatHora, formatUSD } from "../../utils/format";
+import { formatCOP, formatFecha, formatHora, formatUSD } from "../../utils/format";
 import ModalEntrada from "../../components/fondos/ModalEntrada";
 import ModalTransferencia from "../../components/fondos/ModalTransferencia";
 import ModalGasto from "../../components/gastos/ModalGasto";
@@ -97,13 +97,6 @@ export default function FondosPage() {
     retry: false,
   });
 
-  const { data: gastosPeriodo = [] } = useQuery({
-    queryKey: ["gastos", filtroFecha],
-    queryFn: () => gastoService.listar(filtroFecha),
-    enabled: !!filtroFecha,
-    staleTime: 0,
-  });
-
   const invalidarFondos = () => {
     qc.invalidateQueries({ queryKey: ["fondos"] });
     qc.invalidateQueries({ queryKey: ["fondos-historial"] });
@@ -142,16 +135,6 @@ export default function FondosPage() {
     : saldoCop + saldoNequiTotal;
 
   const historialProcesado = useMemo(() => procesarHistorial(historial), [historial]);
-
-  const totalVentasPeriodo = useMemo(
-    () => historial.filter((m) => m.tipo === "cobro").reduce((s, m) => s + Number(m.montoCop ?? 0), 0),
-    [historial]
-  );
-  const totalGastosPeriodo = useMemo(
-    () => gastosPeriodo.reduce((s, g) => s + Number(g.montoCop ?? 0), 0),
-    [gastosPeriodo]
-  );
-  const netoPeriodo = totalVentasPeriodo - totalGastosPeriodo;
 
   return (
     <div>
@@ -241,32 +224,6 @@ export default function FondosPage() {
           </div>
 
         </>
-      )}
-
-      {/* KPIs del período — solo cuando hay filtro de fecha activo */}
-      {filtroFecha && (
-        <div className="grid gap-[14px] mb-5" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <div className="card border-l-4 border-l-verde-claro">
-            <div className="p-[18px]">
-              <div className="text-[12px] text-gray-500 mb-1">Ventas {formatFechaLabel(filtroFecha)}</div>
-              <div className="text-[22px] font-extrabold text-verde-claro">+{formatCOP(totalVentasPeriodo)}</div>
-            </div>
-          </div>
-          <div className="card border-l-4 border-l-red-500">
-            <div className="p-[18px]">
-              <div className="text-[12px] text-gray-500 mb-1">Gastos {formatFechaLabel(filtroFecha)}</div>
-              <div className="text-[22px] font-extrabold text-red-600">−{formatCOP(totalGastosPeriodo)}</div>
-            </div>
-          </div>
-          <div className={`card border-l-4 ${netoPeriodo >= 0 ? "border-l-verde-claro" : "border-l-red-500"}`}>
-            <div className="p-[18px]">
-              <div className="text-[12px] text-gray-500 mb-1">Neto {formatFechaLabel(filtroFecha)}</div>
-              <div className={`text-[22px] font-extrabold ${netoPeriodo >= 0 ? "text-verde-claro" : "text-red-600"}`}>
-                {netoPeriodo >= 0 ? "+" : "−"}{formatCOP(Math.abs(netoPeriodo))}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Historial unificado */}
