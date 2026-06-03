@@ -15,4 +15,14 @@ public class CierreCajaRequest {
     private BigDecimal contadoUsd;
     private BigDecimal contadoNequi;
     private String observacion;
+
+    // Denominaciones opcionales — si se envían, contadoCop se calcula desde ellas
+    private BigDecimal baseCop;
+    private Integer billetes100k;
+    private Integer billetes50k;
+    private Integer billetes20k;
+    private Integer billetes10k;
+    private Integer billetes5k;
+    private Integer billetes2k;
+    private BigDecimal monedasCop;
 }

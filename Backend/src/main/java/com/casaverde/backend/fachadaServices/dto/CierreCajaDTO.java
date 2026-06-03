@@ -30,4 +30,15 @@ public class CierreCajaDTO {
     private String observacion;
     private String backupPath;
     private LocalDateTime cerradoEn;
+
+    // Denominaciones del arqueo (null en cierres históricos)
+    private BigDecimal baseCop;
+    private Integer billetes100k;
+    private Integer billetes50k;
+    private Integer billetes20k;
+    private Integer billetes10k;
+    private Integer billetes5k;
+    private Integer billetes2k;
+    private BigDecimal monedasCop;
+    private BigDecimal paraEntregar;   // calculado: contadoCop - baseCop
 }
