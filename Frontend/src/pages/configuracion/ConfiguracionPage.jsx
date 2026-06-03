@@ -9,6 +9,8 @@ import CategoriasTab from "./tabs/CategoriasTab";
 import AuditoriaTab  from "./tabs/AuditoriaTab";
 import BackupsTab    from "./tabs/BackupsTab";
 import ReportesTab   from "./tabs/ReportesTab";
+import ProveedoresTab from "./tabs/ProveedoresTab";
+import ComprasTab     from "./tabs/ComprasTab";
 
 const TABS = [
   { id: "productos",  label: "Productos"  },
@@ -21,6 +23,8 @@ const TABS = [
   { id: "auditoria",  label: "Auditoría"  },
   { id: "backups",    label: "Backups"    },
   { id: "reportes",   label: "Reportes"   },
+  { id: "proveedores", label: "Proveedores" },
+  { id: "compras",     label: "Compras"     },
 ];
 
 export default function ConfiguracionPage() {
@@ -54,6 +58,8 @@ export default function ConfiguracionPage() {
       {tab === "auditoria"  && <AuditoriaTab  />}
       {tab === "backups"    && <BackupsTab    />}
       {tab === "reportes"   && <ReportesTab   />}
+      {tab === "proveedores" && <ProveedoresTab />}
+      {tab === "compras"     && <ComprasTab     />}
     </div>
   );
 }
