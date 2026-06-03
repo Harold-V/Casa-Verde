@@ -20,26 +20,31 @@ Tras completar el Tier 1 (UI pendiente), el sistema tiene todos los endpoints ex
 
 ### Backend
 
-**Entidad `CierreCaja`** — agregar 7 campos nuevos (todos nullable para compatibilidad con cierres históricos):
+**Contexto operativo:** El dueño coloca una "base" (ej. $350.000) en la caja al iniciar el día para dar cambio. Al cerrar, el operador cuenta TODO el efectivo físico (billetes + monedas + la base misma). La base se deja en la caja para el día siguiente — no es ingreso. El operador entrega al dueño: `total contado − base`.
+
+**Entidad `CierreCaja`** — agregar 8 campos nuevos (todos nullable para compatibilidad con cierres históricos):
 
 ```java
-@Column(name = "billetes_100k") private Integer billetes100k;
-@Column(name = "billetes_50k")  private Integer billetes50k;
-@Column(name = "billetes_20k")  private Integer billetes20k;
-@Column(name = "billetes_10k")  private Integer billetes10k;
-@Column(name = "billetes_5k")   private Integer billetes5k;
-@Column(name = "billetes_2k")   private Integer billetes2k;
-@Column(name = "monedas_cop", precision = 19, scale = 0) private BigDecimal monedasCop;
+@Column(name = "base_cop",       precision = 19, scale = 0) private BigDecimal baseCop;
+@Column(name = "billetes_100k")  private Integer billetes100k;
+@Column(name = "billetes_50k")   private Integer billetes50k;
+@Column(name = "billetes_20k")   private Integer billetes20k;
+@Column(name = "billetes_10k")   private Integer billetes10k;
+@Column(name = "billetes_5k")    private Integer billetes5k;
+@Column(name = "billetes_2k")    private Integer billetes2k;
+@Column(name = "monedas_cop",    precision = 19, scale = 0) private BigDecimal monedasCop;
 ```
 
-**`CierreCajaRequest`** — agregar los mismos 7 campos opcionales (`@Nullable`).
+`baseCop` = monto que se deja en caja para el siguiente día (pre-cargado desde config, editable).
 
-**`CierreCajaDTO`** — agregar los 7 campos para que el panel los muestre en modo lectura.
+**`CierreCajaRequest`** — agregar los mismos 8 campos opcionales (`@Nullable`).
 
-**`CierreCajaServiceImpl.cerrar()`** — antes de calcular `diferenciaCop`, si el request tiene al menos un campo de denominación no nulo, calcular `contadoCop` como:
+**`CierreCajaDTO`** — agregar los 8 campos para que el panel los muestre en modo lectura. Incluir campo calculado `paraEntregar` (BigDecimal) = `contadoCop - baseCop` (calculado en el mapper, null si no hay denominaciones).
+
+**`CierreCajaServiceImpl.cerrar()`** — si el request tiene al menos un campo de denominación no nulo, calcular `contadoCop` como:
 
 ```java
-BigDecimal contadoCop = BigDecimal.ZERO
+BigDecimal contadoCop = safeDecimal(req.getBaseCop())
     .add(safe(req.getBilletes100k()).multiply(new BigDecimal("100000")))
     .add(safe(req.getBilletes50k()).multiply(new BigDecimal("50000")))
     .add(safe(req.getBilletes20k()).multiply(new BigDecimal("20000")))
@@ -47,40 +52,45 @@ BigDecimal contadoCop = BigDecimal.ZERO
     .add(safe(req.getBilletes5k()).multiply(new BigDecimal("5000")))
     .add(safe(req.getBilletes2k()).multiply(new BigDecimal("2000")))
     .add(safeDecimal(req.getMonedasCop()));
-// donde safe(Integer n) = n != null ? new BigDecimal(n) : BigDecimal.ZERO
+// donde safe(Integer n) → BigDecimal, safeDecimal(BigDecimal) → BigDecimal o ZERO si null
 ```
 
-Si todos los campos de denominación son nulos, usar `req.getContadoCop()` directamente (compatibilidad hacia atrás).
+Si todos los campos son nulos, usar `req.getContadoCop()` directamente (compatibilidad hacia atrás).
 
-Guardar los campos de denominación en la entidad. La diferencia y el balance siguen calculándose igual sobre `contadoCop`.
+**`DataInitializer`** — agregar clave `base_caja_cop` con valor `"0"` si no existe (idempotente).
 
-**Mapper `CierreCajaMapper`** — mapear los 7 campos nuevos en entity ↔ DTO.
+**Mapper `CierreCajaMapper`** — mapear los 8 campos nuevos en entity ↔ DTO. Calcular `paraEntregar = contadoCop - baseCop` cuando `baseCop != null`.
 
 ### Frontend
 
-**`CierreCajaPanel.jsx`** — reemplazar el input único `contadoCop` por grilla de denominaciones:
+**`CierreCajaPanel.jsx`** — reemplazar el input único `contadoCop` por grilla de denominaciones con base:
 
 ```
-Denominaciones (COP)
-┌───────────────┬──────────┬─────────────┐
-│ Billetes      │ Cantidad │ Subtotal    │
-├───────────────┼──────────┼─────────────┤
-│ $100.000      │ [____]   │ $0          │
-│ $ 50.000      │ [____]   │ $0          │
-│ $ 20.000      │ [____]   │ $0          │
-│ $ 10.000      │ [____]   │ $0          │
-│ $  5.000      │ [____]   │ $0          │
-│ $  2.000      │ [____]   │ $0          │
-│ Monedas (COP) │ [______] │ —           │
-├───────────────┴──────────┼─────────────┤
-│ Total contado COP        │ $0          │
-└──────────────────────────┴─────────────┘
+Conteo de caja COP
+┌─────────────────────┬───────────┬──────────────┐
+│                     │ Cantidad  │ Subtotal     │
+├─────────────────────┼───────────┼──────────────┤
+│ Base para mañana    │ [350.000] │  $350.000    │  ← pre-cargada de config, editable
+├─────────────────────┼───────────┼──────────────┤
+│ $100.000            │ [____]    │       $0     │
+│ $ 50.000            │ [____]    │       $0     │
+│ $ 20.000            │ [____]    │       $0     │
+│ $ 10.000            │ [____]    │       $0     │
+│ $  5.000            │ [____]    │       $0     │
+│ $  2.000            │ [____]    │       $0     │
+│ Monedas (COP)       │ [______]  │       —      │  ← monto total en monedas
+├─────────────────────┴───────────┼──────────────┤
+│ Total contado                   │   $350.000   │
+│ Para entregar al dueño          │         $0   │  ← total − base (informativo)
+└─────────────────────────────────┴──────────────┘
 ```
 
+- "Base para mañana" se pre-carga con `GET /api/v1/configuracion/base_caja_cop` al montar el panel
 - Los subtotales y el total se calculan en tiempo real con `useMemo`
-- El total calculado es el `contadoCop` que se envía al backend
-- Si el cierre ya existe (modo lectura), mostrar el desglose guardado o solo el total si los campos son null (cierre antiguo)
-- Las denominaciones son **opcionales** — el cierre puede ejecutarse sin ingresar desglose (compatibilidad hacia atrás). Si todos los campos de denominación quedan vacíos, el usuario debe ingresar `contadoCop` manualmente (campo fallback visible cuando no hay ninguna denominación ingresada).
+- "Para entregar" = total − base (informativo, no afecta la reconciliación financiera)
+- El `contadoCop` enviado al backend = total calculado (base + billetes + monedas)
+- Si el cierre ya existe (modo lectura), mostrar el desglose guardado
+- Las denominaciones son **opcionales** — fallback: si todos quedan vacíos, campo manual `contadoCop`
 
 ---
 
@@ -242,11 +252,12 @@ comparativo: (año) =>
 
 | Archivo | Cambio |
 |---|---|
-| `CierreCaja.java` | +7 campos de denominación |
-| `CierreCajaRequest.java` | +7 campos opcionales |
-| `CierreCajaDTO.java` | +7 campos para respuesta |
-| `CierreCajaServiceImpl.java` | calcular contadoCop desde denominaciones |
-| `CierreCajaMapper.java` | mapear campos nuevos |
+| `CierreCaja.java` | +8 campos (baseCop + 7 denominaciones) |
+| `CierreCajaRequest.java` | +8 campos opcionales |
+| `CierreCajaDTO.java` | +8 campos + campo calculado `paraEntregar` |
+| `CierreCajaServiceImpl.java` | calcular contadoCop desde base + denominaciones |
+| `CierreCajaMapper.java` | mapear campos nuevos + calcular paraEntregar |
+| `DataInitializer.java` | seed `base_caja_cop = "0"` en ConfiguracionGeneral |
 | `Inventario.java` | +campo alertaMinima |
 | `InventarioDTO.java` | +campo alertaMinima |
 | `InventarioMapper.java` | mapear alertaMinima |
