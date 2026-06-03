@@ -33,7 +33,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 |---|---|
 | UI | React 19 + Vite 7 |
 | Estilos | Tailwind CSS v4 (clases utilitarias + `@layer components` propias) |
-| Routing | React Router v7 (`createBrowserRouter`) |
+| Routing | React Router v7 (`createBrowserRouter`; `createHashRouter` cuando `VITE_ELECTRON=true`) |
 | Estado global | Zustand v5 (`useSessionStore`) |
 | Fetching / caché | TanStack React Query v5 |
 | HTTP | Axios — base URL `/api/v1` (relativa; nginx la proxea al backend) |
@@ -41,7 +41,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 | Iconos | lucide-react |
 | Fechas | date-fns |
 | Tests | Vitest + Testing Library (jsdom) |
-| Desktop | Electron 37.2.2 + electron-builder 26.0.12 — carpeta `electron/` existe, no integrada con el build Docker aún |
+| Desktop | Electron ^42.x + electron-builder 26.0.12 — carpeta `electron/` existe, no integrada con el build Docker aún |
 | Puerto local | nginx `:80` → proxy `/api/*` → `backend:5020` |
 
 ### Despliegue (Docker Compose)
@@ -67,7 +67,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 Casa-Verde/
 ├── Backend/          ← Spring Boot 3.4 / Java 17
 ├── Frontend/         ← React 19 + Vite + Tailwind v4
-│   └── electron/     ← Electron 37 (no integrado aún)
+│   └── electron/     ← Electron 42 (no integrado aún)
 ├── docker-compose.yml
 └── CLAUDE.md
 ```
@@ -83,7 +83,7 @@ Casa-Verde/
 ├── config/
 │   ├── DataSourceConfig.java      ← DataSource SQLite
 │   ├── CorsConfig.java            ← CORS (localhost:5173, :80, null/Electron)
-│   ├── DataInitializer.java       ← CommandLineRunner — carga datos iniciales
+│   ├── DataInitializer.java       ← CommandLineRunner — siembra datos iniciales + 4 métodos de backfill/migración idempotentes (backfillNequiAlias, backfillFinalizadoEn, backfillEstadosPedido, backfillPreciosDetalles)
 │   ├── controllerAdvice/
 │   │   ├── GlobalExceptionHandler.java
 │   │   ├── ValidacionException.java
@@ -91,12 +91,12 @@ Casa-Verde/
 │   └── dialect/
 │       └── SQLiteDialect.java
 └── fachadaServices/
-    ├── dto/      ← 41 DTOs y Requests
+    ├── dto/      ← 38 DTOs y Requests
     ├── mapper/   ← 12 @Mapper MapStruct
     └── services/
         ├── configuracionService/   ← IConfiguracionGeneralService, ITasaCambioService
         ├── pagoService/            ← IFondoService, ICajaMovimientoService
-        ├── pedidoService/          ← IPedidoService, ICierreCajaService, IResumenService
+        ├── pedidoService/          ← IPedidoService, ICierreCajaService, IResumenService, IComprobanteService
         └── productoService/        ← IProductoService, ICategoriaProductoService,
                                        IInventarioService, ISalonService, IGastoService,
                                        IUsuarioService, IMonetaryService,
@@ -134,6 +134,7 @@ Casa-Verde/
 | PUT | `/{id}` | Actualizar producto |
 | PUT | `/{id}/precio` | Actualizar precio (registra historial automático) |
 | PUT | `/{id}/toggle` | Activar / desactivar |
+| DELETE | `/{id}` | Soft-delete (marca `eliminado=true`; no aparece en listados) |
 
 ### Categorías — `/api/v1/categorias`
 | Método | Ruta | Descripción |
@@ -195,6 +196,7 @@ Casa-Verde/
 | POST | `/` | Crear |
 | PUT | `/{id}` | Actualizar |
 | PUT | `/{id}/toggle` | Activar / desactivar |
+| DELETE | `/{id}` | Soft-delete (marca `eliminado=true`; no aparece en listados) |
 
 ### Cierre de caja — `/api/v1/cierres-caja`
 | Método | Ruta | Descripción |
@@ -254,13 +256,16 @@ Casa-Verde/
 - `nombreSnapshot`: copia del nombre del producto al momento de agregar
 - `composicionSnapshot`: JSON de la composición inventariable (snapshot, no FK a Producto)
 - `precioUnitarioCop`, `cantidad`
+- `@Version` para bloqueo optimista
 
 ### Pago
 - `moneda` (COP | USD | NEQUI), `monto`, `montoCop`, `tasaUsada`
 - Los pagos **no** afectan el fondo hasta que el pedido se **finaliza**
+- `@Version` para bloqueo optimista
 
 ### Producto
 - `afectaInventario` (boolean): si true, al finalizar el pedido se descuenta inventario
+- `eliminado` (Boolean, default false): soft-delete — los listados filtran `eliminado=false`
 - `composicion`: lista de `ProductoComposicionInventario` (insumo + cantidad)
 - `@Version` para bloqueo optimista
 
@@ -308,10 +313,17 @@ Casa-Verde/
 - Usuarios iniciales: un ADMIN (password: `admin123`, hasheado **BCrypt**) y un OPERADOR
 - Contraseñas almacenadas con BCrypt (Spring Security Crypto) — no SHA-256
 
+### Salon
+- `nombre`, `aforo`, `activo`, `eliminado` (Boolean, default false): soft-delete — los listados filtran `eliminado=false`
+
+### CategoriaProducto
+- `nombre`, `orden` (posición en UI), `activo`
+
 ### ConfiguracionGeneral
 - Parámetros clave-valor. Claves iniciales:
   - `nombre_negocio`, `moneda_base`, `capital_inicial_cop`
   - `mostrar_tasa_dolar`, `zona_horaria`, `backup_dir`
+  - `limite_exento_nequi_mensual` (límite mensual exento de 4×1000 NEQUI), `cuenta_nequi_activa`
 
 ### HistorialAuditoria
 - Registra acción, entidad, id de entidad y detalle
@@ -327,7 +339,7 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 ### Productos y composición de inventario
 | Producto | afectaInventario | Composición |
 |---|---|---|
-| Cuy | ✅ | 1 gallina + 1 cuy *(ver nota)* |
+| Cuy | ✅ | 1 cuy |
 | 1/2 Cuy | ✅ | 0.5 cuy |
 | 1/4 Cuy | ✅ | 0.25 cuy |
 | Gallina | ✅ | 1 gallina |
@@ -395,7 +407,7 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 
 ```
 src/
-├── App.jsx                         ← Router (createBrowserRouter) + QueryClientProvider
+├── App.jsx                         ← Router (createBrowserRouter / createHashRouter en Electron) + QueryClientProvider
 ├── main.jsx                        ← ReactDOM.createRoot
 ├── index.css                       ← Tailwind v4 + @layer components (design system)
 ├── components/
@@ -408,7 +420,8 @@ src/
 │   ├── pedidos/                    ← OrdenCard, ProductoRow, ModalCrearPedido,
 │   │                                  ModalDetallePedido, ModalCobrar, ModalAgregarItems
 │   ├── configuracion/              ← ModalProducto, ModalSalon, ModalHistorialPrecios,
-│   │                                  ModalCrearOperador, ModalCambiarPassword
+│   │                                  ModalActualizarPrecio, ModalCrearOperador, ModalCambiarPassword,
+│   │                                  ModalCategoria
 │   ├── fondos/                     ← ModalAjuste, ModalEntrada, ModalTransferencia
 │   ├── gastos/                     ← ModalGasto
 │   ├── inventario/                 ← ModalMovimiento, ModalCompraInsumo
@@ -416,19 +429,18 @@ src/
 ├── pages/
 │   ├── dashboard/Dashboard.jsx     ← ✅ Implementado
 │   ├── pedidos/PedidosPage.jsx     ← ✅ Implementado (prioritario)
-│   ├── gastos/GastosPage.jsx       ← ✅ Implementado
-│   ├── fondos/FondosPage.jsx       ← ✅ Implementado
+│   ├── fondos/FondosPage.jsx       ← ✅ Implementado (fondos + salidas de caja/gastos)
 │   ├── inventario/InventarioPage.jsx ← ✅ Implementado
 │   ├── resumen/ResumenPage.jsx     ← ✅ Implementado (incluye CierreCajaPanel)
 │   ├── configuracion/
-│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Categorías, Salones, Usuarios, Tasa USD
-│   │   └── tabs/*.jsx              ← ✅ Los 5 tabs implementados
+│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Salones, Tasa USD, Fondos, Usuarios, Inventario, Categorías, Auditoría, Backups
+│   │   └── tabs/*.jsx              ← ✅ 9 tabs: ProductosTab, SalonesTab, TasaTab, FondosTab, UsuariosTab, InventarioTab, CategoriasTab, AuditoriaTab, BackupsTab
 │   └── Placeholder.jsx             ← Componente vacío para módulos pendientes
-├── services/                       ← 13 archivos (un servicio por dominio)
-│   │  pedidoService, productoService, categoriaService, inventarioService,
-│   │  fondoService, gastoService, salonService, tasaService, cierreCajaService,
-│   │  resumenService, configuracionService, usuarioService,
-│   │  exportacionService, auditoriaService
+├── services/                       ← 15 archivos (14 servicios de dominio + api.js instancia Axios)
+│   │  api.js (instancia Axios base), pedidoService, productoService (incluye categoriaService),
+│   │  inventarioService, fondoService, gastoService, salonService, tasaService,
+│   │  cierreCajaService, resumenService, configuracionService, usuarioService,
+│   │  exportacionService, auditoriaService, backupService
 ├── store/useSessionStore.js        ← Zustand: { usuario, sidebarColapsado }
 │   │  (la tasa USD viene de React Query, no de Zustand)
 ├── hooks/
@@ -436,15 +448,16 @@ src/
 │   └── useModalKeyboard.js         ← Cierre de modales con tecla Escape
 └── utils/
     ├── format.js                   ← formatCOP, formatUSD, formatDecimal, formatFecha,
-    │                                  formatHora, formatCreadoEn
+    │                                  formatHora, formatCreadoEn, formatFechaLabel
     ├── constants.js                ← ESTADO_BADGE, CAT_BADGE y demás constantes de dominio
-    └── pedidoHelpers.js            ← esActivo, sortByReserva, calcularInsumos, formatInsumo
+    └── pedidoHelpers.js            ← esActivo, sortByReserva, calcularInsumos, formatInsumo,
+                                       calcularInsumosDetallado, normalizarFracciones, REGLAS_FRACCION,
+                                       formatFraccion, formatFechaReserva, formatHoraReserva,
+                                       formatReservaDisplay, esEnCursoPedido, toTitleCase, capFirst,
+                                       ESTADOS_ACTIVOS
 ```
 
-### Módulos pendientes de implementar (no tienen página en el router)
-- **Auditoría** — endpoint `/api/v1/auditoria` existe, sin UI
-- **Backups** — endpoint `/api/v1/backups` existe, sin UI
-- **Exportaciones CSV** — endpoints `/api/v1/exportaciones/*` existen, sin UI
+> **Nota de diseño:** Los gastos (salidas de caja) no tienen página propia — se registran desde `/fondos`. Es una decisión intencional, no deuda técnica.
 
 ### Prioridad de trabajo actual
 **El módulo de Pedidos es el más crítico.** Trabajar primero cualquier mejora, corrección o feature relacionada con pedidos antes de otros módulos.
@@ -523,7 +536,7 @@ Clases utilitarias propias definidas en `@layer components`:
 - `default` methods en mappers con lógica personalizada deben anotarse con `@Named(...)` si retornan tipos comunes (`String`, `BigDecimal`) para evitar que MapStruct los aplique automáticamente en otros mappings
 - Los repositories extienden `JpaRepository<Entity, ID>` sin `@Repository`
 - Las entidades usan `@PrePersist` / `@PreUpdate` para timestamps en zona `America/Bogota`
-- Optimistic locking en entidades con concurrencia: `@Version Long version` (Fondo, Gasto, Inventario, Pedido, Producto)
+- Optimistic locking en entidades con concurrencia: `@Version Long version` (Fondo, Gasto, Inventario, Pedido, PedidoDetalle, Pago, Producto)
 
 ---
 
@@ -578,12 +591,9 @@ Admin panel de escritorio, no landing page.
 | Pedidos | `/pedidos` | ✅ Implementado — **prioridad #1** |
 | Resumen del día | `/resumen` | ✅ Implementado (incluye Cierre de Caja) |
 | Inventario | `/inventario` | ✅ Implementado |
-| Gastos | `/gastos` | ✅ Implementado |
-| Capital y fondos | `/fondos` | ✅ Implementado |
-| Configuración (Productos, Categorías, Salones, Usuarios, Tasa USD) | `/configuracion` | ✅ Implementado |
-| Auditoría | — | ⏳ Pendiente — endpoint backend listo |
-| Backups | — | ⏳ Pendiente — endpoint backend listo |
-| Exportaciones CSV | — | ⏳ Pendiente — endpoints backend listos |
+| Capital, fondos y salidas | `/fondos` | ✅ Implementado (los gastos son "salidas de caja" registradas desde aquí) |
+| Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups) | `/configuracion` | ✅ Implementado (9 tabs) |
+| Exportaciones CSV | ResumenPage | ✅ Implementado — botones "Resumen CSV" y "Caja CSV" en ResumenPage |
 
 ---
 
