@@ -1,15 +1,20 @@
 import api from "./api";
 
 const _descargar = async (ruta, filename) => {
-  const response = await api.get(ruta, { responseType: "blob" });
-  const blobUrl = URL.createObjectURL(response.data);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
+  try {
+    const response = await api.get(ruta, { responseType: "blob" });
+    const blobUrl = URL.createObjectURL(response.data);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    console.error("Error al descargar archivo:", err);
+    throw err;
+  }
 };
 
 export const exportacionService = {
