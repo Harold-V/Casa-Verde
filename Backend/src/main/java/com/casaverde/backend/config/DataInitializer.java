@@ -152,6 +152,7 @@ public class DataInitializer implements CommandLineRunner {
         saveConfigIfAbsent("backup_dir", "./Backups", "Carpeta local de backups SQLite");
         saveConfigIfAbsent("limite_exento_nequi_mensual", "3404310", "Límite mensual exento de 4x1000 en NEQUI (COP)");
         saveConfigIfAbsent("cuenta_nequi_activa", "NEQUI", "Cuenta Nequi activa para pagos y movimientos");
+        saveConfigIfAbsent("base_caja_cop", "0", "Base de caja inicial en COP para el conteo de denominaciones");
     }
 
     private void saveConfigIfAbsent(String clave, String valor, String desc) {
