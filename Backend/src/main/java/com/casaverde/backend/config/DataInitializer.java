@@ -65,6 +65,7 @@ public class DataInitializer implements CommandLineRunner {
         backfillFinalizadoEn();
         backfillEstadosPedido();
         backfillPreciosDetalles();
+        backfillAlertasInventario();
     }
 
     private void initCategorias() {
@@ -240,6 +241,24 @@ public class DataInitializer implements CommandLineRunner {
         if (!actualizados.isEmpty()) {
             pedidoRepo.saveAll(actualizados);
         }
+    }
+
+    /**
+     * Asigna alertaMinima a los insumos de inventario existentes si aún no tienen valor.
+     * Idempotente — solo toca registros con alertaMinima null.
+     * gallina = 5, cuy = 10.
+     */
+    private void backfillAlertasInventario() {
+        inventarioRepo.findAll().forEach(inv -> {
+            if (inv.getAlertaMinima() == null) {
+                if ("gallina".equalsIgnoreCase(inv.getInsumo())) {
+                    inv.setAlertaMinima(new BigDecimal("5"));
+                } else if ("cuy".equalsIgnoreCase(inv.getInsumo())) {
+                    inv.setAlertaMinima(new BigDecimal("10"));
+                }
+                inventarioRepo.save(inv);
+            }
+        });
     }
 
     // ---- helpers ----

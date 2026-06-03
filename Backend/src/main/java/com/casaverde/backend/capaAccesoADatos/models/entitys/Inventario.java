@@ -30,6 +30,9 @@ public class Inventario {
     @Builder.Default
     private BigDecimal stockActual = BigDecimal.ZERO;
 
+    @Column(name = "alerta_minima", precision = 19, scale = 4)
+    private BigDecimal alertaMinima;
+
     @Column(nullable = false)
     @Builder.Default
     private String unidad = "unidad";
