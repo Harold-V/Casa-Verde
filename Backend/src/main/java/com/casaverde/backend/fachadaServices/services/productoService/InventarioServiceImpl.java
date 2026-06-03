@@ -2,6 +2,8 @@ package com.casaverde.backend.fachadaServices.services.productoService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.models.enums.TipoMovimientoInventario;
+import com.casaverde.backend.fachadaServices.dto.ComparativoMensualDTO;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -185,6 +188,18 @@ public class InventarioServiceImpl implements IInventarioService {
         }
     }
 
+    @Transactional
+    @Override
+    public InventarioDTO actualizarAlerta(String insumo, BigDecimal alertaMinima) {
+        if (alertaMinima == null || alertaMinima.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidacionException("La alerta mínima debe ser un valor positivo o cero");
+        }
+        Inventario inv = inventarioRepo.findByInsumo(insumo)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Insumo no encontrado: " + insumo));
+        inv.setAlertaMinima(alertaMinima);
+        return inventarioMapper.toDTO(inventarioRepo.save(inv));
+    }
+
     private void registrarSalida(String insumo, BigDecimal cantidad, Long pedidoId) {
         Inventario inv = inventarioRepo.findByInsumo(insumo)
                 .orElseThrow(() -> new ValidacionException(
@@ -206,5 +221,35 @@ public class InventarioServiceImpl implements IInventarioService {
                 .referenciaId(pedidoId)
                 .observacion("Finalización pedido #" + pedidoId)
                 .build());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public ComparativoMensualDTO comparativoAnual(int año) {
+        List<Object[]> rows = movimientoRepo.sumaSalidasPorMesYInsumo(String.valueOf(año));
+
+        Map<Integer, Map<String, BigDecimal>> mapa = new HashMap<>();
+        for (int m = 1; m <= 12; m++) {
+            mapa.put(m, new HashMap<>());
+        }
+
+        for (Object[] row : rows) {
+            String insumo = (String) row[0];
+            int mes = ((Number) row[1]).intValue();
+            BigDecimal total = new BigDecimal(row[2].toString());
+            mapa.get(mes).put(insumo.toLowerCase(), total);
+        }
+
+        List<ComparativoMensualDTO.FilaMes> meses = new ArrayList<>();
+        for (int m = 1; m <= 12; m++) {
+            Map<String, BigDecimal> fila = mapa.get(m);
+            meses.add(ComparativoMensualDTO.FilaMes.builder()
+                .mes(m)
+                .gallina(fila.getOrDefault("gallina", BigDecimal.ZERO))
+                .cuy(fila.getOrDefault("cuy", BigDecimal.ZERO))
+                .build());
+        }
+
+        return ComparativoMensualDTO.builder().año(año).meses(meses).build();
     }
 }

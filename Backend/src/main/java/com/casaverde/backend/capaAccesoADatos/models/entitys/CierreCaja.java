@@ -74,6 +74,31 @@ public class CierreCaja {
     @Column(name = "cerrado_en", nullable = false)
     private LocalDateTime cerradoEn;
 
+    // ── Denominaciones arqueo COP ──────────────────────────────────────────
+    @Column(name = "base_cop", precision = 19, scale = 0)
+    private BigDecimal baseCop;          // monto reservado para el día siguiente
+
+    @Column(name = "billetes_100k")
+    private Integer billetes100k;
+
+    @Column(name = "billetes_50k")
+    private Integer billetes50k;
+
+    @Column(name = "billetes_20k")
+    private Integer billetes20k;
+
+    @Column(name = "billetes_10k")
+    private Integer billetes10k;
+
+    @Column(name = "billetes_5k")
+    private Integer billetes5k;
+
+    @Column(name = "billetes_2k")
+    private Integer billetes2k;
+
+    @Column(name = "monedas_cop", precision = 19, scale = 0)
+    private BigDecimal monedasCop;       // valor total de monedas en COP
+
     @PrePersist
     void onCreate() {
         cerradoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));

@@ -82,6 +82,9 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
         BigDecimal esperadoUsd = saldoFondo("USD");
         BigDecimal esperadoNequi = saldoFondo("NEQUI");
 
+        if (tieneDenominaciones(request)) {
+            request.setContadoCop(calcularContadoCopDesdeDenominaciones(request));
+        }
         BigDecimal contadoCop = normalizarOCero("COP", request.getContadoCop(), esperadoCop);
         BigDecimal contadoUsd = normalizarOCero("USD", request.getContadoUsd(), esperadoUsd);
         BigDecimal contadoNequi = normalizarOCero("NEQUI", request.getContadoNequi(), esperadoNequi);
@@ -107,6 +110,14 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                 .balanceNeto(resumen.getBalanceNeto())
                 .observacion(request.getObservacion())
                 .backupPath(backup.getPath())
+                .baseCop(request.getBaseCop())
+                .billetes100k(request.getBilletes100k())
+                .billetes50k(request.getBilletes50k())
+                .billetes20k(request.getBilletes20k())
+                .billetes10k(request.getBilletes10k())
+                .billetes5k(request.getBilletes5k())
+                .billetes2k(request.getBilletes2k())
+                .monedasCop(request.getMonedasCop())
                 .build();
 
         CierreCaja guardado = cierreRepo.save(cierre);
@@ -119,6 +130,37 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
         return fondoRepo.findById(moneda)
                 .map(Fondo::getSaldo)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    private BigDecimal denom(Integer cantidad, long valorUnitario) {
+        if (cantidad == null || cantidad == 0) return BigDecimal.ZERO;
+        return BigDecimal.valueOf(cantidad).multiply(BigDecimal.valueOf(valorUnitario));
+    }
+
+    private BigDecimal safe(BigDecimal v) {
+        return v != null ? v : BigDecimal.ZERO;
+    }
+
+    private boolean tieneDenominaciones(CierreCajaRequest req) {
+        return req.getBaseCop() != null
+            || req.getBilletes100k() != null
+            || req.getBilletes50k() != null
+            || req.getBilletes20k() != null
+            || req.getBilletes10k() != null
+            || req.getBilletes5k() != null
+            || req.getBilletes2k() != null
+            || req.getMonedasCop() != null;
+    }
+
+    private BigDecimal calcularContadoCopDesdeDenominaciones(CierreCajaRequest req) {
+        return safe(req.getBaseCop())
+            .add(denom(req.getBilletes100k(), 100_000L))
+            .add(denom(req.getBilletes50k(),   50_000L))
+            .add(denom(req.getBilletes20k(),   20_000L))
+            .add(denom(req.getBilletes10k(),   10_000L))
+            .add(denom(req.getBilletes5k(),     5_000L))
+            .add(denom(req.getBilletes2k(),     2_000L))
+            .add(safe(req.getMonedasCop()));
     }
 
     private BigDecimal normalizarOCero(String moneda, BigDecimal valor, BigDecimal fallback) {

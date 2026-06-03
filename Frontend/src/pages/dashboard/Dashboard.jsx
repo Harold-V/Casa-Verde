@@ -16,16 +16,15 @@ function StockCard({ s, estimado = 0 }) {
   const texto   = formatInsumo(s.insumo, s.stockActual) ?? "0";
   const deficit = Math.max(0, estimado - s.stockActual);
 
-  const borderCls = deficit > 0 || s.stockActual < 2
-    ? "border-l-red-600"
-    : s.stockActual < 5
-      ? "border-l-amber-500"
-      : "border-l-verde-claro";
-  const textCls = deficit > 0 || s.stockActual < 2
-    ? "text-red-600"
-    : s.stockActual < 5
-      ? "text-amber-600"
-      : "text-verde-claro";
+  const umbral = s.alertaMinima ?? 5;
+  const color =
+    deficit > 0 || s.stockActual < umbral * 0.4
+      ? "red-600"
+      : s.stockActual < umbral
+      ? "amber-500"
+      : "verde-claro";
+  const borderCls = `border-l-${color}`;
+  const textCls = color === "amber-500" ? "text-amber-600" : `text-${color}`;
   const label = s.insumo.charAt(0).toUpperCase() + s.insumo.slice(1);
 
   return (
@@ -267,12 +266,12 @@ export default function Dashboard() {
       </div>
 
       {/* Alerta de stock bajo */}
-      {stock.some((s) => s.stockActual < 2) && (
+      {stock.some((s) => s.stockActual < (s.alertaMinima ?? 5) * 0.4) && (
         <div className="mt-3.5 px-[14px] py-[10px] rounded-lg bg-red-600/[0.08] border border-red-600 flex items-center gap-2.5 text-[13px] text-red-600">
           <AlertTriangle size={16} />
           <span>
             <strong>Stock crítico:</strong>{" "}
-            {stock.filter((s) => s.stockActual < 2).map((s) => `${s.insumo} (${formatDecimal(s.stockActual)})`).join(", ")}
+            {stock.filter((s) => s.stockActual < (s.alertaMinima ?? 5) * 0.4).map((s) => `${s.insumo} (${formatDecimal(s.stockActual)})`).join(", ")}
           </span>
         </div>
       )}

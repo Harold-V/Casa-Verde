@@ -65,6 +65,7 @@ public class DataInitializer implements CommandLineRunner {
         backfillFinalizadoEn();
         backfillEstadosPedido();
         backfillPreciosDetalles();
+        backfillAlertasInventario();
     }
 
     private void initCategorias() {
@@ -152,6 +153,7 @@ public class DataInitializer implements CommandLineRunner {
         saveConfigIfAbsent("backup_dir", "./Backups", "Carpeta local de backups SQLite");
         saveConfigIfAbsent("limite_exento_nequi_mensual", "3404310", "Límite mensual exento de 4x1000 en NEQUI (COP)");
         saveConfigIfAbsent("cuenta_nequi_activa", "NEQUI", "Cuenta Nequi activa para pagos y movimientos");
+        saveConfigIfAbsent("base_caja_cop", "0", "Base de caja inicial en COP para el conteo de denominaciones");
     }
 
     private void saveConfigIfAbsent(String clave, String valor, String desc) {
@@ -239,6 +241,24 @@ public class DataInitializer implements CommandLineRunner {
         if (!actualizados.isEmpty()) {
             pedidoRepo.saveAll(actualizados);
         }
+    }
+
+    /**
+     * Asigna alertaMinima a los insumos de inventario existentes si aún no tienen valor.
+     * Idempotente — solo toca registros con alertaMinima null.
+     * gallina = 5, cuy = 10.
+     */
+    private void backfillAlertasInventario() {
+        inventarioRepo.findAll().forEach(inv -> {
+            if (inv.getAlertaMinima() == null) {
+                if ("gallina".equalsIgnoreCase(inv.getInsumo())) {
+                    inv.setAlertaMinima(new BigDecimal("5"));
+                } else if ("cuy".equalsIgnoreCase(inv.getInsumo())) {
+                    inv.setAlertaMinima(new BigDecimal("10"));
+                }
+                inventarioRepo.save(inv);
+            }
+        });
     }
 
     // ---- helpers ----
