@@ -5,6 +5,9 @@ import TasaUsdTab    from "./tabs/TasaUsdTab";
 import FondosTab     from "./tabs/FondosTab";
 import UsuariosTab   from "./tabs/UsuariosTab";
 import InventarioTab from "./tabs/InventarioTab";
+import CategoriasTab from "./tabs/CategoriasTab";
+import AuditoriaTab  from "./tabs/AuditoriaTab";
+import BackupsTab    from "./tabs/BackupsTab";
 
 const TABS = [
   { id: "productos",  label: "Productos"  },
@@ -13,6 +16,9 @@ const TABS = [
   { id: "fondos",     label: "Fondos"     },
   { id: "usuarios",   label: "Usuarios"   },
   { id: "inventario", label: "Inventario" },
+  { id: "categorias", label: "Categorías" },
+  { id: "auditoria",  label: "Auditoría"  },
+  { id: "backups",    label: "Backups"    },
 ];
 
 export default function ConfiguracionPage() {
@@ -42,6 +48,9 @@ export default function ConfiguracionPage() {
       {tab === "fondos"     && <FondosTab />}
       {tab === "usuarios"   && <UsuariosTab />}
       {tab === "inventario" && <InventarioTab />}
+      {tab === "categorias" && <CategoriasTab />}
+      {tab === "auditoria"  && <AuditoriaTab  />}
+      {tab === "backups"    && <BackupsTab    />}
     </div>
   );
 }
