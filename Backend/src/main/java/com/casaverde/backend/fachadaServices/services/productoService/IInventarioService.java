@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
+import com.casaverde.backend.fachadaServices.dto.ComparativoMensualDTO;
 import com.casaverde.backend.fachadaServices.dto.InventarioDTO;
 import com.casaverde.backend.fachadaServices.dto.MovimientoInventarioDTO;
 import com.casaverde.backend.fachadaServices.dto.MovimientoRequest;
@@ -23,4 +24,6 @@ public interface IInventarioService {
     void descontarPorPedido(Pedido pedido);
 
     InventarioDTO actualizarAlerta(String insumo, BigDecimal alertaMinima);
+
+    ComparativoMensualDTO comparativoAnual(int año);
 }
