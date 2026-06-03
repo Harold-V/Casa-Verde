@@ -5,4 +5,6 @@ export const inventarioService = {
   listarMovimientos: (insumo) =>
     api.get("/inventario/movimientos", { params: insumo ? { insumo } : {} }).then((r) => r.data),
   registrarMovimiento: (data) => api.post("/inventario/movimiento", data).then((r) => r.data),
+  actualizarAlerta: (insumo, alertaMinima) =>
+    api.patch(`/inventario/${insumo}/alerta`, { alertaMinima }).then((r) => r.data),
 };
