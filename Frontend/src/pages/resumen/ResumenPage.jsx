@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, DollarSign, ShoppingBag } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Download } from "lucide-react";
 import { resumenService } from "../../services/resumenService";
 import { cierreCajaService } from "../../services/cierreCajaService";
 import { tasaService } from "../../services/tasaService";
+import { exportacionService } from "../../services/exportacionService";
 import { useSessionStore } from "../../store/useSessionStore";
 import { formatCOP, formatFechaLabel, formatHora, formatUSD } from "../../utils/format";
 import { ESTADO_BADGE, CAT_BADGE } from "../../utils/constants";
@@ -74,6 +75,22 @@ export default function ResumenPage() {
           {fecha !== hoy && (
             <button className="btn btn-secondary btn-sm" onClick={() => setFecha(hoy)}>Hoy</button>
           )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => exportacionService.descargarResumen(fecha).catch(() => {})}
+            title="Descargar resumen del día como CSV"
+          >
+            <Download size={14} /> Resumen CSV
+          </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => exportacionService.descargarCaja(fecha).catch(() => {})}
+            title="Descargar libro de caja del día como CSV"
+          >
+            <Download size={14} /> Caja CSV
+          </button>
         </div>
       </div>
 
