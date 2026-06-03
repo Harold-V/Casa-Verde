@@ -33,6 +33,8 @@ public interface FondoMapper {
             case TRANSFERENCIA_SALIDA -> "salida";
             case TRANSFERENCIA_ENTRADA -> "entrada";
             case COMPRA_PAGO -> "salida";
+            case ADELANTO_EMPLEADO -> "salida";
+            case PAGO_EMPLEADO -> "salida";
         };
     }
 
