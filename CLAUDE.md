@@ -91,16 +91,17 @@ Casa-Verde/
 │   └── dialect/
 │       └── SQLiteDialect.java
 └── fachadaServices/
-    ├── dto/      ← 38 DTOs y Requests
-    ├── mapper/   ← 12 @Mapper MapStruct
+    ├── dto/      ← 44 DTOs y Requests
+    ├── mapper/   ← 15 @Mapper MapStruct
     └── services/
         ├── configuracionService/   ← IConfiguracionGeneralService, ITasaCambioService
         ├── pagoService/            ← IFondoService, ICajaMovimientoService
         ├── pedidoService/          ← IPedidoService, ICierreCajaService, IResumenService, IComprobanteService
-        └── productoService/        ← IProductoService, ICategoriaProductoService,
-                                       IInventarioService, ISalonService, IGastoService,
-                                       IUsuarioService, IMonetaryService,
-                                       IBackupService, IExportacionService, IAuditoriaService
+        ├── productoService/        ← IProductoService, ICategoriaProductoService,
+        │                              IInventarioService, ISalonService, IGastoService,
+        │                              IUsuarioService, IMonetaryService,
+        │                              IBackupService, IExportacionService, IAuditoriaService
+        └── compraService/          ← IProveedorService, ICompraService
 ```
 
 ---
@@ -241,6 +242,24 @@ Casa-Verde/
 | GET | `/resumen` | CSV resumen del día. `?fecha=` |
 | GET | `/caja` | CSV libro de caja del día. `?fecha=` |
 
+### Proveedores — `/api/v1/proveedores`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista proveedores. `?soloActivos=true` filtra inactivos |
+| POST | `/` | Crear proveedor (`{nombre, tipo, telefono?}`) |
+| PUT | `/{id}` | Actualizar proveedor |
+| PUT | `/{id}/toggle` | Activar / desactivar |
+
+### Compras — `/api/v1/compras`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista compras. `?fecha=` y `?estado=` (PENDIENTE/ABONADO_PARCIAL/PAGADO) |
+| GET | `/{id}` | Detalle de una compra (incluye abonos y totalAbonado/saldoPendiente) |
+| POST | `/` | Registrar compra (`{proveedorId, insumo, cantidad, precioUnitario, fecha, observacion?}`) — suma inventario automáticamente |
+| DELETE | `/{id}` | Anular compra (solo estado PENDIENTE, sin abonos) — revierte inventario |
+| GET | `/{id}/abonos` | Lista abonos de una compra |
+| POST | `/{id}/abonos` | Registrar abono (`{monto, moneda, fecha}`) — debita fondo, actualiza estado compra |
+
 ---
 
 ## Entidades implementadas
@@ -318,6 +337,21 @@ Casa-Verde/
 
 ### CategoriaProducto
 - `nombre`, `orden` (posición en UI), `activo`
+
+### Proveedor
+- `nombre`, `tipo` (TipoProveedor: CUY/GALLINA/AMBOS/OTROS), `telefono` (nullable), `activo` (default true), `creadoEn`
+
+### Compra
+- `proveedor` (@ManyToOne), `proveedorNombre` (snapshot), `insumo`, `cantidad` (scale 4), `precioUnitario` (scale 0), `totalCop` (scale 0)
+- `estado` (EstadoCompra: PENDIENTE → ABONADO_PARCIAL → PAGADO), `observacion`, `fecha` (LocalDate), `creadoEn`
+- `@Version` para bloqueo optimista
+- Al registrar: suma stock de `insumo` en Inventario con `referenciaTipo="compra"`
+- Al anular (solo PENDIENTE sin abonos): revierte stock con `referenciaTipo="compra_anulada"`
+
+### AbonoCompra
+- `compra` (@ManyToOne), `monto`, `moneda`, `montoCop`, `tasaUsada` (nullable), `fondoDebitado`, `fecha` (LocalDate), `creadoEn`
+- `@Version` para bloqueo optimista
+- Debita el fondo vía `CajaMovimientoTipo.COMPRA_PAGO` con monto negativo
 
 ### ConfiguracionGeneral
 - Parámetros clave-valor. Claves iniciales:
@@ -440,7 +474,8 @@ src/
 │   │  api.js (instancia Axios base), pedidoService, productoService (incluye categoriaService),
 │   │  inventarioService, fondoService, gastoService, salonService, tasaService,
 │   │  cierreCajaService, resumenService, configuracionService, usuarioService,
-│   │  exportacionService, auditoriaService, backupService
+│   │  exportacionService, auditoriaService, backupService,
+│   │  proveedorService, compraService
 ├── store/useSessionStore.js        ← Zustand: { usuario, sidebarColapsado }
 │   │  (la tasa USD viene de React Query, no de Zustand)
 ├── hooks/
@@ -592,7 +627,7 @@ Admin panel de escritorio, no landing page.
 | Resumen del día | `/resumen` | ✅ Implementado (incluye Cierre de Caja) |
 | Inventario | `/inventario` | ✅ Implementado |
 | Capital, fondos y salidas | `/fondos` | ✅ Implementado (los gastos son "salidas de caja" registradas desde aquí) |
-| Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups) | `/configuracion` | ✅ Implementado (9 tabs) |
+| Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups, Reportes, Proveedores, Compras) | `/configuracion` | ✅ Implementado (12 tabs) |
 | Exportaciones CSV | ResumenPage | ✅ Implementado — botones "Resumen CSV" y "Caja CSV" en ResumenPage |
 
 ---
