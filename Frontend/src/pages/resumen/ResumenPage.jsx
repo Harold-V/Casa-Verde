@@ -79,14 +79,14 @@ export default function ResumenPage() {
         <div className="flex gap-2">
           <button
             className="btn btn-secondary btn-sm"
-            onClick={() => exportacionService.descargarResumen(fecha)}
+            onClick={() => exportacionService.descargarResumen(fecha).catch(() => {})}
             title="Descargar resumen del día como CSV"
           >
             <Download size={14} /> Resumen CSV
           </button>
           <button
             className="btn btn-secondary btn-sm"
-            onClick={() => exportacionService.descargarCaja(fecha)}
+            onClick={() => exportacionService.descargarCaja(fecha).catch(() => {})}
             title="Descargar libro de caja del día como CSV"
           >
             <Download size={14} /> Caja CSV
