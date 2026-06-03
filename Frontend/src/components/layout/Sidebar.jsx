@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, CheckSquare,
-  Package, Wallet, Settings,
+  Package, Wallet, Settings, Users,
 } from "lucide-react";
 import { useSessionStore } from "../../store/useSessionStore";
 
@@ -12,6 +12,7 @@ const links = [
   { to: "/inventario",    icon: Package,         label: "Inventario" },
 
   { to: "/fondos",        icon: Wallet,          label: "Fondos" },
+  { to: "/empleados",     icon: Users,           label: "Empleados" },
   { to: "/configuracion", icon: Settings,        label: "Configuración" },
 ];
 
