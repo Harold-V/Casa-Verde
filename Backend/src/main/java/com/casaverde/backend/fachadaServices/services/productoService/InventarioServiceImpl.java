@@ -185,6 +185,18 @@ public class InventarioServiceImpl implements IInventarioService {
         }
     }
 
+    @Transactional
+    @Override
+    public InventarioDTO actualizarAlerta(String insumo, BigDecimal alertaMinima) {
+        if (alertaMinima == null || alertaMinima.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidacionException("La alerta mínima debe ser un valor positivo o cero");
+        }
+        Inventario inv = inventarioRepo.findByInsumo(insumo)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Insumo no encontrado: " + insumo));
+        inv.setAlertaMinima(alertaMinima);
+        return inventarioMapper.toDTO(inventarioRepo.save(inv));
+    }
+
     private void registrarSalida(String insumo, BigDecimal cantidad, Long pedidoId) {
         Inventario inv = inventarioRepo.findByInsumo(insumo)
                 .orElseThrow(() -> new ValidacionException(

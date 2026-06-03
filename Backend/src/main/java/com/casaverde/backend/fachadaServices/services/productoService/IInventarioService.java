@@ -1,5 +1,6 @@
 package com.casaverde.backend.fachadaServices.services.productoService;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
@@ -20,4 +21,6 @@ public interface IInventarioService {
     MovimientoInventarioDTO registrarMovimiento(MovimientoRequest req);
 
     void descontarPorPedido(Pedido pedido);
+
+    InventarioDTO actualizarAlerta(String insumo, BigDecimal alertaMinima);
 }

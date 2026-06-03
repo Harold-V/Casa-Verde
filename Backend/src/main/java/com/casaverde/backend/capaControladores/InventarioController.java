@@ -1,7 +1,9 @@
 package com.casaverde.backend.capaControladores;
 
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,5 +44,12 @@ public class InventarioController {
     @PostMapping("/movimiento")
     public ResponseEntity<MovimientoInventarioDTO> registrarMovimiento(@Valid @RequestBody MovimientoRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.registrarMovimiento(req));
+    }
+
+    @PatchMapping("/{insumo}/alerta")
+    public InventarioDTO actualizarAlerta(
+            @PathVariable String insumo,
+            @RequestBody Map<String, BigDecimal> body) {
+        return service.actualizarAlerta(insumo, body.get("alertaMinima"));
     }
 }
