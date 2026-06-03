@@ -101,7 +101,8 @@ Casa-Verde/
         │                              IInventarioService, ISalonService, IGastoService,
         │                              IUsuarioService, IMonetaryService,
         │                              IBackupService, IExportacionService, IAuditoriaService
-        └── compraService/          ← IProveedorService, ICompraService
+        ├── compraService/          ← IProveedorService, ICompraService
+        └── empleadoService/        ← IEmpleadoService
 ```
 
 ---
@@ -260,6 +261,25 @@ Casa-Verde/
 | GET | `/{id}/abonos` | Lista abonos de una compra |
 | POST | `/{id}/abonos` | Registrar abono (`{monto, moneda, fecha}`) — debita fondo, actualiza estado compra |
 
+### Empleados — `/api/v1/empleados`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista empleados. `?soloActivos=true` (default) |
+| POST | `/` | Crear empleado (`{nombre, tipo, salario}`) |
+| PUT | `/{id}` | Actualizar nombre y/o salario |
+| PUT | `/{id}/toggle` | Activar / desactivar |
+| GET | `/{id}/adelantos` | Historial de adelantos |
+| POST | `/{id}/adelantos` | Registrar adelanto — debita fondo inmediatamente con ADELANTO_EMPLEADO |
+| GET | `/{id}/dias` | Días trabajados. `?soloNoPagados=true` |
+| POST | `/{id}/dias` | Registrar un día trabajado (solo POR_DIA) |
+| DELETE | `/{id}/dias/{diaId}` | Eliminar día no pagado |
+| GET | `/{id}/pagos` | Historial de liquidaciones |
+| GET | `/{id}/pagos/preview` | Vista previa del pago sin ejecutar (devuelve `EmpleadoResumenDTO`) |
+| POST | `/{id}/pagos` | Liquidar — calcula, debita fondo con PAGO_EMPLEADO, marca adelantos y días como pagados |
+| GET | `/{id}/vacaciones` | Historial de vacaciones |
+| POST | `/{id}/vacaciones` | Registrar periodo de vacaciones (informativo) |
+| DELETE | `/{id}/vacaciones/{vacId}` | Eliminar registro de vacación |
+
 ---
 
 ## Entidades implementadas
@@ -299,7 +319,7 @@ Casa-Verde/
 - El fondo se acredita **al finalizar un pedido**, no al registrar el pago
 
 ### CajaMovimiento
-- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA
+- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA | COMPRA_PAGO | ADELANTO_EMPLEADO | PAGO_EMPLEADO
 - `referenciaTipo` + `referenciaId`: trazabilidad al origen del movimiento
 - Cada movimiento guarda `saldoResultante` en el momento del registro
 
@@ -362,6 +382,31 @@ Casa-Verde/
 ### HistorialAuditoria
 - Registra acción, entidad, id de entidad y detalle
 - Usuario por defecto: `"sistema-local"`
+
+### Empleado
+- `tipo`: QUINCENAL (salario fijo por quincena) | POR_DIA (tarifa diaria × días acumulados)
+- `salario`: BigDecimal scale 0 — monto quincenal o tarifa diaria según tipo
+- `@Version` para bloqueo optimista
+- `activo` (default true)
+
+### Adelanto
+- Se debita el fondo **inmediatamente** al registrar (no al liquidar)
+- `pagado = false` hasta incluirse en una liquidación
+- `montoCop` = equivalente en COP (USD se convierte con tasa vigente)
+
+### TrabajoDia
+- Solo para empleados `POR_DIA`
+- Los días no pagados se pueden eliminar (corrección de errores)
+- Al liquidar, todos los días pendientes se marcan `pagado = true`
+
+### PagoEmpleado
+- Snapshot completo: `salarioBruto`, `totalAdelantos`, `totalNeto`, `montoPagado`, `montoCop`
+- `tipo`: QUINCENA | COBRO_DIAS
+- `fondoDebitado` = moneda elegida al pagar
+
+### Vacacion
+- Registro informativo de periodo sin trabajo
+- Sin efecto en cálculos de pago — se puede eliminar sin restricciones
 
 ---
 
@@ -475,7 +520,7 @@ src/
 │   │  inventarioService, fondoService, gastoService, salonService, tasaService,
 │   │  cierreCajaService, resumenService, configuracionService, usuarioService,
 │   │  exportacionService, auditoriaService, backupService,
-│   │  proveedorService, compraService
+│   │  proveedorService, compraService, empleadoService
 ├── store/useSessionStore.js        ← Zustand: { usuario, sidebarColapsado }
 │   │  (la tasa USD viene de React Query, no de Zustand)
 ├── hooks/
@@ -629,6 +674,7 @@ Admin panel de escritorio, no landing page.
 | Capital, fondos y salidas | `/fondos` | ✅ Implementado (los gastos son "salidas de caja" registradas desde aquí) |
 | Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups, Reportes, Proveedores, Compras) | `/configuracion` | ✅ Implementado (12 tabs) |
 | Exportaciones CSV | ResumenPage | ✅ Implementado — botones "Resumen CSV" y "Caja CSV" en ResumenPage |
+| Empleados | `/empleados` | ✅ Implementado |
 
 ---
 
