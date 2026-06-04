@@ -296,13 +296,15 @@ public class CompraServiceImpl implements ICompraService {
                 .orElseThrow(() -> new ValidacionException("Insumo no encontrado en inventario: " + insumo));
         BigDecimal nuevo = inv.getStockActual().subtract(cantidad);
         if (nuevo.compareTo(BigDecimal.ZERO) < 0)
-            nuevo = BigDecimal.ZERO;
+            throw new ValidacionException(
+                    "Stock insuficiente para revertir la compra. Stock actual de " + insumo
+                    + ": " + inv.getStockActual() + ", a revertir: " + cantidad);
         inv.setStockActual(nuevo);
         inventarioRepo.save(inv);
         movimientoRepo.save(MovimientoInventario.builder()
                 .insumo(insumo)
                 .tipo("ajuste")
-                .cantidad(nuevo)
+                .cantidad(cantidad.negate())
                 .stockResultante(nuevo)
                 .referenciaTipo("compra_anulada")
                 .referenciaId(compraId)

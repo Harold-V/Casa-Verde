@@ -391,6 +391,40 @@ class CasaVerdeBusinessRulesTests {
                                 .hasMessageContaining("mayor a 0");
         }
 
+        @Test
+        void anularCompraConStockInsuficienteEsRechazada() {
+                // Setup: create an active proveedor
+                var proveedor = com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                .nombre("Proveedor Test Anulacion")
+                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.GALLINA)
+                                .activo(true)
+                                .build();
+                proveedor = proveedorRepository.save(proveedor);
+
+                // Register a purchase of 5 gallinas (stock goes up by 5)
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("gallina");
+                req.setCantidad(BigDecimal.valueOf(5));
+                req.setPrecioUnitario(BigDecimal.valueOf(30000));
+                req.setFecha(LocalDate.now());
+                var compra = compraService.registrar(req);
+
+                // Manually reduce stock to 2 (simulate pedidos consuming stock between purchase and cancellation)
+                Inventario gallina = inventarioRepository.findByInsumo("gallina").orElseThrow();
+                gallina.setStockActual(BigDecimal.valueOf(2));
+                inventarioRepository.save(gallina);
+
+                // Act & Assert: anular should fail, NOT silently corrupt inventory
+                assertThatThrownBy(() -> compraService.anular(compra.getId()))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("Stock insuficiente");
+
+                // Stock should remain at 2 (unchanged after the failed anulacion)
+                assertThat(inventarioRepository.findByInsumo("gallina").orElseThrow().getStockActual())
+                                .isEqualByComparingTo(BigDecimal.valueOf(2));
+        }
+
         private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {
                 CrearPedidoRequest request = new CrearPedidoRequest();
                 request.setNombre(cliente);
