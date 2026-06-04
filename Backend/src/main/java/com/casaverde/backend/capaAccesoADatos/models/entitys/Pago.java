@@ -8,7 +8,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "pago")
+@Table(name = "pago", indexes = {
+        @Index(name = "idx_pago_registrado_en", columnList = "registrado_en")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,10 +32,10 @@ public class Pago {
     @Column(nullable = false)
     private String moneda; // COP, USD, NEQUI
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal monto;
 
-    @Column(name = "monto_cop", nullable = false)
+    @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal montoCop;
 
     @Column(name = "tasa_usada")

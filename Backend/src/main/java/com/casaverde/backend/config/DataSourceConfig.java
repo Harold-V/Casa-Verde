@@ -32,7 +32,7 @@ public class DataSourceConfig {
 
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("org.sqlite.JDBC");
-        ds.setUrl("jdbc:sqlite:" + dbPath);
+        ds.setUrl("jdbc:sqlite:" + dbPath + "?foreign_keys=on");
         return ds;
     }
 }

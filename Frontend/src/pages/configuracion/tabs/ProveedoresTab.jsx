@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Power } from "lucide-react";
+import { Plus, Pencil, Power, Banknote } from "lucide-react";
 import { proveedorService } from "../../../services/proveedorService";
 import ModalProveedor from "../../../components/configuracion/ModalProveedor";
+import ModalAdelantoProveedor from "../../../components/configuracion/ModalAdelantoProveedor";
 
 const TIPO_BADGE = {
   CUY:     "badge-success",
@@ -15,6 +16,7 @@ export default function ProveedoresTab() {
   const qc = useQueryClient();
   const [editando, setEditando] = useState(null);
   const [creando, setCreando] = useState(false);
+  const [adelantando, setAdelantando] = useState(null);
 
   const { data: proveedores = [], isLoading } = useQuery({
     queryKey: ["proveedores"],
@@ -57,7 +59,7 @@ export default function ProveedoresTab() {
           ) : (
             <table>
               <thead>
-                <tr><th>Nombre</th><th>Tipo</th><th>Teléfono</th><th>Estado</th><th>Acciones</th></tr>
+                <tr><th>Nombre</th><th>Tipo</th><th>Teléfono</th><th>Estado</th><th>Adelanto</th><th>Acciones</th></tr>
               </thead>
               <tbody>
                 {proveedores.map((p) => (
@@ -69,6 +71,15 @@ export default function ProveedoresTab() {
                       <span className={`badge ${p.activo ? "badge-success" : "badge-danger"}`}>
                         {p.activo ? "Activo" : "Inactivo"}
                       </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        title="Ver/registrar adelantos"
+                        onClick={() => setAdelantando(p)}
+                      >
+                        <Banknote size={13} /> Adelantos
+                      </button>
                     </td>
                     <td>
                       <div className="flex gap-1">
@@ -97,6 +108,13 @@ export default function ProveedoresTab() {
           proveedor={editando}
           onClose={() => { setCreando(false); setEditando(null); }}
           onSave={handleSave}
+        />
+      )}
+
+      {adelantando && (
+        <ModalAdelantoProveedor
+          proveedor={adelantando}
+          onClose={() => setAdelantando(null)}
         />
       )}
     </div>

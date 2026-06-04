@@ -8,7 +8,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "caja_movimiento")
+@Table(name = "caja_movimiento", indexes = {
+        @Index(name = "idx_cm_moneda_registrado", columnList = "moneda, registrado_en"),
+        @Index(name = "idx_cm_referencia", columnList = "referencia_tipo, referencia_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,10 +29,10 @@ public class CajaMovimiento {
     @Column(nullable = false)
     private String moneda;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal monto;
 
-    @Column(name = "monto_cop", nullable = false)
+    @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal montoCop;
 
     @Column(name = "saldo_resultante", nullable = false)

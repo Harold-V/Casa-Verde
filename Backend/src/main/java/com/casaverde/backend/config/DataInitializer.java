@@ -3,6 +3,8 @@ package com.casaverde.backend.config;
 import java.math.BigDecimal;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,8 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoDetalleRepository;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Salon;
 import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
+import com.casaverde.backend.capaAccesoADatos.models.enums.TipoAdelanto;
+import com.casaverde.backend.capaAccesoADatos.repositories.AdelantoRepository;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +41,8 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
     private final CategoriaProductoRepository categoriaRepo;
     private final ProductoRepository productoRepo;
@@ -48,11 +54,12 @@ public class DataInitializer implements CommandLineRunner {
     private final FondoRepository fondoRepo;
     private final PedidoRepository pedidoRepo;
     private final PedidoDetalleRepository pedidoDetalleRepo;
+    private final AdelantoRepository adelantoRepo;
     private final IUsuarioService usuarioService;
 
     @Override
-    @Transactional
     public void run(String... args) {
+        // Seed data: cada método tiene su guard "if count > 0 return" — idempotente por diseño
         initCategorias();
         initProductos();
         initSalones();
@@ -61,11 +68,22 @@ public class DataInitializer implements CommandLineRunner {
         initInventario();
         initFondos();
         usuarioService.ensureUsuariosIniciales();
-        backfillNequiAlias();
-        backfillFinalizadoEn();
-        backfillEstadosPedido();
-        backfillPreciosDetalles();
-        backfillAlertasInventario();
+        // Backfills: un fallo no debe impedir el arranque — se registra y se continúa
+        runBackfill("NequiAlias", this::backfillNequiAlias);
+        runBackfill("FinalizadoEn", this::backfillFinalizadoEn);
+        runBackfill("EstadosPedido", this::backfillEstadosPedido);
+        runBackfill("PreciosDetalles", this::backfillPreciosDetalles);
+        runBackfill("AlertasInventario", this::backfillAlertasInventario);
+        runBackfill("TipoAdelanto", this::backfillTipoAdelanto);
+    }
+
+    @Transactional
+    public void runBackfill(String nombre, Runnable tarea) {
+        try {
+            tarea.run();
+        } catch (Exception e) {
+            log.warn("Backfill '{}' falló (no crítico, se reintentará en el próximo arranque): {}", nombre, e.getMessage());
+        }
     }
 
     private void initCategorias() {
@@ -259,6 +277,15 @@ public class DataInitializer implements CommandLineRunner {
                 inventarioRepo.save(inv);
             }
         });
+    }
+
+    /** Asigna tipo=EFECTIVO a todos los adelantos existentes que no tengan tipo. Idempotente. */
+    private void backfillTipoAdelanto() {
+        List<com.casaverde.backend.capaAccesoADatos.models.entitys.Adelanto> sin = adelantoRepo.findAll().stream()
+                .filter(a -> a.getTipo() == null)
+                .peek(a -> a.setTipo(TipoAdelanto.EFECTIVO))
+                .toList();
+        if (!sin.isEmpty()) adelantoRepo.saveAll(sin);
     }
 
     // ---- helpers ----

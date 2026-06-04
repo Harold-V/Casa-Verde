@@ -9,7 +9,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "abono_compra")
+@Table(name = "abono_compra", indexes = {
+        @Index(name = "idx_abono_compra_compra", columnList = "compra_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -42,6 +44,10 @@ public class AbonoCompra {
 
     @Column(name = "fondo_debitado", nullable = false)
     private String fondoDebitado;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "adelanto_proveedor_id")
+    private AdelantoProveedor adelantoProveedor;
 
     @Column(nullable = false)
     private LocalDate fecha;

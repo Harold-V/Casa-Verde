@@ -11,7 +11,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "compra")
+@Table(name = "compra", indexes = {
+        @Index(name = "idx_compra_estado_fecha", columnList = "estado, fecha"),
+        @Index(name = "idx_compra_proveedor_estado", columnList = "proveedor_id, estado")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -46,7 +49,7 @@ public class Compra {
     private BigDecimal totalCop;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private EstadoCompra estado;
 
     private String observacion;

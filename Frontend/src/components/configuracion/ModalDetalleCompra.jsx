@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 import { compraService } from "../../services/compraService";
 import { fondoService } from "../../services/fondoService";
+import { proveedorService } from "../../services/proveedorService";
 import { formatCOP } from "../../utils/format";
 
 const hoy = () => new Date().toLocaleDateString("en-CA");
@@ -16,7 +17,7 @@ const ESTADO_BADGE = {
 
 export default function ModalDetalleCompra({ compraId, onClose }) {
   const qc = useQueryClient();
-  const [abonoForm, setAbonoForm] = useState({ monto: "", moneda: "COP", fecha: hoy() });
+  const [abonoForm, setAbonoForm] = useState({ monto: "", moneda: "COP", fecha: hoy(), usarAdelanto: false, adelantoProveedorId: null });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -37,7 +38,8 @@ export default function ModalDetalleCompra({ compraId, onClose }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["compra", compraId] });
       qc.invalidateQueries({ queryKey: ["compras"] });
-      setAbonoForm({ monto: "", moneda: "COP", fecha: hoy() });
+      qc.invalidateQueries({ queryKey: ["proveedor-adelantos"] });
+      setAbonoForm({ monto: "", moneda: "COP", fecha: hoy(), usarAdelanto: false, adelantoProveedorId: null });
       setError("");
     },
     onError: (err) => setError(err.response?.data?.message ?? err.message),
@@ -45,21 +47,26 @@ export default function ModalDetalleCompra({ compraId, onClose }) {
 
   const handleAbonar = async (e) => {
     e.preventDefault();
-    if (!abonoForm.monto || parseFloat(abonoForm.monto) <= 0) {
-      setError("El monto debe ser mayor a 0");
-      return;
-    }
-    setSaving(true);
-    try {
-      await mutAbono.mutateAsync({
-        monto: parseFloat(abonoForm.monto),
-        moneda: abonoForm.moneda,
-        fecha: abonoForm.fecha,
-      });
-    } finally {
-      setSaving(false);
+    if (abonoForm.usarAdelanto) {
+      if (!abonoForm.adelantoProveedorId) { setError("Seleccione el adelanto a usar"); return; }
+      setSaving(true);
+      try {
+        await mutAbono.mutateAsync({ fecha: abonoForm.fecha, adelantoProveedorId: abonoForm.adelantoProveedorId });
+      } finally { setSaving(false); }
+    } else {
+      if (!abonoForm.monto || parseFloat(abonoForm.monto) <= 0) { setError("El monto debe ser mayor a 0"); return; }
+      setSaving(true);
+      try {
+        await mutAbono.mutateAsync({ monto: parseFloat(abonoForm.monto), moneda: abonoForm.moneda, fecha: abonoForm.fecha });
+      } finally { setSaving(false); }
     }
   };
+
+  const { data: adelantosActivos = [] } = useQuery({
+    queryKey: ["proveedor-adelantos-activos", compra?.proveedorId],
+    queryFn: () => proveedorService.listarAdelantos(compra.proveedorId).then(l => l.filter(a => a.activo)),
+    enabled: !!compra?.proveedorId,
+  });
 
   const totalAbonado = compra?.abonos?.reduce((s, a) => s + Number(a.montoCop), 0) ?? 0;
 
@@ -130,41 +137,80 @@ export default function ModalDetalleCompra({ compraId, onClose }) {
                     Registrar abono — saldo pendiente: <strong>{formatCOP(compra.saldoPendiente)}</strong>
                   </p>
                   {error && <div className="alert alert-error mb-3">{error}</div>}
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Monto *</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        min="1"
-                        step="1"
-                        value={abonoForm.monto}
-                        onChange={(e) => setAbonoForm((f) => ({ ...f, monto: e.target.value }))}
-                        placeholder="0"
-                      />
+
+                  {adelantosActivos.length > 0 && (
+                    <div className="flex items-center gap-3 mb-3 p-2 bg-amber-50 rounded border border-amber-200 text-sm">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={abonoForm.usarAdelanto}
+                          onChange={(e) => setAbonoForm((f) => ({ ...f, usarAdelanto: e.target.checked, adelantoProveedorId: null }))}
+                        />
+                        Usar adelanto prepagado al proveedor
+                      </label>
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Moneda *</label>
-                      <select
-                        className="form-control"
-                        value={abonoForm.moneda}
-                        onChange={(e) => setAbonoForm((f) => ({ ...f, moneda: e.target.value }))}
-                      >
-                        {fondos.map((f) => (
-                          <option key={f.moneda} value={f.moneda}>{f.alias ?? f.moneda}</option>
-                        ))}
-                      </select>
+                  )}
+
+                  {abonoForm.usarAdelanto ? (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Adelanto a usar *</label>
+                        <select
+                          className="form-control"
+                          value={abonoForm.adelantoProveedorId ?? ""}
+                          onChange={(e) => setAbonoForm((f) => ({ ...f, adelantoProveedorId: Number(e.target.value) || null }))}
+                        >
+                          <option value="">Seleccione…</option>
+                          {adelantosActivos.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.fecha} — saldo {formatCOP(a.saldoRestante)} ({a.insumo})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Fecha *</label>
+                        <input
+                          type="date" className="form-control"
+                          value={abonoForm.fecha}
+                          onChange={(e) => setAbonoForm((f) => ({ ...f, fecha: e.target.value }))}
+                        />
+                      </div>
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Fecha *</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={abonoForm.fecha}
-                        onChange={(e) => setAbonoForm((f) => ({ ...f, fecha: e.target.value }))}
-                      />
+                  ) : (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Monto *</label>
+                        <input
+                          type="number" className="form-control" min="1" step="1"
+                          value={abonoForm.monto}
+                          onChange={(e) => setAbonoForm((f) => ({ ...f, monto: e.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Moneda *</label>
+                        <select
+                          className="form-control"
+                          value={abonoForm.moneda}
+                          onChange={(e) => setAbonoForm((f) => ({ ...f, moneda: e.target.value }))}
+                        >
+                          {fondos.map((f) => (
+                            <option key={f.moneda} value={f.moneda}>{f.alias ?? f.moneda}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Fecha *</label>
+                        <input
+                          type="date" className="form-control"
+                          value={abonoForm.fecha}
+                          onChange={(e) => setAbonoForm((f) => ({ ...f, fecha: e.target.value }))}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
+
                   <div className="flex justify-end mt-2">
                     <button type="submit" className="btn btn-primary" disabled={saving}>
                       {saving ? "Registrando…" : "Registrar abono"}

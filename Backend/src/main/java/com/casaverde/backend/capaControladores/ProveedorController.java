@@ -6,8 +6,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.casaverde.backend.fachadaServices.dto.AdelantoProveedorDTO;
+import com.casaverde.backend.fachadaServices.dto.AdelantoProveedorRequest;
 import com.casaverde.backend.fachadaServices.dto.ProveedorDTO;
 import com.casaverde.backend.fachadaServices.dto.ProveedorRequest;
+import com.casaverde.backend.fachadaServices.services.compraService.IAdelantoProveedorService;
 import com.casaverde.backend.fachadaServices.services.compraService.IProveedorService;
 
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class ProveedorController {
 
     private final IProveedorService proveedorService;
+    private final IAdelantoProveedorService adelantoProveedorService;
 
     @GetMapping
     public List<ProveedorDTO> listar(@RequestParam(defaultValue = "false") boolean soloActivos) {
@@ -37,5 +41,17 @@ public class ProveedorController {
     @PutMapping("/{id}/toggle")
     public ProveedorDTO toggle(@PathVariable Long id) {
         return proveedorService.toggle(id);
+    }
+
+    @GetMapping("/{id}/adelantos")
+    public List<AdelantoProveedorDTO> listarAdelantos(@PathVariable Long id) {
+        return adelantoProveedorService.listarPorProveedor(id);
+    }
+
+    @PostMapping("/{id}/adelantos")
+    public ResponseEntity<AdelantoProveedorDTO> registrarAdelanto(
+            @PathVariable Long id, @RequestBody AdelantoProveedorRequest req) {
+        req.setProveedorId(id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(adelantoProveedorService.registrar(req));
     }
 }

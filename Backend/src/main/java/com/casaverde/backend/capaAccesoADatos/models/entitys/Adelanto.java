@@ -5,11 +5,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+import com.casaverde.backend.capaAccesoADatos.models.enums.TipoAdelanto;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "adelanto")
+@Table(name = "adelanto", indexes = {
+        @Index(name = "idx_adelanto_empleado_pagado", columnList = "empleado_id, pagado")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,6 +27,11 @@ public class Adelanto {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empleado_id", nullable = false)
     private Empleado empleado;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "VARCHAR(50) DEFAULT 'EFECTIVO'")
+    @Builder.Default
+    private TipoAdelanto tipo = TipoAdelanto.EFECTIVO;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal monto;
@@ -54,6 +62,7 @@ public class Adelanto {
 
     @PrePersist
     void prePersist() {
+        if (tipo == null) tipo = TipoAdelanto.EFECTIVO;
         creadoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
     }
 }

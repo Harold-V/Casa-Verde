@@ -18,7 +18,7 @@ public class ConfiguracionGeneral {
     @Id
     private String clave;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String valor;
 
     private String descripcion;

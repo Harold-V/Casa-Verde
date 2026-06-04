@@ -13,4 +13,5 @@ public class AbonoCompraRequest {
     private BigDecimal monto;
     private String moneda;
     private LocalDate fecha;
+    private Long adelantoProveedorId;
 }

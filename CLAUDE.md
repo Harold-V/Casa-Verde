@@ -250,6 +250,8 @@ Casa-Verde/
 | POST | `/` | Crear proveedor (`{nombre, tipo, telefono?}`) |
 | PUT | `/{id}` | Actualizar proveedor |
 | PUT | `/{id}/toggle` | Activar / desactivar |
+| GET | `/{id}/adelantos` | Lista adelantos prepagados del proveedor |
+| POST | `/{id}/adelantos` | Registrar adelanto prepagado (`{monto, moneda, insumo, precioUnitarioAcordado, fecha}`) — debita fondo con ADELANTO_PROVEEDOR |
 
 ### Compras — `/api/v1/compras`
 | Método | Ruta | Descripción |
@@ -259,7 +261,17 @@ Casa-Verde/
 | POST | `/` | Registrar compra (`{proveedorId, insumo, cantidad, precioUnitario, fecha, observacion?}`) — suma inventario automáticamente |
 | DELETE | `/{id}` | Anular compra (solo estado PENDIENTE, sin abonos) — revierte inventario |
 | GET | `/{id}/abonos` | Lista abonos de una compra |
-| POST | `/{id}/abonos` | Registrar abono (`{monto, moneda, fecha}`) — debita fondo, actualiza estado compra |
+| POST | `/{id}/abonos` | Registrar abono (`{monto, moneda, fecha, adelantoProveedorId?}`) — si `adelantoProveedorId` presente, descuenta del adelanto prepagado en vez de debitar fondo |
+
+### Cuentas por Cobrar — `/api/v1/cuentas-cobrar`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista cuentas. Filtros: `estado` (PENDIENTE/ABONADO_PARCIAL/CANCELADO), `fecha`, `q` (búsqueda por cliente) |
+| GET | `/{id}` | Detalle de una cuenta con abonos |
+| POST | `/` | Registrar deuda (`{clienteNombre, concepto?, monto, celular?, fecha, observacion?}`) |
+| DELETE | `/{id}` | Anular cuenta (solo PENDIENTE sin abonos) |
+| GET | `/{id}/abonos` | Lista cobros de una cuenta |
+| POST | `/{id}/abonos` | Registrar cobro (`{monto, moneda, fecha, observacion?}`) — **acredita** el fondo con COBRO_CUENTA_COBRAR |
 
 ### Empleados — `/api/v1/empleados`
 | Método | Ruta | Descripción |
@@ -319,7 +331,7 @@ Casa-Verde/
 - El fondo se acredita **al finalizar un pedido**, no al registrar el pago
 
 ### CajaMovimiento
-- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA | COMPRA_PAGO | ADELANTO_EMPLEADO | PAGO_EMPLEADO
+- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA | COMPRA_PAGO | ADELANTO_EMPLEADO | PAGO_EMPLEADO | ADELANTO_PROVEEDOR | APLICACION_ADELANTO_PROVEEDOR | COBRO_CUENTA_COBRAR
 - `referenciaTipo` + `referenciaId`: trazabilidad al origen del movimiento
 - Cada movimiento guarda `saldoResultante` en el momento del registro
 
@@ -390,9 +402,11 @@ Casa-Verde/
 - `activo` (default true)
 
 ### Adelanto
-- Se debita el fondo **inmediatamente** al registrar (no al liquidar)
+- `tipo`: EFECTIVO (debita el fondo inmediatamente) | ESPECIE (bien o servicio descontado del sueldo, no debita fondo — observación obligatoria)
+- Se debita el fondo **inmediatamente** al registrar si tipo=EFECTIVO
 - `pagado = false` hasta incluirse en una liquidación
 - `montoCop` = equivalente en COP (USD se convierte con tasa vigente)
+- `fondoDebitado` = moneda del fondo (tipo EFECTIVO) o "ESPECIE" (tipo ESPECIE)
 
 ### TrabajoDia
 - Solo para empleados `POR_DIA`
@@ -407,6 +421,26 @@ Casa-Verde/
 ### Vacacion
 - Registro informativo de periodo sin trabajo
 - Sin efecto en cálculos de pago — se puede eliminar sin restricciones
+
+### AdelantoProveedor
+- Dinero entregado al proveedor antes de recibir los insumos
+- `monto`, `saldoRestante` (decrece por cada compra contra el adelanto), `insumo`, `precioUnitarioAcordado`
+- `activo = false` cuando `saldoRestante = 0`
+- Debita el fondo al registrar con `ADELANTO_PROVEEDOR`
+- Al abonar una compra con `adelantoProveedorId`, descuenta de `saldoRestante` sin tocar el fondo
+
+### AbonoCompra (modificado)
+- Campo nuevo `adelantoProveedorId` (nullable): si presente, el abono se aplica contra el adelanto prepagado
+
+### CuentaCobrar
+- Deuda de un cliente (crédito otorgado en el momento del consumo)
+- `clienteNombre`, `concepto`, `monto` (deuda original), `celular`, `fecha`
+- Estado: PENDIENTE → ABONADO_PARCIAL → CANCELADO
+- Al registrar: **no toca el fondo** (el dinero aún no ha entrado)
+- Al registrar abono: **acredita el fondo** con `COBRO_CUENTA_COBRAR`
+
+### AbonoCuentaCobrar
+- `cuenta` (@ManyToOne), `monto`, `moneda`, `montoCop`, `tasaUsada`, `fondoAcreditado`, `fecha`
 
 ---
 
@@ -675,6 +709,7 @@ Admin panel de escritorio, no landing page.
 | Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups, Reportes, Proveedores, Compras) | `/configuracion` | ✅ Implementado (12 tabs) |
 | Exportaciones CSV | ResumenPage | ✅ Implementado — botones "Resumen CSV" y "Caja CSV" en ResumenPage |
 | Empleados | `/empleados` | ✅ Implementado |
+| Cuentas por Cobrar | `/cuentas-cobrar` | ✅ Implementado |
 
 ---
 

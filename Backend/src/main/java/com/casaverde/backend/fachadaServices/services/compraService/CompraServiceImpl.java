@@ -10,13 +10,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.AbonoCompra;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.CajaMovimiento;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Compra;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Fondo;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.MovimientoInventario;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoCompra;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.AdelantoProveedor;
 import com.casaverde.backend.capaAccesoADatos.repositories.AbonoCompraRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.AdelantoProveedorRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.CompraRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository;
@@ -41,8 +47,11 @@ public class CompraServiceImpl implements ICompraService {
     private final CompraRepository compraRepo;
     private final ProveedorRepository proveedorRepo;
     private final AbonoCompraRepository abonoRepo;
+    private final AdelantoProveedorRepository adelantoProveedorRepo;
     private final InventarioRepository inventarioRepo;
     private final MovimientoInventarioRepository movimientoRepo;
+    private final FondoRepository fondoRepo;
+    private final CajaMovimientoRepository cajaMovimientoRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
     private final IAuditoriaService auditoriaService;
@@ -127,49 +136,114 @@ public class CompraServiceImpl implements ICompraService {
         if (compra.getEstado() == EstadoCompra.PAGADO)
             throw new ValidacionException("La compra ya está pagada completamente");
 
-        String moneda = req.getMoneda().trim().toUpperCase();
-
-        BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = "USD".equals(moneda)
-                ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
-                : req.getMonto().setScale(0, RoundingMode.HALF_UP);
-        BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
-
         BigDecimal totalAbonado = abonoRepo.sumMontoCopByCompraId(compraId);
         BigDecimal saldoPendiente = compra.getTotalCop().subtract(totalAbonado);
-        if (montoCop.compareTo(saldoPendiente) > 0)
-            throw new ValidacionException(
-                    "El abono ($" + montoCop + ") supera el saldo pendiente ($" + saldoPendiente + ")");
 
-        cajaMovimientoService.registrar(
-                CajaMovimientoTipo.COMPRA_PAGO,
-                moneda,
-                req.getMonto().negate(),
-                montoCop.negate(),
-                "compra",
-                compraId,
-                "Pago compra #" + compraId + " (" + compra.getInsumo() + ")",
-                null);
+        AbonoCompra abono;
 
-        AbonoCompra abono = abonoRepo.save(AbonoCompra.builder()
-                .compra(compra)
-                .monto(req.getMonto())
-                .moneda(moneda)
-                .montoCop(montoCop)
-                .tasaUsada(tasaUsada)
-                .fondoDebitado(moneda)
-                .fecha(req.getFecha())
-                .build());
+        if (req.getAdelantoProveedorId() != null) {
+            // Pago con adelanto prepagado al proveedor — no debita fondo
+            AdelantoProveedor adelanto = adelantoProveedorRepo.findById(req.getAdelantoProveedorId())
+                    .orElseThrow(() -> new RecursoNoEncontradoException(
+                            "Adelanto proveedor no encontrado: " + req.getAdelantoProveedorId()));
+            if (!adelanto.getActivo())
+                throw new ValidacionException("El adelanto al proveedor ya fue agotado");
+            if (!adelanto.getProveedor().getId().equals(compra.getProveedor().getId()))
+                throw new ValidacionException("El adelanto no pertenece al proveedor de esta compra");
 
-        BigDecimal nuevoTotal = totalAbonado.add(montoCop);
-        EstadoCompra nuevoEstado = nuevoTotal.compareTo(compra.getTotalCop()) >= 0
-                ? EstadoCompra.PAGADO
-                : EstadoCompra.ABONADO_PARCIAL;
-        compra.setEstado(nuevoEstado);
-        compraRepo.save(compra);
+            BigDecimal montoCop = saldoPendiente.min(adelanto.getSaldoRestante());
 
-        auditoriaService.registrar("AbonoCompra", abono.getId(), "REGISTRAR",
-                "Abono $" + req.getMonto() + " " + moneda + " a compra #" + compraId);
+            adelanto.setSaldoRestante(adelanto.getSaldoRestante().subtract(montoCop));
+            if (adelanto.getSaldoRestante().compareTo(BigDecimal.ZERO) <= 0) {
+                adelanto.setSaldoRestante(BigDecimal.ZERO);
+                adelanto.setActivo(false);
+            }
+            adelantoProveedorRepo.save(adelanto);
+
+            // Registro de trazabilidad: el fondo ya fue debitado en ADELANTO_PROVEEDOR,
+            // este movimiento solo deja constancia de la aplicación sin modificar el saldo.
+            Fondo fondoCop = fondoRepo.findById("COP").orElse(null);
+            BigDecimal saldoCopActual = fondoCop != null ? fondoCop.getSaldo() : BigDecimal.ZERO;
+            cajaMovimientoRepo.save(CajaMovimiento.builder()
+                    .tipo(CajaMovimientoTipo.APLICACION_ADELANTO_PROVEEDOR.name())
+                    .moneda("COP")
+                    .monto(montoCop)
+                    .montoCop(montoCop)
+                    .saldoResultante(saldoCopActual)
+                    .referenciaTipo("compra")
+                    .referenciaId(compraId)
+                    .concepto("Aplicación adelanto proveedor #" + adelanto.getId() + " a compra #" + compraId)
+                    .build());
+
+            String monedaAdelanto = adelanto.getMoneda();
+            BigDecimal tasaUsd = tasaCambioService.getValorVigente();
+            BigDecimal montoOriginal = "USD".equals(monedaAdelanto)
+                    ? montoCop.divide(tasaUsd, 2, RoundingMode.HALF_UP)
+                    : montoCop;
+            BigDecimal tasaUsadaAdelanto = "USD".equals(monedaAdelanto) ? tasaUsd : null;
+
+            abono = abonoRepo.save(AbonoCompra.builder()
+                    .compra(compra)
+                    .monto(montoOriginal)
+                    .moneda(monedaAdelanto)
+                    .montoCop(montoCop)
+                    .tasaUsada(tasaUsadaAdelanto)
+                    .fondoDebitado("ADELANTO_PROVEEDOR")
+                    .adelantoProveedor(adelanto)
+                    .fecha(req.getFecha())
+                    .build());
+
+            auditoriaService.registrar("AbonoCompra", abono.getId(), "REGISTRAR",
+                    "Abono $" + montoOriginal + " " + monedaAdelanto + " (=" + montoCop + " COP) aplicado de adelanto proveedor #"
+                            + adelanto.getId() + " a compra #" + compraId);
+
+            BigDecimal nuevoTotal = totalAbonado.add(montoCop);
+            compra.setEstado(EstadoCompra.calcular(compra.getTotalCop(), nuevoTotal));
+            compraRepo.save(compra);
+
+        } else {
+            // Pago normal desde fondo
+            if (req.getMoneda() == null || req.getMoneda().isBlank())
+                throw new ValidacionException("La moneda es obligatoria");
+            String moneda = req.getMoneda().trim().toUpperCase();
+            BigDecimal tasaUsd = tasaCambioService.getValorVigente();
+            BigDecimal montoCop = "USD".equals(moneda)
+                    ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
+                    : req.getMonto().setScale(0, RoundingMode.HALF_UP);
+            BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
+
+            if (montoCop.compareTo(saldoPendiente) > 0)
+                throw new ValidacionException(
+                        "El abono ($" + montoCop + ") supera el saldo pendiente ($" + saldoPendiente + ")");
+
+            cajaMovimientoService.registrar(
+                    CajaMovimientoTipo.COMPRA_PAGO,
+                    moneda,
+                    req.getMonto().negate(),
+                    montoCop.negate(),
+                    "compra",
+                    compraId,
+                    "Pago compra #" + compraId + " (" + compra.getInsumo() + ")",
+                    null);
+
+            abono = abonoRepo.save(AbonoCompra.builder()
+                    .compra(compra)
+                    .monto(req.getMonto())
+                    .moneda(moneda)
+                    .montoCop(montoCop)
+                    .tasaUsada(tasaUsada)
+                    .fondoDebitado(moneda)
+                    .fecha(req.getFecha())
+                    .build());
+
+            BigDecimal nuevoTotal = totalAbonado.add(montoCop);
+            compra.setEstado(EstadoCompra.calcular(compra.getTotalCop(), nuevoTotal));
+            compraRepo.save(compra);
+
+            auditoriaService.registrar("AbonoCompra", abono.getId(), "REGISTRAR",
+                    "Abono $" + req.getMonto() + " " + moneda + " a compra #" + compraId);
+        }
+
         return abonoMapper.toDTO(abono);
     }
 
