@@ -103,36 +103,48 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
     @Transactional
     public AdelantoDTO registrarAdelanto(Long empleadoId, AdelantoRequest req) {
         Empleado emp = findEmpleado(empleadoId);
-        String moneda = req.getMoneda().trim().toUpperCase();
+        TipoAdelanto tipo = req.getTipo() != null ? req.getTipo() : TipoAdelanto.EFECTIVO;
+
+        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
+            throw new ValidacionException("El monto del adelanto debe ser mayor a 0");
+        if (req.getFecha() == null)
+            throw new ValidacionException("La fecha es obligatoria");
+        if (tipo == TipoAdelanto.ESPECIE && (req.getObservacion() == null || req.getObservacion().isBlank()))
+            throw new ValidacionException("La observación es obligatoria para descuentos en especie");
+
+        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
         BigDecimal montoCop = "USD".equals(moneda)
                 ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
                 : req.getMonto().setScale(0, RoundingMode.HALF_UP);
         BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
 
-        cajaMovimientoService.registrar(
-                CajaMovimientoTipo.ADELANTO_EMPLEADO,
-                moneda,
-                req.getMonto().negate(),
-                montoCop.negate(),
-                "empleado",
-                empleadoId,
-                "Adelanto a " + emp.getNombre(),
-                req.getObservacion());
+        if (tipo == TipoAdelanto.EFECTIVO) {
+            cajaMovimientoService.registrar(
+                    CajaMovimientoTipo.ADELANTO_EMPLEADO,
+                    moneda,
+                    req.getMonto().negate(),
+                    montoCop.negate(),
+                    "empleado",
+                    empleadoId,
+                    "Adelanto a " + emp.getNombre(),
+                    req.getObservacion());
+        }
 
         Adelanto adelanto = adelantoRepo.save(Adelanto.builder()
                 .empleado(emp)
+                .tipo(tipo)
                 .monto(req.getMonto())
                 .moneda(moneda)
                 .montoCop(montoCop)
                 .tasaUsada(tasaUsada)
-                .fondoDebitado(moneda)
+                .fondoDebitado(tipo == TipoAdelanto.EFECTIVO ? moneda : "ESPECIE")
                 .fecha(req.getFecha())
                 .observacion(req.getObservacion())
                 .build());
 
         auditoriaService.registrar("Adelanto", adelanto.getId(), "REGISTRAR",
-                "Adelanto $" + req.getMonto() + " " + moneda + " a " + emp.getNombre());
+                "Adelanto " + tipo.name() + " $" + req.getMonto() + " " + moneda + " a " + emp.getNombre());
         return empleadoMapper.toAdelantoDTO(adelanto);
     }
 

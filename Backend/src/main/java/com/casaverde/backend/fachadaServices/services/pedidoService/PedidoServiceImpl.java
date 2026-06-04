@@ -1,8 +1,8 @@
 package com.casaverde.backend.fachadaServices.services.pedidoService;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.LinkedHashMap;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -15,11 +15,8 @@ import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryS
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
-import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
-import com.casaverde.backend.fachadaServices.services.productoService.IInventarioService;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.ProductoComposicionInventario;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
@@ -47,13 +44,12 @@ public class PedidoServiceImpl implements IPedidoService {
     private final PedidoRepository pedidoRepo;
     private final ProductoRepository productoRepo;
     private final SalonRepository salonRepo;
-    private final IInventarioService inventarioService;
     private final IComprobanteService comprobanteService;
     private final ITasaCambioService tasaCambioService;
-    private final ICajaMovimientoService cajaMovimientoService;
     private final IFondoService fondoService;
     private final IMonetaryService monetaryService;
     private final IAuditoriaService auditoriaService;
+    private final IPedidoFinalizacionService finalizacionService;
     private final ObjectMapper objectMapper;
     private final PedidoMapper pedidoMapper;
 
@@ -88,8 +84,10 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido pedido = Pedido.builder()
                 .nombre(req.getNombre().trim())
                 .mesa(req.getMesa())
-                .fechaReserva(req.getFechaReserva())
-                .horaReserva(req.getHoraReserva())
+                .fechaReserva(req.getFechaReserva() != null && !req.getFechaReserva().isBlank()
+                        ? LocalDate.parse(req.getFechaReserva()) : null)
+                .horaReserva(req.getHoraReserva() != null && !req.getHoraReserva().isBlank()
+                        ? LocalTime.parse(req.getHoraReserva()) : null)
                 .cantPersonas(req.getCantPersonas())
                 .observacion(req.getObservacion())
                 .paraLlevar(Boolean.TRUE.equals(req.getParaLlevar()))
@@ -137,8 +135,10 @@ public class PedidoServiceImpl implements IPedidoService {
         if (req.getNombre() != null && !req.getNombre().isBlank())
             pedido.setNombre(req.getNombre().trim());
 
-        pedido.setFechaReserva(req.getFechaReserva());
-        pedido.setHoraReserva(req.getHoraReserva());
+        pedido.setFechaReserva(req.getFechaReserva() != null && !req.getFechaReserva().isBlank()
+                ? LocalDate.parse(req.getFechaReserva()) : null);
+        pedido.setHoraReserva(req.getHoraReserva() != null && !req.getHoraReserva().isBlank()
+                ? LocalTime.parse(req.getHoraReserva()) : null);
         pedido.setMesa(req.getMesa());
         pedido.setCantPersonas(req.getCantPersonas());
         pedido.setObservacion(req.getObservacion());
@@ -292,9 +292,8 @@ public class PedidoServiceImpl implements IPedidoService {
         // Validar que la hora de la reserva ya haya llegado
         if (pedido.getFechaReserva() != null || pedido.getHoraReserva() != null) {
             java.time.ZoneId bogota = java.time.ZoneId.of("America/Bogota");
-            java.time.LocalDate hoy = java.time.LocalDate.now(bogota);
-            java.time.LocalDate fechaRes = java.time.LocalDate.parse(
-                    pedido.getFechaReserva() != null ? pedido.getFechaReserva() : hoy.toString());
+            LocalDate hoy = LocalDate.now(bogota);
+            LocalDate fechaRes = pedido.getFechaReserva() != null ? pedido.getFechaReserva() : hoy;
             boolean reservaFutura;
             if (fechaRes.isAfter(hoy)) {
                 reservaFutura = true;
@@ -302,27 +301,23 @@ public class PedidoServiceImpl implements IPedidoService {
                 reservaFutura = false;
             } else { // misma fecha: revisar hora
                 reservaFutura = pedido.getHoraReserva() != null &&
-                        java.time.LocalTime.parse(pedido.getHoraReserva())
-                                .isAfter(java.time.LocalTime.now(bogota));
+                        pedido.getHoraReserva().isAfter(LocalTime.now(bogota));
             }
             if (reservaFutura) {
                 String cuando = (pedido.getFechaReserva() != null && pedido.getHoraReserva() != null)
                         ? pedido.getFechaReserva() + " a las " + pedido.getHoraReserva()
-                        : pedido.getFechaReserva() != null ? pedido.getFechaReserva()
+                        : pedido.getFechaReserva() != null ? pedido.getFechaReserva().toString()
                                 : "las " + pedido.getHoraReserva();
                 throw new ValidacionException(
                         "No se puede finalizar antes de la reserva (" + cuando + ")");
             }
         }
 
-        inventarioService.descontarPorPedido(pedido);
         pedido.setEstado(EstadoPedido.FINALIZADO);
         pedido.setFinalizadoEn(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota")));
         Pedido guardado = pedidoRepo.save(pedido);
 
-        // Un único cobro al fondo por moneda usada (solo el valor del pedido, no el
-        // cambio)
-        registrarCobroFinalPedido(guardado, total);
+        finalizacionService.ejecutar(guardado, total);
 
         auditoriaService.registrar("pedido", guardado.getId(), "FINALIZAR",
                 "Pedido finalizado con total COP " + total);
@@ -438,59 +433,6 @@ public class PedidoServiceImpl implements IPedidoService {
             return objectMapper.writeValueAsString(list);
         } catch (Exception e) {
             return null;
-        }
-    }
-
-    /**
-     * Al finalizar un pedido, registra UN único movimiento al fondo por cada moneda
-     * usada.
-     * Solo ingresa el valor del pedido (totalCop), distribuyendo proporcionalmente
-     * entre
-     * las monedas si hay pagos mixtos. El cambio nunca toca el fondo.
-     */
-    private void registrarCobroFinalPedido(Pedido pedido, BigDecimal totalCop) {
-        // Agrupar pagos por moneda: [0] = suma monto original, [1] = suma montoCop
-        Map<String, BigDecimal[]> porMoneda = new LinkedHashMap<>();
-        for (Pago p : pedido.getPagos()) {
-            porMoneda.compute(p.getMoneda(), (k, arr) -> {
-                if (arr == null)
-                    arr = new BigDecimal[] { BigDecimal.ZERO, BigDecimal.ZERO };
-                arr[0] = arr[0].add(p.getMonto());
-                arr[1] = arr[1].add(p.getMontoCop());
-                return arr;
-            });
-        }
-
-        BigDecimal restante = totalCop;
-        for (Map.Entry<String, BigDecimal[]> e : porMoneda.entrySet()) {
-            if (restante.compareTo(BigDecimal.ZERO) <= 0)
-                break;
-            String moneda = e.getKey();
-            BigDecimal montoOrig = e.getValue()[0]; // en la moneda original
-            BigDecimal montoCopTot = e.getValue()[1]; // equivalente COP total recibido
-
-            BigDecimal montoCopFondo = montoCopTot.min(restante);
-            BigDecimal montoFondo;
-            if ("USD".equals(moneda) && montoCopTot.compareTo(BigDecimal.ZERO) > 0) {
-                // Proporción: montoFondo_usd = montoOrig * (montoCopFondo / montoCopTot)
-                montoFondo = montoOrig.multiply(montoCopFondo)
-                        .divide(montoCopTot, 2, RoundingMode.FLOOR);
-            } else {
-                montoFondo = montoCopFondo; // COP y NEQUI: monto == montoCop
-            }
-
-            if (montoFondo.compareTo(BigDecimal.ZERO) > 0) {
-                cajaMovimientoService.registrar(
-                        CajaMovimientoTipo.COBRO_PEDIDO,
-                        moneda,
-                        montoFondo,
-                        montoCopFondo,
-                        "pedido",
-                        pedido.getId(),
-                        "Cobro pedido #" + pedido.getId(),
-                        null);
-                restante = restante.subtract(montoCopFondo);
-            }
         }
     }
 

@@ -35,6 +35,9 @@ public interface FondoMapper {
             case COMPRA_PAGO -> "salida";
             case ADELANTO_EMPLEADO -> "salida";
             case PAGO_EMPLEADO -> "salida";
+            case ADELANTO_PROVEEDOR -> "salida";
+            case APLICACION_ADELANTO_PROVEEDOR -> "salida";
+            case COBRO_CUENTA_COBRAR -> "entrada";
         };
     }
 

@@ -1,0 +1,2 @@
+-- V1: Baseline — el esquema inicial y datos semilla son gestionados por Hibernate DDL + DataInitializer.
+-- Las migraciones futuras (V2+) van aquí en lugar de nuevos métodos en DataInitializer.

@@ -8,7 +8,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "movimiento_inventario")
+@Table(name = "movimiento_inventario", indexes = {
+        @Index(name = "idx_mi_tipo_ref_insumo", columnList = "tipo, referencia_tipo, insumo"),
+        @Index(name = "idx_mi_insumo_registrado", columnList = "insumo, registrado_en")
+})
 @Getter
 @Setter
 @NoArgsConstructor

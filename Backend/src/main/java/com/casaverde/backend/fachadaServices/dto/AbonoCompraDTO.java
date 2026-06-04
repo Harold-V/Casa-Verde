@@ -19,6 +19,7 @@ public class AbonoCompraDTO {
     private BigDecimal montoCop;
     private BigDecimal tasaUsada;
     private String fondoDebitado;
+    private Long adelantoProveedorId;
     private LocalDate fecha;
     private LocalDateTime creadoEn;
 }

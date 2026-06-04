@@ -2,6 +2,7 @@ package com.casaverde.backend.fachadaServices.services.productoService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -226,18 +227,21 @@ public class InventarioServiceImpl implements IInventarioService {
     @Transactional(readOnly = true)
     @Override
     public ComparativoMensualDTO comparativoAnual(int año) {
-        List<Object[]> rows = movimientoRepo.sumaSalidasPorMesYInsumo(String.valueOf(año));
+        LocalDateTime inicio = LocalDateTime.of(año, 1, 1, 0, 0);
+        LocalDateTime fin = LocalDateTime.of(año + 1, 1, 1, 0, 0);
+        List<MovimientoInventario> movimientos = movimientoRepo
+                .findByTipoAndReferenciaTipoAndRegistradoEnBetween("salida", "pedido", inicio, fin);
 
         Map<Integer, Map<String, BigDecimal>> mapa = new HashMap<>();
         for (int m = 1; m <= 12; m++) {
             mapa.put(m, new HashMap<>());
         }
 
-        for (Object[] row : rows) {
-            String insumo = (String) row[0];
-            int mes = ((Number) row[1]).intValue();
-            BigDecimal total = new BigDecimal(row[2].toString());
-            mapa.get(mes).put(insumo.toLowerCase(), total);
+        for (MovimientoInventario mov : movimientos) {
+            int mes = mov.getRegistradoEn().getMonthValue();
+            String insumo = mov.getInsumo().toLowerCase();
+            BigDecimal acum = mapa.get(mes).getOrDefault(insumo, BigDecimal.ZERO).add(mov.getCantidad());
+            mapa.get(mes).put(insumo, acum);
         }
 
         List<ComparativoMensualDTO.FilaMes> meses = new ArrayList<>();

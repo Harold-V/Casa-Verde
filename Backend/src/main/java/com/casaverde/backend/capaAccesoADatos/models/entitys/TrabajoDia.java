@@ -8,7 +8,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "trabajo_dia")
+@Table(name = "trabajo_dia",
+        uniqueConstraints = @UniqueConstraint(name = "uk_trabajo_dia_empleado_fecha", columnNames = {"empleado_id", "fecha"}),
+        indexes = @Index(name = "idx_trabajo_dia_empleado_pagado", columnList = "empleado_id, pagado"))
 @Getter
 @Setter
 @NoArgsConstructor

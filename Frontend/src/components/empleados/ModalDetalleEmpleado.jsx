@@ -20,7 +20,7 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
   const [saving, setSaving] = useState(false);
 
   const [adelantoForm, setAdelantoForm] = useState({
-    monto: "", moneda: "COP", fecha: hoy(), observacion: "",
+    monto: "", moneda: "COP", fecha: hoy(), observacion: "", tipo: "EFECTIVO",
   });
   const [diaForm, setDiaForm] = useState({ fecha: hoy(), observacion: "" });
   const [vacForm, setVacForm] = useState({
@@ -59,7 +59,7 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
     mutationFn: (data) => empleadoService.registrarAdelanto(empleado.id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["empleado-adelantos", empleado.id] });
-      setAdelantoForm({ monto: "", moneda: "COP", fecha: hoy(), observacion: "" });
+      setAdelantoForm({ monto: "", moneda: "COP", fecha: hoy(), observacion: "", tipo: "EFECTIVO" });
       setError("");
     },
     onError: (err) => setError(err.response?.data?.message ?? err.message),
@@ -102,13 +102,17 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
     if (!adelantoForm.monto || Number(adelantoForm.monto) <= 0) {
       setError("El monto debe ser mayor a 0"); return;
     }
+    if (adelantoForm.tipo === "ESPECIE" && !adelantoForm.observacion?.trim()) {
+      setError("La observación es obligatoria para descuentos en especie"); return;
+    }
     setSaving(true);
     try {
       await mutAdelanto.mutateAsync({
         monto: Number(adelantoForm.monto),
-        moneda: adelantoForm.moneda,
+        moneda: adelantoForm.tipo === "ESPECIE" ? "COP" : adelantoForm.moneda,
         fecha: adelantoForm.fecha,
         observacion: adelantoForm.observacion || null,
+        tipo: adelantoForm.tipo,
       });
     } finally { setSaving(false); }
   };
@@ -177,15 +181,20 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
                 <div className="table-wrap mb-4">
                   <table>
                     <thead>
-                      <tr><th>Fecha</th><th>Monto</th><th>Moneda</th><th>Fondo</th><th>Estado</th></tr>
+                      <tr><th>Fecha</th><th>Monto</th><th>Tipo</th><th>Fondo</th><th>Observación</th><th>Estado</th></tr>
                     </thead>
                     <tbody>
                       {adelantos.map((a) => (
                         <tr key={a.id}>
                           <td>{a.fecha}</td>
-                          <td>{Number(a.monto).toLocaleString("es-CO")}</td>
-                          <td>{a.moneda}</td>
-                          <td>{a.fondoDebitado}</td>
+                          <td>{Number(a.monto).toLocaleString("es-CO")} {a.tipo !== "ESPECIE" ? a.moneda : ""}</td>
+                          <td>
+                            {a.tipo === "ESPECIE"
+                              ? <span className="badge badge-gray">Especie</span>
+                              : <span className="badge badge-info">Efectivo</span>}
+                          </td>
+                          <td>{a.tipo === "ESPECIE" ? "—" : a.fondoDebitado}</td>
+                          <td className="text-xs text-gray-500">{a.observacion ?? "—"}</td>
                           <td>
                             <span className={`badge ${a.pagado ? "badge-success" : "badge-warning"}`}>
                               {a.pagado ? "Pagado" : "Pendiente"}
@@ -198,10 +207,21 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
                 </div>
               ) : null}
               <form onSubmit={handleRegistrarAdelanto} className="border-t pt-4">
-                <p className="text-sm font-medium mb-3">Registrar adelanto</p>
+                <p className="text-sm font-medium mb-3">Registrar adelanto o descuento</p>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Monto *</label>
+                    <label className="form-label">Tipo *</label>
+                    <select
+                      className="form-control"
+                      value={adelantoForm.tipo}
+                      onChange={(e) => setAdelantoForm((f) => ({ ...f, tipo: e.target.value }))}
+                    >
+                      <option value="EFECTIVO">Efectivo (debita fondo)</option>
+                      <option value="ESPECIE">En especie (mercado, gallina, etc.)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Monto COP *</label>
                     <input
                       type="number" className="form-control" min="1" step="1"
                       value={adelantoForm.monto}
@@ -209,18 +229,20 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
                       placeholder="0"
                     />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Fondo *</label>
-                    <select
-                      className="form-control"
-                      value={adelantoForm.moneda}
-                      onChange={(e) => setAdelantoForm((f) => ({ ...f, moneda: e.target.value }))}
-                    >
-                      {fondos.map((f) => (
-                        <option key={f.moneda} value={f.moneda}>{f.alias ?? f.moneda}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {adelantoForm.tipo === "EFECTIVO" && (
+                    <div className="form-group">
+                      <label className="form-label">Fondo *</label>
+                      <select
+                        className="form-control"
+                        value={adelantoForm.moneda}
+                        onChange={(e) => setAdelantoForm((f) => ({ ...f, moneda: e.target.value }))}
+                      >
+                        {fondos.map((f) => (
+                          <option key={f.moneda} value={f.moneda}>{f.alias ?? f.moneda}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="form-group">
                     <label className="form-label">Fecha *</label>
                     <input
@@ -231,17 +253,19 @@ export default function ModalDetalleEmpleado({ empleado, onClose }) {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Observación</label>
+                  <label className="form-label">
+                    Observación {adelantoForm.tipo === "ESPECIE" ? "*" : ""}
+                  </label>
                   <input
                     className="form-control"
                     value={adelantoForm.observacion}
                     onChange={(e) => setAdelantoForm((f) => ({ ...f, observacion: e.target.value }))}
-                    placeholder="Opcional"
+                    placeholder={adelantoForm.tipo === "ESPECIE" ? "Ej: mercado 8.000, gallina 45.000" : "Opcional"}
                   />
                 </div>
                 <div className="flex justify-end mt-2">
                   <button type="submit" className="btn btn-primary" disabled={saving}>
-                    {saving ? "Registrando…" : "Registrar adelanto"}
+                    {saving ? "Registrando…" : "Registrar"}
                   </button>
                 </div>
               </form>

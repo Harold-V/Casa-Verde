@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface AbonoCompraMapper {
 
     @Mapping(source = "compra.id", target = "compraId")
+    @Mapping(source = "adelantoProveedor.id", target = "adelantoProveedorId")
     AbonoCompraDTO toDTO(AbonoCompra abono);
 }

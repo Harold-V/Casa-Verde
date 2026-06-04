@@ -1,19 +1,20 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, CheckSquare,
-  Package, Wallet, Settings, Users,
+  Package, Wallet, Settings, Users, HandCoins,
 } from "lucide-react";
 import { useSessionStore } from "../../store/useSessionStore";
 
 const links = [
-  { to: "/",              icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/pedidos",       icon: ClipboardList,   label: "Pedidos" },
-  { to: "/resumen",       icon: CheckSquare,     label: "Resumen del día" },
-  { to: "/inventario",    icon: Package,         label: "Inventario" },
+  { to: "/",               icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/pedidos",        icon: ClipboardList,   label: "Pedidos" },
+  { to: "/resumen",        icon: CheckSquare,     label: "Resumen del día" },
+  { to: "/inventario",     icon: Package,         label: "Inventario" },
 
-  { to: "/fondos",        icon: Wallet,          label: "Fondos" },
-  { to: "/empleados",     icon: Users,           label: "Empleados" },
-  { to: "/configuracion", icon: Settings,        label: "Configuración" },
+  { to: "/fondos",         icon: Wallet,          label: "Fondos" },
+  { to: "/cuentas-cobrar", icon: HandCoins,       label: "Cuentas x Cobrar" },
+  { to: "/empleados",      icon: Users,           label: "Empleados" },
+  { to: "/configuracion",  icon: Settings,        label: "Configuración" },
 ];
 
 export default function Sidebar() {

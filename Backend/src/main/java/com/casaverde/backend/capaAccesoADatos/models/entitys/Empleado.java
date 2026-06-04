@@ -29,7 +29,7 @@ public class Empleado {
     private String nombre;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private TipoEmpleado tipo;
 
     @Column(nullable = false, precision = 19, scale = 0)

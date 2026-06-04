@@ -8,7 +8,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "vacacion")
+@Table(name = "vacacion", indexes = {
+        @Index(name = "idx_vacacion_empleado", columnList = "empleado_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -37,6 +39,8 @@ public class Vacacion {
 
     @PrePersist
     void prePersist() {
+        if (fechaFin != null && fechaInicio != null && fechaFin.isBefore(fechaInicio))
+            throw new IllegalArgumentException("La fecha de fin de vacación no puede ser anterior a la fecha de inicio");
         creadoEn = LocalDateTime.now(ZoneId.of("America/Bogota"));
     }
 }

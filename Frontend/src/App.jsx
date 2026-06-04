@@ -9,6 +9,7 @@ import PedidosPage from "./pages/pedidos/PedidosPage";
 import ResumenPage from "./pages/resumen/ResumenPage";
 import FondosPage from "./pages/fondos/FondosPage";
 import EmpleadosPage from "./pages/empleados/EmpleadosPage";
+import CuentasCobrarPage from "./pages/cuentas-cobrar/CuentasCobrarPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -50,8 +51,9 @@ const routes = [
 
       { path: "fondos",        element: <FondosPage /> },
       { path: "configuracion", element: <ConfiguracionPage /> },
-      { path: "empleados",     element: <EmpleadosPage /> },
-      { path: "*",             element: <NotFound /> },
+      { path: "empleados",       element: <EmpleadosPage /> },
+      { path: "cuentas-cobrar", element: <CuentasCobrarPage /> },
+      { path: "*",              element: <NotFound /> },
     ],
   },
 ];

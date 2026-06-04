@@ -11,7 +11,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "pago_empleado")
+@Table(name = "pago_empleado", indexes = {
+        @Index(name = "idx_pago_empleado_empleado", columnList = "empleado_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,7 +30,7 @@ public class PagoEmpleado {
     private Empleado empleado;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private TipoPagoEmpleado tipo;
 
     @Column(name = "periodo_inicio", nullable = false)

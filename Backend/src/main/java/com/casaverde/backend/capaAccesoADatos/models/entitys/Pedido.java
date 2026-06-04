@@ -2,7 +2,9 @@ package com.casaverde.backend.capaAccesoADatos.models.entitys;
 
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +14,10 @@ import lombok.*;
 import org.hibernate.annotations.BatchSize;
 
 @Entity
-@Table(name = "pedido")
+@Table(name = "pedido", indexes = {
+        @Index(name = "idx_pedido_estado", columnList = "estado"),
+        @Index(name = "idx_pedido_creado_en", columnList = "creado_en")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,16 +41,16 @@ public class Pedido {
     private String mesa;
 
     @Column(name = "fecha_reserva")
-    private String fechaReserva; // "yyyy-MM-dd"
+    private LocalDate fechaReserva;
 
     @Column(name = "hora_reserva")
-    private String horaReserva; // "HH:mm"
+    private LocalTime horaReserva;
 
     @Column(name = "cant_personas")
     private Integer cantPersonas;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private EstadoPedido estado;
 
     private String observacion;
