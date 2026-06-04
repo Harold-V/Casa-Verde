@@ -87,6 +87,9 @@ class CasaVerdeBusinessRulesTests {
         @Autowired
         private ProductoPrecioHistorialRepository precioHistorialRepository;
 
+        @Autowired
+        private com.casaverde.backend.fachadaServices.services.pedidoService.ICuentaCobrarService cuentaCobrarService;
+
         @Test
         void noFinalizaPedidoSiNoHayStockSuficiente() {
                 Inventario cuy = inventarioRepository.findByInsumo("cuy").orElseThrow();
@@ -308,6 +311,29 @@ class CasaVerdeBusinessRulesTests {
                                         assertThat(h.getPrecioNuevo()).isEqualByComparingTo(BigDecimal.valueOf(3500));
                                         assertThat(h.getMotivo()).isEqualTo("ACTUALIZAR_PRECIO");
                                 });
+        }
+
+        @Test
+        void registrarAbonoCuentaCobrarConMontoNegativoEsRechazado() {
+                ajustarFondo("COP", BigDecimal.valueOf(50000));
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest();
+                req.setClienteNombre("Pedro Test");
+                req.setMonto(BigDecimal.valueOf(30000));
+                req.setFecha(LocalDate.now());
+                var cuenta = cuentaCobrarService.registrar(req);
+
+                var abonoReq = new com.casaverde.backend.fachadaServices.dto.AbonoCuentaCobrarRequest();
+                abonoReq.setMonto(BigDecimal.valueOf(-5000));
+                abonoReq.setMoneda("COP");
+                abonoReq.setFecha(LocalDate.now());
+
+                assertThatThrownBy(() -> cuentaCobrarService.registrarAbono(cuenta.getId(), abonoReq))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("mayor a 0");
+
+                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(BigDecimal.valueOf(50000));
         }
 
         private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {

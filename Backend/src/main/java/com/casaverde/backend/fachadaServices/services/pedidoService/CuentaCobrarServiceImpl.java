@@ -108,6 +108,9 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         if (cuenta.getEstado() == EstadoCuentaCobrar.CANCELADO)
             throw new ValidacionException("La cuenta ya está cancelada");
 
+        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
+            throw new ValidacionException("El monto del cobro debe ser mayor a 0");
+
         String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
         BigDecimal montoCop = "USD".equals(moneda)
