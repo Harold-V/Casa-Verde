@@ -11,7 +11,10 @@ import lombok.*;
 import org.hibernate.annotations.BatchSize;
 
 @Entity
-@Table(name = "producto")
+@Table(name = "producto", indexes = {
+        @Index(name = "idx_producto_activo_eliminado", columnList = "activo, eliminado"),
+        @Index(name = "idx_producto_categoria_id", columnList = "categoria_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,7 +32,7 @@ public class Producto {
     @Column(nullable = false, unique = true)
     private String nombre;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 0)
     @Builder.Default
     private BigDecimal precio = BigDecimal.ZERO;
 

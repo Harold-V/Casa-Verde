@@ -22,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ExportacionController {
 
+    private static final MediaType TEXT_CSV_UTF_8 = new MediaType("text", "csv", StandardCharsets.UTF_8);
+
     private final IExportacionService service;
 
     @GetMapping("/resumen")
@@ -40,9 +42,9 @@ public class ExportacionController {
 
     private ResponseEntity<String> csv(String filename, String body) {
         return ResponseEntity.ok()
-                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .contentType(TEXT_CSV_UTF_8)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition.attachment().filename(filename).build().toString())
+                        ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(body);
     }
 }

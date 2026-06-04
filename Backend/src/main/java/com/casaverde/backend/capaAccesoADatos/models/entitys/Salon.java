@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "salon")
+@Table(name = "salon", indexes = {
+        @Index(name = "idx_salon_activo_eliminado", columnList = "activo, eliminado")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,7 +18,7 @@ public class Salon {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 100)
     private String nombre;
 
     private Integer aforo;

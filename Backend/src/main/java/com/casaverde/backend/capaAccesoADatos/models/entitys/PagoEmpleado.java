@@ -30,7 +30,7 @@ public class PagoEmpleado {
     private Empleado empleado;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 20)
     private TipoPagoEmpleado tipo;
 
     @Column(name = "periodo_inicio", nullable = false)
@@ -51,7 +51,7 @@ public class PagoEmpleado {
     @Column(name = "total_neto", nullable = false, precision = 19, scale = 0)
     private BigDecimal totalNeto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda;
 
     @Column(name = "monto_pagado", nullable = false, precision = 19, scale = 2)
@@ -63,9 +63,10 @@ public class PagoEmpleado {
     @Column(name = "tasa_usada", precision = 19, scale = 2)
     private BigDecimal tasaUsada;
 
-    @Column(name = "fondo_debitado", nullable = false)
+    @Column(name = "fondo_debitado", nullable = false, length = 30)
     private String fondoDebitado;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(name = "creado_en", nullable = false, updatable = false)

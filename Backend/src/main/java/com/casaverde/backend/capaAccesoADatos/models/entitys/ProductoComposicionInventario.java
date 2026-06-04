@@ -23,7 +23,7 @@ public class ProductoComposicionInventario {
     @JoinColumn(name = "producto_id", nullable = false)
     private Producto producto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String insumo;
 
     @Column(nullable = false, precision = 19, scale = 4)

@@ -22,7 +22,7 @@ public class TasaCambio {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "valor_cop", nullable = false)
+    @Column(name = "valor_cop", nullable = false, precision = 19, scale = 2)
     private BigDecimal valorCop;
 
     @Column(name = "vigente_desde", nullable = false)

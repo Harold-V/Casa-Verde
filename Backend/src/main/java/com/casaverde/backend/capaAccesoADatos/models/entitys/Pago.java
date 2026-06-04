@@ -9,6 +9,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "pago", indexes = {
+        @Index(name = "idx_pago_pedido_id", columnList = "pedido_id"),
         @Index(name = "idx_pago_registrado_en", columnList = "registrado_en")
 })
 @Getter
@@ -29,7 +30,7 @@ public class Pago {
     @JoinColumn(name = "pedido_id", nullable = false)
     private Pedido pedido;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda; // COP, USD, NEQUI
 
     @Column(nullable = false, precision = 19, scale = 2)
@@ -38,7 +39,7 @@ public class Pago {
     @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal montoCop;
 
-    @Column(name = "tasa_usada")
+    @Column(name = "tasa_usada", precision = 19, scale = 2)
     private BigDecimal tasaUsada;
 
     @Column(name = "registrado_en", nullable = false)

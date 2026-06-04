@@ -8,7 +8,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "producto_precio_historial", indexes = @Index(name = "idx_precio_producto", columnList = "producto_id,registrado_en"))
+@Table(name = "producto_precio_historial", indexes = @Index(name = "idx_precio_producto", columnList = "producto_id, registrado_en"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,10 +20,11 @@ public class ProductoPrecioHistorial {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "producto_id", nullable = false)
-    private Long productoId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "producto_id", nullable = false)
+    private Producto producto;
 
-    @Column(name = "producto_nombre", nullable = false)
+    @Column(name = "producto_nombre", nullable = false, length = 150)
     private String productoNombre;
 
     @Column(name = "precio_anterior", precision = 19, scale = 0)
@@ -32,7 +33,7 @@ public class ProductoPrecioHistorial {
     @Column(name = "precio_nuevo", nullable = false, precision = 19, scale = 0)
     private BigDecimal precioNuevo;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 200)
     private String motivo;
 
     @Column(name = "usuario_id")

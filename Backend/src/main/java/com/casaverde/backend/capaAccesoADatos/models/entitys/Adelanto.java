@@ -24,19 +24,22 @@ public class Adelanto {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empleado_id", nullable = false)
     private Empleado empleado;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "VARCHAR(50) DEFAULT 'EFECTIVO'")
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'EFECTIVO'")
     @Builder.Default
     private TipoAdelanto tipo = TipoAdelanto.EFECTIVO;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal monto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda;
 
     @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
@@ -45,12 +48,13 @@ public class Adelanto {
     @Column(name = "tasa_usada", precision = 19, scale = 2)
     private BigDecimal tasaUsada;
 
-    @Column(name = "fondo_debitado", nullable = false)
+    @Column(name = "fondo_debitado", nullable = false, length = 30)
     private String fondoDebitado;
 
     @Column(nullable = false)
     private LocalDate fecha;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(nullable = false)

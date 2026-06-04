@@ -2,6 +2,7 @@ package com.casaverde.backend.config;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,8 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Seed data: cada método tiene su guard "if count > 0 return" — idempotente por diseño
+        // Seed data: cada método tiene su guard "if count > 0 return" — idempotente por
+        // diseño
         initCategorias();
         initProductos();
         initSalones();
@@ -82,19 +84,21 @@ public class DataInitializer implements CommandLineRunner {
         try {
             tarea.run();
         } catch (Exception e) {
-            log.warn("Backfill '{}' falló (no crítico, se reintentará en el próximo arranque): {}", nombre, e.getMessage());
+            log.warn("Backfill '{}' falló (no crítico, se reintentará en el próximo arranque): {}", nombre,
+                    e.getMessage());
         }
     }
 
     private void initCategorias() {
         if (categoriaRepo.count() > 0)
             return;
-        categoriaRepo.saveAll(List.of(
-                cat("Cuyes", 1),
-                cat("Gallinas", 2),
-                cat("Almuerzos", 3),
-                cat("Complementos", 4),
-                cat("Bebidas", 5)));
+        List<CategoriaProducto> cats = new ArrayList<>();
+        cats.add(cat("Cuyes", 1));
+        cats.add(cat("Gallinas", 2));
+        cats.add(cat("Almuerzos", 3));
+        cats.add(cat("Complementos", 4));
+        cats.add(cat("Bebidas", 5));
+        categoriaRepo.saveAll(cats);
     }
 
     private void initProductos() {
@@ -150,16 +154,18 @@ public class DataInitializer implements CommandLineRunner {
     private void initSalones() {
         if (salonRepo.count() > 0)
             return;
-        salonRepo.saveAll(List.of(
-                Salon.builder().nombre("Salón principal").aforo(30).activo(true).build(),
-                Salon.builder().nombre("Terraza").aforo(20).activo(true).build(),
-                Salon.builder().nombre("Para llevar").activo(true).build()));
+        List<Salon> salones = new ArrayList<>();
+        salones.add(Salon.builder().nombre("Salón principal").aforo(30).activo(true).build());
+        salones.add(Salon.builder().nombre("Terraza").aforo(20).activo(true).build());
+        salones.add(Salon.builder().nombre("Para llevar").activo(true).build());
+        salonRepo.saveAll(salones);
     }
 
     private void initTasaCambio() {
         if (tasaRepo.count() > 0)
             return;
-        tasaRepo.save(TasaCambio.builder().valorCop(BigDecimal.valueOf(4200)).build());
+        tasaRepo.save(
+                java.util.Objects.requireNonNull(TasaCambio.builder().valorCop(BigDecimal.valueOf(4200)).build()));
     }
 
     private void initConfiguracion() {
@@ -262,7 +268,8 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * Asigna alertaMinima a los insumos de inventario existentes si aún no tienen valor.
+     * Asigna alertaMinima a los insumos de inventario existentes si aún no tienen
+     * valor.
      * Idempotente — solo toca registros con alertaMinima null.
      * gallina = 5, cuy = 10.
      */
@@ -279,13 +286,17 @@ public class DataInitializer implements CommandLineRunner {
         });
     }
 
-    /** Asigna tipo=EFECTIVO a todos los adelantos existentes que no tengan tipo. Idempotente. */
+    /**
+     * Asigna tipo=EFECTIVO a todos los adelantos existentes que no tengan tipo.
+     * Idempotente.
+     */
     private void backfillTipoAdelanto() {
         List<com.casaverde.backend.capaAccesoADatos.models.entitys.Adelanto> sin = adelantoRepo.findAll().stream()
                 .filter(a -> a.getTipo() == null)
                 .peek(a -> a.setTipo(TipoAdelanto.EFECTIVO))
                 .toList();
-        if (!sin.isEmpty()) adelantoRepo.saveAll(sin);
+        if (!sin.isEmpty())
+            adelantoRepo.saveAll(sin);
     }
 
     // ---- helpers ----

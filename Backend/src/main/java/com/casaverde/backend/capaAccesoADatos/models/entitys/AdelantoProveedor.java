@@ -30,7 +30,7 @@ public class AdelantoProveedor {
     @JoinColumn(name = "proveedor_id", nullable = false)
     private Proveedor proveedor;
 
-    @Column(name = "proveedor_nombre", nullable = false)
+    @Column(name = "proveedor_nombre", nullable = false, length = 150)
     private String proveedorNombreSnapshot;
 
     @Column(nullable = false, precision = 19, scale = 0)
@@ -39,16 +39,16 @@ public class AdelantoProveedor {
     @Column(name = "saldo_restante", nullable = false, precision = 19, scale = 0)
     private BigDecimal saldoRestante;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda;
 
     @Column(name = "monto_cop_inicial", nullable = false, precision = 19, scale = 0)
     private BigDecimal montoCopInicial;
 
-    @Column(name = "fondo_debitado", nullable = false)
+    @Column(name = "fondo_debitado", nullable = false, length = 30)
     private String fondoDebitado;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String insumo;
 
     @Column(name = "precio_unitario_acordado", nullable = false, precision = 19, scale = 0)
@@ -57,6 +57,7 @@ public class AdelantoProveedor {
     @Column(nullable = false)
     private LocalDate fecha;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(nullable = false)

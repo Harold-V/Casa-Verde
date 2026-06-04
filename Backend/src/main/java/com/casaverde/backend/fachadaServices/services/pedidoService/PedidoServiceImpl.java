@@ -85,9 +85,11 @@ public class PedidoServiceImpl implements IPedidoService {
                 .nombre(req.getNombre().trim())
                 .mesa(req.getMesa())
                 .fechaReserva(req.getFechaReserva() != null && !req.getFechaReserva().isBlank()
-                        ? LocalDate.parse(req.getFechaReserva()) : null)
+                        ? LocalDate.parse(req.getFechaReserva())
+                        : null)
                 .horaReserva(req.getHoraReserva() != null && !req.getHoraReserva().isBlank()
-                        ? LocalTime.parse(req.getHoraReserva()) : null)
+                        ? LocalTime.parse(req.getHoraReserva())
+                        : null)
                 .cantPersonas(req.getCantPersonas())
                 .observacion(req.getObservacion())
                 .paraLlevar(Boolean.TRUE.equals(req.getParaLlevar()))
@@ -136,9 +138,11 @@ public class PedidoServiceImpl implements IPedidoService {
             pedido.setNombre(req.getNombre().trim());
 
         pedido.setFechaReserva(req.getFechaReserva() != null && !req.getFechaReserva().isBlank()
-                ? LocalDate.parse(req.getFechaReserva()) : null);
+                ? LocalDate.parse(req.getFechaReserva())
+                : null);
         pedido.setHoraReserva(req.getHoraReserva() != null && !req.getHoraReserva().isBlank()
-                ? LocalTime.parse(req.getHoraReserva()) : null);
+                ? LocalTime.parse(req.getHoraReserva())
+                : null);
         pedido.setMesa(req.getMesa());
         pedido.setCantPersonas(req.getCantPersonas());
         pedido.setObservacion(req.getObservacion());

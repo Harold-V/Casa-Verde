@@ -311,7 +311,7 @@ class CasaVerdeBusinessRulesTests {
 
                 productoService.actualizarPrecio(producto.getId(), BigDecimal.valueOf(3500), null);
 
-                assertThat(precioHistorialRepository.findByProductoIdOrderByRegistradoEnDesc(producto.getId()))
+                assertThat(precioHistorialRepository.findByProducto_IdOrderByRegistradoEnDesc(producto.getId()))
                                 .anySatisfy(h -> {
                                         assertThat(h.getPrecioAnterior()).isEqualByComparingTo(BigDecimal.ZERO);
                                         assertThat(h.getPrecioNuevo()).isEqualByComparingTo(BigDecimal.valueOf(3500));
@@ -410,7 +410,8 @@ class CasaVerdeBusinessRulesTests {
                 req.setFecha(LocalDate.now());
                 var compra = compraService.registrar(req);
 
-                // Manually reduce stock to 2 (simulate pedidos consuming stock between purchase and cancellation)
+                // Manually reduce stock to 2 (simulate pedidos consuming stock between purchase
+                // and cancellation)
                 Inventario gallina = inventarioRepository.findByInsumo("gallina").orElseThrow();
                 gallina.setStockActual(BigDecimal.valueOf(2));
                 inventarioRepository.save(gallina);

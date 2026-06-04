@@ -33,7 +33,7 @@ public class AbonoCompra {
     @Column(precision = 19, scale = 2, nullable = false)
     private BigDecimal monto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda;
 
     @Column(name = "monto_cop", precision = 19, scale = 0, nullable = false)
@@ -42,7 +42,7 @@ public class AbonoCompra {
     @Column(name = "tasa_usada", precision = 19, scale = 2)
     private BigDecimal tasaUsada;
 
-    @Column(name = "fondo_debitado", nullable = false)
+    @Column(name = "fondo_debitado", nullable = false, length = 30)
     private String fondoDebitado;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
