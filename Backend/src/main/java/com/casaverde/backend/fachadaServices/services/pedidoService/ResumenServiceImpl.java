@@ -15,6 +15,7 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.Fondo;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Gasto;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pago;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
+import com.casaverde.backend.fachadaServices.dto.PedidoTotales;
 import com.casaverde.backend.fachadaServices.dto.ResumenDiaDTO;
 import com.casaverde.backend.fachadaServices.mapper.FondoMapper;
 import com.casaverde.backend.fachadaServices.mapper.GastoMapper;
@@ -93,7 +94,7 @@ public class ResumenServiceImpl implements IResumenService {
                 .pedidos(Stream.concat(
                         pedidosFinalizados.stream(),
                         pedidosCreados.stream().filter(p -> EstadoPedido.ANULADO == p.getEstado()))
-                        .map(pedidoMapper::toDTO).collect(Collectors.toList()))
+                        .map(p -> pedidoMapper.toDTO(p, calcularTotales(p))).collect(Collectors.toList()))
                 .gastos(gastos.stream().map(gastoMapper::toDTO).collect(Collectors.toList()))
                 .build();
     }
@@ -118,6 +119,20 @@ public class ResumenServiceImpl implements IResumenService {
     private BigDecimal sumarGastosPorMoneda(List<Gasto> gastos, String moneda) {
         return gastos.stream().filter(g -> moneda.equals(g.getMoneda()))
                 .map(Gasto::getMonto).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private PedidoTotales calcularTotales(Pedido pedido) {
+        BigDecimal total = pedido.getDetalles().stream()
+                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal abonado = pedido.getPagos().stream()
+                .map(Pago::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new PedidoTotales(
+                total,
+                abonado,
+                total.subtract(abonado).max(BigDecimal.ZERO),
+                abonado.subtract(total).max(BigDecimal.ZERO));
     }
 
 }

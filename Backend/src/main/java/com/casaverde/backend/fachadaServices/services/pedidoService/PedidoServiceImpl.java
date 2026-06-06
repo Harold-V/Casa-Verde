@@ -38,6 +38,7 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.PedidoTotales;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.mapper.PedidoMapper;
 import lombok.RequiredArgsConstructor;
@@ -63,30 +64,31 @@ public class PedidoServiceImpl implements IPedidoService {
     @Transactional(readOnly = true)
     public List<PedidoDTO> listarActivos() {
         return pedidoRepo.findByEstadoInOrderByCreadoEnDesc(EstadoPedido.activos())
-                .stream().map(pedidoMapper::toDTO).collect(Collectors.toList());
+                .stream().map(p -> pedidoMapper.toDTO(p, calcularTotales(p))).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<PedidoDTO> listarTodos() {
         return pedidoRepo.findAllByOrderByCreadoEnDesc()
-                .stream().map(pedidoMapper::toDTO).collect(Collectors.toList());
+                .stream().map(p -> pedidoMapper.toDTO(p, calcularTotales(p))).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public Page<PedidoDTO> listarTodosPaginado(Pageable pageable) {
         return pedidoRepo.findAllByOrderByCreadoEnDesc(pageable)
-                .map(pedidoMapper::toDTO);
+                .map(p -> pedidoMapper.toDTO(p, calcularTotales(p)));
     }
 
     @Transactional(readOnly = true)
     public PedidoDTO obtener(Long id) {
-        return pedidoMapper.toDTO(findOrThrow(id));
+        Pedido pedido = findOrThrow(id);
+        return pedidoMapper.toDTO(pedido, calcularTotales(pedido));
     }
 
     @Transactional(readOnly = true)
     public String comprobanteTexto(Long id) {
         Pedido pedido = findOrThrow(id);
-        return comprobanteService.generar(pedidoMapper.toDTO(pedido));
+        return comprobanteService.generar(pedidoMapper.toDTO(pedido, calcularTotales(pedido)));
     }
 
     @Transactional
@@ -141,7 +143,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "CREAR",
                 "Pedido creado para " + guardado.getNombre());
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -177,7 +179,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR",
                 "Datos generales del pedido actualizados");
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -222,7 +224,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "AGREGAR_ITEM",
                 "Item agregado o acumulado en el pedido");
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -236,7 +238,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "QUITAR_ITEM",
                 "Item eliminado del pedido: " + detalleId);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -260,7 +262,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR_ITEM",
                 "Item actualizado en el pedido: " + detalleId);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -289,7 +291,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "REGISTRAR_PAGO",
                 "Pago " + moneda + " " + monto + " equivalente COP " + montoCop);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -301,8 +303,9 @@ public class PedidoServiceImpl implements IPedidoService {
         if (pedido.getDetalles().isEmpty())
             throw new ValidacionException("El pedido no tiene ítems");
 
-        BigDecimal total = pedidoMapper.calcularTotal(pedido);
-        BigDecimal abonado = pedidoMapper.calcularAbonado(pedido);
+        PedidoTotales totalesFinalizacion = calcularTotales(pedido);
+        BigDecimal total = totalesFinalizacion.totalCop();
+        BigDecimal abonado = totalesFinalizacion.totalAbonado();
         recalcularEstadoPago(pedido);
         if (EstadoPedido.PAGADO != pedido.getEstado()) {
             throw new ValidacionException(String.format(
@@ -343,7 +346,7 @@ public class PedidoServiceImpl implements IPedidoService {
         log.info("[finalizar] pedidoId={} COMPLETADO", pedidoId);
         auditoriaService.registrar("pedido", guardado.getId(), "FINALIZAR",
                 "Pedido finalizado con total COP " + total);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -362,7 +365,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ANULAR",
                 "Pedido anulado con " + pedido.getPagos().size() + " pago(s) sin impacto en fondos");
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -381,7 +384,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "QUITAR_PAGO",
                 "Pago eliminado: " + pagoId);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -412,7 +415,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR_PAGO",
                 "Pago actualizado: " + pagoId + " a " + nuevaMoneda + " " + nuevoMonto);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     // ---- private helpers ----
@@ -476,10 +479,9 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     private void recalcularEstadoPago(Pedido pedido) {
-        if (!pedido.getEstado().permiteEdicion())
-            return;
-        pedido.setEstado(
-                EstadoPedido.calcular(pedidoMapper.calcularTotal(pedido), pedidoMapper.calcularAbonado(pedido)));
+        if (!pedido.getEstado().permiteEdicion()) return;
+        PedidoTotales t = calcularTotales(pedido);
+        pedido.setEstado(EstadoPedido.calcular(t.totalCop(), t.totalAbonado()));
     }
 
     private void validarAbierto(Pedido pedido, String accion) {
@@ -487,6 +489,20 @@ public class PedidoServiceImpl implements IPedidoService {
             log.warn("[validarAbierto] pedidoId={} accion='{}' estado={}", pedido.getId(), accion, pedido.getEstado());
             throw new ValidacionException("No se puede " + accion + " en un pedido " + pedido.getEstado());
         }
+    }
+
+    private PedidoTotales calcularTotales(Pedido pedido) {
+        BigDecimal total = pedido.getDetalles().stream()
+                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal abonado = pedido.getPagos().stream()
+                .map(Pago::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new PedidoTotales(
+                total,
+                abonado,
+                total.subtract(abonado).max(BigDecimal.ZERO),
+                abonado.subtract(total).max(BigDecimal.ZERO));
     }
 
     private Pedido findOrThrow(Long id) {
