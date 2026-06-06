@@ -492,17 +492,7 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     private PedidoTotales calcularTotales(Pedido pedido) {
-        BigDecimal total = pedido.getDetalles().stream()
-                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal abonado = pedido.getPagos().stream()
-                .map(Pago::getMontoCop)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new PedidoTotales(
-                total,
-                abonado,
-                total.subtract(abonado).max(BigDecimal.ZERO),
-                abonado.subtract(total).max(BigDecimal.ZERO));
+        return PedidoTotales.of(pedido);
     }
 
     private Pedido findOrThrow(Long id) {
