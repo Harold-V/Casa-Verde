@@ -1,7 +1,10 @@
-package com.casaverde.backend.fachadaServices.services.productoService;
+package com.casaverde.backend.fachadaServices.services.inventarioService;
 
 import java.math.BigDecimal;
 import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.fachadaServices.dto.ComparativoMensualDTO;
@@ -18,6 +21,8 @@ public interface IInventarioService {
     List<MovimientoInventarioDTO> listarMovimientos();
 
     List<MovimientoInventarioDTO> listarMovimientosPorInsumo(String insumo);
+
+    Page<MovimientoInventarioDTO> listarMovimientosPaginado(String insumo, Pageable pageable);
 
     MovimientoInventarioDTO registrarMovimiento(MovimientoRequest req);
 

@@ -9,9 +9,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "proveedor", indexes = {
-        @Index(name = "idx_proveedor_activo", columnList = "activo")
-})
+@Table(name = "proveedor")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,6 +19,7 @@ public class Proveedor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Column(nullable = false, unique = true, length = 150)

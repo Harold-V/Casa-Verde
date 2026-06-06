@@ -19,6 +19,7 @@ public class PedidoDetalle {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version

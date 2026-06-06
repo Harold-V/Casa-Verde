@@ -23,6 +23,7 @@ public class PagoEmpleado {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)

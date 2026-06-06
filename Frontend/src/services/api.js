@@ -1,9 +1,18 @@
 import axios from "axios";
+import { useSessionStore } from "../store/useSessionStore";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE ?? "/api/v1",
   headers: { "Content-Type": "application/json" },
   timeout: 10000,
+});
+
+api.interceptors.request.use((config) => {
+  const token = useSessionStore.getState().usuario?.token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 api.interceptors.response.use(

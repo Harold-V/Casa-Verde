@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +17,7 @@ import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryS
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.ProductoComposicionInventario;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
@@ -63,6 +65,12 @@ public class PedidoServiceImpl implements IPedidoService {
     public List<PedidoDTO> listarTodos() {
         return pedidoRepo.findAllByOrderByCreadoEnDesc()
                 .stream().map(pedidoMapper::toDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PedidoDTO> listarTodosPaginado(Pageable pageable) {
+        return pedidoRepo.findAllByOrderByCreadoEnDesc(pageable)
+                .map(pedidoMapper::toDTO);
     }
 
     @Transactional(readOnly = true)

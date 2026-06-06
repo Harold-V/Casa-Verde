@@ -3,6 +3,9 @@ package com.casaverde.backend.fachadaServices.services.productoService;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,20 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<HistorialAuditoriaDTO> listarPaginado(String entidad, Long entidadId, Pageable pageable) {
+        if (entidad != null && !entidad.isBlank() && entidadId != null) {
+            return repo.findByEntidadAndEntidadIdOrderByRegistradoEnDesc(entidad.trim(), entidadId, pageable)
+                    .map(auditoriaMapper::toDTO);
+        }
+        if ((entidad == null || entidad.isBlank()) && entidadId == null) {
+            return repo.findAllByOrderByRegistradoEnDesc(pageable)
+                    .map(auditoriaMapper::toDTO);
+        }
+        return paginarLista(listar(entidad, entidadId), pageable);
+    }
+
     @Transactional
     public void registrar(String entidad, Long entidadId, String accion, String detalle) {
         repo.save(HistorialAuditoria.builder()
@@ -42,6 +59,12 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
                 .accion(accion)
                 .detalle(detalle)
                 .build());
+    }
+
+    private <T> Page<T> paginarLista(List<T> lista, Pageable pageable) {
+        int start = (int) Math.min(pageable.getOffset(), lista.size());
+        int end = Math.min(start + pageable.getPageSize(), lista.size());
+        return new PageImpl<>(lista.subList(start, end), pageable, lista.size());
     }
 
 }

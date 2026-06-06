@@ -2,6 +2,9 @@ package com.casaverde.backend.fachadaServices.services.pedidoService;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.casaverde.backend.fachadaServices.dto.ActualizarDetalleRequest;
 import com.casaverde.backend.fachadaServices.dto.ActualizarPagoRequest;
 import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
@@ -15,6 +18,8 @@ public interface IPedidoService {
     List<PedidoDTO> listarActivos();
 
     List<PedidoDTO> listarTodos();
+
+    Page<PedidoDTO> listarTodosPaginado(Pageable pageable);
 
     PedidoDTO obtener(Long id);
 

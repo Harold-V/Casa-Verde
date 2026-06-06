@@ -20,6 +20,7 @@ public class TasaCambio {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Column(name = "valor_cop", nullable = false, precision = 19, scale = 2)

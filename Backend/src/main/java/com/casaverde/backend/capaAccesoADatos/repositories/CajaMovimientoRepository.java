@@ -3,6 +3,8 @@ package com.casaverde.backend.capaAccesoADatos.repositories;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +16,12 @@ import java.math.BigDecimal;
 public interface CajaMovimientoRepository extends JpaRepository<CajaMovimiento, Long> {
        List<CajaMovimiento> findAllByOrderByRegistradoEnDesc();
 
+       Page<CajaMovimiento> findAllByOrderByRegistradoEnDesc(Pageable pageable);
+
        List<CajaMovimiento> findByRegistradoEnBetweenOrderByRegistradoEnDesc(LocalDateTime inicio, LocalDateTime fin);
+
+       Page<CajaMovimiento> findByRegistradoEnBetweenOrderByRegistradoEnDesc(
+                     LocalDateTime inicio, LocalDateTime fin, Pageable pageable);
 
        boolean existsByReferenciaTipoAndReferenciaIdAndTipo(String referenciaTipo, Long referenciaId, String tipo);
 

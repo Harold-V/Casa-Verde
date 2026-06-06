@@ -1,4 +1,4 @@
-package com.casaverde.backend.fachadaServices.services.pagoService;
+package com.casaverde.backend.fachadaServices.services.cajaService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +27,6 @@ import com.casaverde.backend.fachadaServices.dto.FondoDTO;
 import com.casaverde.backend.fachadaServices.dto.GastoRequest;
 import com.casaverde.backend.fachadaServices.dto.MovimientoFondoDTO;
 import com.casaverde.backend.fachadaServices.dto.TransferenciaFondoRequest;
-import com.casaverde.backend.fachadaServices.services.productoService.IGastoService;
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.mapper.FondoMapper;
@@ -136,6 +138,19 @@ public class FondoServiceImpl implements IFondoService {
                 .filter(m -> tipoNormalizado == null || tipoNormalizado.equalsIgnoreCase(m.getTipo()))
                 .sorted(Comparator.comparing(MovimientoFondoDTO::getFecha).reversed())
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovimientoFondoDTO> historialPaginado(LocalDate fecha, String moneda, String tipo, Pageable pageable) {
+        if ((moneda != null && !moneda.isBlank()) || (tipo != null && !tipo.isBlank())) {
+            return paginarLista(historial(fecha, moneda, tipo), pageable);
+        }
+
+        Page<CajaMovimiento> page = fecha != null
+                ? cajaMovimientoRepo.findByRegistradoEnBetweenOrderByRegistradoEnDesc(
+                        fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay(), pageable)
+                : cajaMovimientoRepo.findAllByOrderByRegistradoEnDesc(pageable);
+        return page.map(fondoMapper::toMovimientoDTO);
     }
 
     @Transactional
@@ -304,6 +319,12 @@ public class FondoServiceImpl implements IFondoService {
             return montoOtro.setScale(0, java.math.RoundingMode.HALF_UP);
         }
         return monto.setScale(0, java.math.RoundingMode.HALF_UP);
+    }
+
+    private <T> Page<T> paginarLista(List<T> lista, Pageable pageable) {
+        int start = (int) Math.min(pageable.getOffset(), lista.size());
+        int end = Math.min(start + pageable.getPageSize(), lista.size());
+        return new PageImpl<>(lista.subList(start, end), pageable, lista.size());
     }
 
 }

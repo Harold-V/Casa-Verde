@@ -10,9 +10,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "empleado", indexes = {
-        @Index(name = "idx_empleado_activo", columnList = "activo")
-})
+@Table(name = "empleado")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,6 +20,7 @@ public class Empleado {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version

@@ -23,7 +23,7 @@ import com.casaverde.backend.fachadaServices.dto.CuentaCobrarDTO;
 import com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest;
 import com.casaverde.backend.fachadaServices.mapper.CuentaCobrarMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;

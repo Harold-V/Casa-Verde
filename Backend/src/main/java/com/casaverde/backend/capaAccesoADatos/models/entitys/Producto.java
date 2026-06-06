@@ -12,7 +12,6 @@ import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(name = "producto", indexes = {
-        @Index(name = "idx_producto_activo_eliminado", columnList = "activo, eliminado"),
         @Index(name = "idx_producto_categoria_id", columnList = "categoria_id")
 })
 @Getter
@@ -24,12 +23,13 @@ public class Producto {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
     private Long version;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String nombre;
 
     @Column(nullable = false, precision = 19, scale = 0)
@@ -48,7 +48,7 @@ public class Producto {
     @Builder.Default
     private Boolean activo = true;
 
-    @Column(columnDefinition = "BOOLEAN NOT NULL DEFAULT 0")
+    @Column(nullable = false)
     @Builder.Default
     private Boolean eliminado = false;
 

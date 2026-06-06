@@ -1,4 +1,4 @@
-package com.casaverde.backend.fachadaServices.services.pagoService;
+package com.casaverde.backend.fachadaServices.services.cajaService;
 
 import java.math.BigDecimal;
 

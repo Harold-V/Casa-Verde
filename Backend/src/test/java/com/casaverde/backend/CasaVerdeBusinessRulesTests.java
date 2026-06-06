@@ -31,10 +31,10 @@ import com.casaverde.backend.fachadaServices.dto.LoginRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.dto.UsuarioDTO;
-import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.ICierreCajaService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.IPedidoService;
-import com.casaverde.backend.fachadaServices.services.productoService.IGastoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IGastoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IProductoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
 

@@ -1,4 +1,4 @@
-package com.casaverde.backend.fachadaServices.services.productoService;
+package com.casaverde.backend.fachadaServices.services.cajaService;
 
 import java.time.LocalDate;
 import java.util.List;

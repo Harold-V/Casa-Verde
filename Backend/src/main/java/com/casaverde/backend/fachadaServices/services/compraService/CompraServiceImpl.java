@@ -35,7 +35,7 @@ import com.casaverde.backend.fachadaServices.dto.CompraRequest;
 import com.casaverde.backend.fachadaServices.mapper.AbonoCompraMapper;
 import com.casaverde.backend.fachadaServices.mapper.CompraMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;

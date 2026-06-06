@@ -12,4 +12,5 @@ public class UsuarioDTO {
     private String rol;
     private Boolean requierePassword;
     private Boolean activo;
+    private String token;
 }
