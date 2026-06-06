@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -190,33 +191,10 @@ public class PedidoServiceImpl implements IPedidoService {
         if (req.getCantidad() == null || req.getCantidad() < 1)
             throw new ValidacionException("La cantidad debe ser al menos 1");
 
-        boolean merged = false;
-
-        if (req.getProductoId() != null) {
-            // Producto de catálogo: sumar si ya existe el mismo productoId
-            for (PedidoDetalle d : pedido.getDetalles()) {
-                if (d.getProducto() != null && d.getProducto().getId().equals(req.getProductoId())) {
-                    d.setCantidad(d.getCantidad() + req.getCantidad());
-                    merged = true;
-                    break;
-                }
-            }
+        Optional<PedidoDetalle> existente = buscarDetalleExistente(pedido, req);
+        if (existente.isPresent()) {
+            existente.get().setCantidad(existente.get().getCantidad() + req.getCantidad());
         } else {
-            // Ítem manual: sumar si mismo nombre y precio
-            String nombre = req.getNombreManual() != null ? req.getNombreManual().trim() : "";
-            BigDecimal precio = monetaryService.normalizarPrecioCop(req.getPrecioManual());
-            for (PedidoDetalle d : pedido.getDetalles()) {
-                if (d.getProducto() == null
-                        && nombre.equalsIgnoreCase(d.getNombreSnapshot())
-                        && precio.compareTo(d.getPrecioUnitarioCop()) == 0) {
-                    d.setCantidad(d.getCantidad() + req.getCantidad());
-                    merged = true;
-                    break;
-                }
-            }
-        }
-
-        if (!merged) {
             pedido.getDetalles().add(buildDetalle(pedido, req));
         }
 
@@ -419,6 +397,22 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     // ---- private helpers ----
+
+    private Optional<PedidoDetalle> buscarDetalleExistente(Pedido pedido, DetalleItemRequest req) {
+        if (req.getProductoId() != null) {
+            return pedido.getDetalles().stream()
+                    .filter(d -> d.getProducto() != null
+                            && d.getProducto().getId().equals(req.getProductoId()))
+                    .findFirst();
+        }
+        String nombre = req.getNombreManual() != null ? req.getNombreManual().trim() : "";
+        BigDecimal precio = monetaryService.normalizarPrecioCop(req.getPrecioManual());
+        return pedido.getDetalles().stream()
+                .filter(d -> d.getProducto() == null
+                        && nombre.equalsIgnoreCase(d.getNombreSnapshot())
+                        && precio.compareTo(d.getPrecioUnitarioCop()) == 0)
+                .findFirst();
+    }
 
     private PedidoDetalle buildDetalle(Pedido pedido, DetalleItemRequest req) {
         if (req.getCantidad() == null || req.getCantidad() < 1)
