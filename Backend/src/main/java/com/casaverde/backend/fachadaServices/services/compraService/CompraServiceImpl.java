@@ -6,6 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class CompraServiceImpl implements ICompraService {
+
+    private static final Logger log = LoggerFactory.getLogger(CompraServiceImpl.class);
 
     private final CompraRepository compraRepo;
     private final ProveedorRepository proveedorRepo;
@@ -116,12 +120,14 @@ public class CompraServiceImpl implements ICompraService {
         auditoriaService.registrar("Compra", compra.getId(),
                 "REGISTRAR", "Compra de " + req.getCantidad() + " " + insumoNorm
                         + " a " + proveedor.getNombre() + " por $" + totalCop);
+        log.info("[registrar] insumo='{}' cantidad={} proveedor='{}' totalCop={}", insumoNorm, req.getCantidad(), proveedor.getNombre(), totalCop);
 
         return enrichCompraDTO(compra);
     }
 
     @Transactional
     public void anular(Long id) {
+        log.info("[anular] compraId={}", id);
         Compra compra = compraRepo.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Compra no encontrada: " + id));
         if (compra.getEstado() != EstadoCompra.PENDIENTE)
@@ -250,6 +256,7 @@ public class CompraServiceImpl implements ICompraService {
                     "Abono $" + req.getMonto() + " " + moneda + " a compra #" + compraId);
         }
 
+        log.info("[abono] compraId={} monto={} moneda={} conAdelanto={}", compraId, req.getMonto(), req.getMoneda(), req.getAdelantoProveedorId() != null);
         return abonoMapper.toDTO(abono);
     }
 

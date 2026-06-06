@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -41,6 +43,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class FondoServiceImpl implements IFondoService {
+
+    private static final Logger log = LoggerFactory.getLogger(FondoServiceImpl.class);
 
     private final FondoRepository fondoRepo;
     private final CajaMovimientoRepository cajaMovimientoRepo;
@@ -75,6 +79,7 @@ public class FondoServiceImpl implements IFondoService {
         BigDecimal delta = nuevoSaldo.subtract(saldoAnterior);
 
         if (delta.compareTo(BigDecimal.ZERO) != 0) {
+            log.info("[ajustar] moneda={} nuevoSaldo={}", monedaNormalizada, nuevoSaldo);
             cajaMovimientoService.registrar(
                     CajaMovimientoTipo.AJUSTE_FONDO,
                     monedaNormalizada,
@@ -111,6 +116,7 @@ public class FondoServiceImpl implements IFondoService {
                 req.getConcepto(),
                 req.getObservacion());
 
+        log.info("[entrada] moneda={} monto={} concepto='{}'", monedaNorm, req.getMonto(), req.getConcepto());
         auditoriaService.registrar("fondo", null, "ENTRADA_MANUAL",
                 "Entrada manual " + monedaNorm + " " + req.getMonto() + ": " + req.getConcepto());
 
@@ -197,6 +203,7 @@ public class FondoServiceImpl implements IFondoService {
         BigDecimal montoCopSalida = calcMontoCop(origen, montoOrigenEfectivo, destino, req.getMontoDestino());
         BigDecimal montoCopEntrada = calcMontoCop(destino, req.getMontoDestino(), origen, montoOrigenEfectivo);
 
+        log.info("[transferencia] origen={} destino={} montoOrigen={}", origen, destino, montoOrigenEfectivo);
         cajaMovimientoService.registrar(
                 CajaMovimientoTipo.TRANSFERENCIA_SALIDA,
                 origen,

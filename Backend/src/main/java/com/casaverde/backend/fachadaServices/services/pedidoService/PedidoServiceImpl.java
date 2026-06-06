@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class PedidoServiceImpl implements IPedidoService {
+
+    private static final Logger log = LoggerFactory.getLogger(PedidoServiceImpl.class);
 
     private final PedidoRepository pedidoRepo;
     private final ProductoRepository productoRepo;
@@ -89,6 +93,8 @@ public class PedidoServiceImpl implements IPedidoService {
     public PedidoDTO crear(CrearPedidoRequest req) {
         if (req.getNombre() == null || req.getNombre().isBlank())
             throw new ValidacionException("El nombre del cliente es obligatorio");
+
+        log.info("[crear] nombre='{}' detalles={}", req.getNombre(), req.getDetalles() != null ? req.getDetalles().size() : 0);
 
         Pedido pedido = Pedido.builder()
                 .nombre(req.getNombre().trim())
@@ -279,6 +285,7 @@ public class PedidoServiceImpl implements IPedidoService {
         pedido.getPagos().add(pago);
 
         recalcularEstadoPago(pedido);
+        log.info("[registrarPago] pedidoId={} moneda={} montoCop={}", pedidoId, moneda, montoCop);
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "REGISTRAR_PAGO",
                 "Pago " + moneda + " " + monto + " equivalente COP " + montoCop);
@@ -288,6 +295,7 @@ public class PedidoServiceImpl implements IPedidoService {
     @Transactional
     public PedidoDTO finalizarPedido(Long pedidoId) {
         Pedido pedido = findOrThrow(pedidoId);
+        log.info("[finalizar] pedidoId={}", pedidoId);
         validarAbierto(pedido, "finalizar");
 
         if (pedido.getDetalles().isEmpty())
@@ -332,6 +340,7 @@ public class PedidoServiceImpl implements IPedidoService {
 
         finalizacionService.ejecutar(guardado, total);
 
+        log.info("[finalizar] pedidoId={} COMPLETADO", pedidoId);
         auditoriaService.registrar("pedido", guardado.getId(), "FINALIZAR",
                 "Pedido finalizado con total COP " + total);
         return pedidoMapper.toDTO(guardado);
@@ -340,6 +349,7 @@ public class PedidoServiceImpl implements IPedidoService {
     @Transactional
     public PedidoDTO anularPedido(Long pedidoId) {
         Pedido pedido = findOrThrow(pedidoId);
+        log.info("[anular] pedidoId={}", pedidoId);
         if (EstadoPedido.ANULADO == pedido.getEstado())
             throw new ValidacionException("El pedido ya está ANULADO");
         if (EstadoPedido.FINALIZADO == pedido.getEstado())
@@ -473,8 +483,10 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     private void validarAbierto(Pedido pedido, String accion) {
-        if (!pedido.getEstado().permiteEdicion())
+        if (!pedido.getEstado().permiteEdicion()) {
+            log.warn("[validarAbierto] pedidoId={} accion='{}' estado={}", pedido.getId(), accion, pedido.getEstado());
             throw new ValidacionException("No se puede " + accion + " en un pedido " + pedido.getEstado());
+        }
     }
 
     private Pedido findOrThrow(Long id) {

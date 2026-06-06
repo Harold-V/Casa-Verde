@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class EmpleadoServiceImpl implements IEmpleadoService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmpleadoServiceImpl.class);
 
     private final EmpleadoRepository empleadoRepo;
     private final AdelantoRepository adelantoRepo;
@@ -146,6 +150,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
 
         auditoriaService.registrar("Adelanto", adelanto.getId(), "REGISTRAR",
                 "Adelanto " + tipo.name() + " $" + req.getMonto() + " " + moneda + " a " + emp.getNombre());
+        log.info("[adelanto] empleadoId={} tipo={} monto={} moneda={}", empleadoId, tipo, req.getMonto(), moneda);
         return empleadoMapper.toAdelantoDTO(adelanto);
     }
 
@@ -297,6 +302,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
             trabajoDiaRepo.saveAll(diasPend);
         }
 
+        log.info("[liquidar] empleadoId={} bruto={} adelantos={} neto={}", empleadoId, bruto, totalAdelantos, neto);
         PagoEmpleado pago = pagoRepo.save(PagoEmpleado.builder()
                 .empleado(emp)
                 .tipo(tipoPago)

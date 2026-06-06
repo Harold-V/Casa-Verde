@@ -6,6 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
+
+    private static final Logger log = LoggerFactory.getLogger(CuentaCobrarServiceImpl.class);
 
     private final CuentaCobrarRepository cuentaRepo;
     private final AbonoCuentaCobrarRepository abonoRepo;
@@ -86,6 +90,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
         auditoriaService.registrar("CuentaCobrar", cuenta.getId(), "REGISTRAR",
                 "Deuda de " + req.getClienteNombre() + " por $" + req.getMonto());
+        log.info("[registrar] cliente='{}' monto={}", req.getClienteNombre(), req.getMonto());
         return enrich(cuenta);
     }
 
@@ -153,6 +158,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
         auditoriaService.registrar("AbonoCuentaCobrar", abono.getId(), "REGISTRAR",
                 "Cobro $" + req.getMonto() + " " + moneda + " de " + cuenta.getClienteNombre());
+        log.info("[abono] cuentaId={} monto={} moneda={}", cuentaId, req.getMonto(), moneda);
         return mapper.toAbonoDTO(abono);
     }
 
