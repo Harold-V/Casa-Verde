@@ -17,6 +17,7 @@ import com.casaverde.backend.fachadaServices.dto.*;
 import com.casaverde.backend.fachadaServices.mapper.EmpleadoMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
@@ -112,12 +113,12 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
         if (tipo == TipoAdelanto.ESPECIE && (req.getObservacion() == null || req.getObservacion().isBlank()))
             throw new ValidacionException("La observación es obligatoria para descuentos en especie");
 
-        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
+        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = "USD".equals(moneda)
+        BigDecimal montoCop = MonedaConstants.USD.equals(moneda)
                 ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
                 : req.getMonto().setScale(0, RoundingMode.HALF_UP);
-        BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
+        BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
         if (tipo == TipoAdelanto.EFECTIVO) {
             cajaMovimientoService.registrar(
@@ -271,7 +272,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
         BigDecimal montoPagado;
         BigDecimal tasaUsada = null;
 
-        if ("USD".equals(moneda)) {
+        if (MonedaConstants.USD.equals(moneda)) {
             tasaUsada = tasaUsd;
             montoPagado = neto.divide(tasaUsd, 2, RoundingMode.HALF_UP);
         } else {

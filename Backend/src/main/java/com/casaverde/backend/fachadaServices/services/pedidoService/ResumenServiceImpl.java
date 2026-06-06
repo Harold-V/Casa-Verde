@@ -22,6 +22,7 @@ import com.casaverde.backend.fachadaServices.mapper.PedidoMapper;
 import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.GastoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PagoRepository;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -57,15 +58,15 @@ public class ResumenServiceImpl implements IResumenService {
         List<Fondo> fondos = fondoRepo.findAll();
 
         // ---- cobros ----
-        BigDecimal cobCOP = sumarPagosPorMoneda(pagos, "COP");
-        BigDecimal cobUSD = sumarPagosPorMoneda(pagos, "USD");
-        BigDecimal cobNEQUI = sumarPagosPorMoneda(pagos, "NEQUI");
+        BigDecimal cobCOP = sumarPagosPorMoneda(pagos, MonedaConstants.COP);
+        BigDecimal cobUSD = sumarPagosPorMoneda(pagos, MonedaConstants.USD);
+        BigDecimal cobNEQUI = sumarPagosPorMoneda(pagos, MonedaConstants.NEQUI);
         BigDecimal cobTotalCop = pagos.stream().map(Pago::getMontoCop).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // ---- gastos ----
-        BigDecimal gCOP = sumarGastosPorMoneda(gastos, "COP");
-        BigDecimal gUSD = sumarGastosPorMoneda(gastos, "USD");
-        BigDecimal gNEQUI = sumarGastosPorMoneda(gastos, "NEQUI");
+        BigDecimal gCOP = sumarGastosPorMoneda(gastos, MonedaConstants.COP);
+        BigDecimal gUSD = sumarGastosPorMoneda(gastos, MonedaConstants.USD);
+        BigDecimal gNEQUI = sumarGastosPorMoneda(gastos, MonedaConstants.NEQUI);
         BigDecimal gTotalCop = gastos.stream().map(Gasto::getMontoCop).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return ResumenDiaDTO.builder()

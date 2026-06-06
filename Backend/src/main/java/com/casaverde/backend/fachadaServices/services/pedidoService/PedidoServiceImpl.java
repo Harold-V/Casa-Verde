@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
@@ -119,9 +120,9 @@ public class PedidoServiceImpl implements IPedidoService {
 
         if (req.getAbono() != null && req.getAbono().compareTo(BigDecimal.ZERO) > 0) {
             String moneda = monetaryService
-                    .normalizarMoneda(resolverMoneda(req.getMonedaAbono() != null ? req.getMonedaAbono() : "COP"));
+                    .normalizarMoneda(resolverMoneda(req.getMonedaAbono() != null ? req.getMonedaAbono() : MonedaConstants.COP));
             BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getAbono());
-            BigDecimal tasa = "USD".equals(moneda) ? getTasaVigente() : null;
+            BigDecimal tasa = MonedaConstants.USD.equals(moneda) ? getTasaVigente() : null;
             BigDecimal montoCop = monetaryService.convertirACop(moneda, monto, tasa);
             // El abono queda registrado en el pedido; el fondo solo se acredita al
             // finalizar
@@ -268,7 +269,7 @@ public class PedidoServiceImpl implements IPedidoService {
 
         String moneda = monetaryService.normalizarMoneda(resolverMoneda(req.getMoneda()));
         BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getMonto());
-        BigDecimal tasaUsada = "USD".equals(moneda) ? getTasaVigente() : null;
+        BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? getTasaVigente() : null;
         BigDecimal montoCop = monetaryService.convertirACop(moneda, monto, tasaUsada);
 
         // El cobro queda en el pedido; el fondo solo se acredita al finalizar
@@ -389,7 +390,7 @@ public class PedidoServiceImpl implements IPedidoService {
         // finalizar)
         String nuevaMoneda = monetaryService.normalizarMoneda(resolverMoneda(req.getMoneda()));
         BigDecimal nuevoMonto = monetaryService.normalizarMontoEntrada(nuevaMoneda, req.getMonto());
-        BigDecimal nuevaTasa = "USD".equals(nuevaMoneda) ? getTasaVigente() : null;
+        BigDecimal nuevaTasa = MonedaConstants.USD.equals(nuevaMoneda) ? getTasaVigente() : null;
         BigDecimal nuevoMontoCop = monetaryService.convertirACop(nuevaMoneda, nuevoMonto, nuevaTasa);
 
         pago.setMoneda(nuevaMoneda);
@@ -456,8 +457,8 @@ public class PedidoServiceImpl implements IPedidoService {
      */
     private String resolverMoneda(String moneda) {
         if (moneda == null)
-            return "COP";
-        return "NEQUI".equalsIgnoreCase(moneda.trim()) ? fondoService.getCuentaNequiActiva() : moneda.trim();
+            return MonedaConstants.COP;
+        return MonedaConstants.NEQUI.equalsIgnoreCase(moneda.trim()) ? fondoService.getCuentaNequiActiva() : moneda.trim();
     }
 
     private BigDecimal getTasaVigente() {

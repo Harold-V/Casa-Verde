@@ -36,6 +36,7 @@ import com.casaverde.backend.fachadaServices.mapper.AbonoCompraMapper;
 import com.casaverde.backend.fachadaServices.mapper.CompraMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
@@ -167,11 +168,11 @@ public class CompraServiceImpl implements ICompraService {
 
             // Registro de trazabilidad: el fondo ya fue debitado en ADELANTO_PROVEEDOR,
             // este movimiento solo deja constancia de la aplicación sin modificar el saldo.
-            Fondo fondoCop = fondoRepo.findById("COP").orElse(null);
+            Fondo fondoCop = fondoRepo.findById(MonedaConstants.COP).orElse(null);
             BigDecimal saldoCopActual = fondoCop != null ? fondoCop.getSaldo() : BigDecimal.ZERO;
             cajaMovimientoRepo.save(CajaMovimiento.builder()
                     .tipo(CajaMovimientoTipo.APLICACION_ADELANTO_PROVEEDOR.name())
-                    .moneda("COP")
+                    .moneda(MonedaConstants.COP)
                     .monto(montoCop)
                     .montoCop(montoCop)
                     .saldoResultante(saldoCopActual)
@@ -182,10 +183,10 @@ public class CompraServiceImpl implements ICompraService {
 
             String monedaAdelanto = adelanto.getMoneda();
             BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-            BigDecimal montoOriginal = "USD".equals(monedaAdelanto)
+            BigDecimal montoOriginal = MonedaConstants.USD.equals(monedaAdelanto)
                     ? montoCop.divide(tasaUsd, 2, RoundingMode.HALF_UP)
                     : montoCop;
-            BigDecimal tasaUsadaAdelanto = "USD".equals(monedaAdelanto) ? tasaUsd : null;
+            BigDecimal tasaUsadaAdelanto = MonedaConstants.USD.equals(monedaAdelanto) ? tasaUsd : null;
 
             abono = abonoRepo.save(AbonoCompra.builder()
                     .compra(compra)
@@ -212,10 +213,10 @@ public class CompraServiceImpl implements ICompraService {
                 throw new ValidacionException("La moneda es obligatoria");
             String moneda = req.getMoneda().trim().toUpperCase();
             BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-            BigDecimal montoCop = "USD".equals(moneda)
+            BigDecimal montoCop = MonedaConstants.USD.equals(moneda)
                     ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
                     : req.getMonto().setScale(0, RoundingMode.HALF_UP);
-            BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
+            BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
             if (montoCop.compareTo(saldoPendiente) > 0)
                 throw new ValidacionException(

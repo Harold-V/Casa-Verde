@@ -13,6 +13,7 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.Pago;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.inventarioService.IInventarioService;
 
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,7 @@ public class PedidoFinalizacionServiceImpl implements IPedidoFinalizacionService
 
             BigDecimal montoCopFondo = montoCopTot.min(restante);
             BigDecimal montoFondo;
-            if ("USD".equals(moneda) && montoCopTot.compareTo(BigDecimal.ZERO) > 0) {
+            if (MonedaConstants.USD.equals(moneda) && montoCopTot.compareTo(BigDecimal.ZERO) > 0) {
                 montoFondo = montoOrig.multiply(montoCopFondo)
                         .divide(montoCopTot, 2, RoundingMode.FLOOR);
             } else {
