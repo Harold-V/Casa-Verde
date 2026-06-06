@@ -15,8 +15,8 @@ import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(name = "pedido", indexes = {
-        @Index(name = "idx_pedido_estado", columnList = "estado"),
-        @Index(name = "idx_pedido_creado_en", columnList = "creado_en")
+        @Index(name = "idx_pedido_estado_creado", columnList = "estado, creado_en"),
+        @Index(name = "idx_pedido_salon_id", columnList = "salon_id")
 })
 @Getter
 @Setter
@@ -27,17 +27,20 @@ public class Pedido {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
     private Long version;
 
+    @Column(length = 150)
     private String nombre;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "salon_id")
     private Salon salon;
 
+    @Column(length = 50)
     private String mesa;
 
     @Column(name = "fecha_reserva")
@@ -53,6 +56,7 @@ public class Pedido {
     @Column(nullable = false, length = 50)
     private EstadoPedido estado;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(name = "para_llevar")

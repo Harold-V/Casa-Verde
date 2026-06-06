@@ -1,4 +1,4 @@
-package com.casaverde.backend.fachadaServices.services.productoService;
+package com.casaverde.backend.fachadaServices.services.inventarioService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -18,6 +18,8 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.models.enums.TipoMovimientoInventario;
 import com.casaverde.backend.fachadaServices.dto.ComparativoMensualDTO;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +33,7 @@ import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.mapper.InventarioMapper;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
+import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -65,6 +68,14 @@ public class InventarioServiceImpl implements IInventarioService {
     public List<MovimientoInventarioDTO> listarMovimientosPorInsumo(String insumo) {
         return movimientoRepo.findByInsumoOrderByRegistradoEnDesc(insumo).stream()
                 .map(inventarioMapper::toMovimientoDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovimientoInventarioDTO> listarMovimientosPaginado(String insumo, Pageable pageable) {
+        return (insumo != null && !insumo.isBlank()
+                ? movimientoRepo.findByInsumoOrderByRegistradoEnDesc(insumo.trim(), pageable)
+                : movimientoRepo.findAllByOrderByRegistradoEnDesc(pageable))
+                .map(inventarioMapper::toMovimientoDTO);
     }
 
     @Transactional

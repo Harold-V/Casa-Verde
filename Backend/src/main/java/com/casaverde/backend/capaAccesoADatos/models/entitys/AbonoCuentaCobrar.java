@@ -21,6 +21,7 @@ public class AbonoCuentaCobrar {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
@@ -33,7 +34,7 @@ public class AbonoCuentaCobrar {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal monto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda;
 
     @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
@@ -42,12 +43,13 @@ public class AbonoCuentaCobrar {
     @Column(name = "tasa_usada", precision = 19, scale = 2)
     private BigDecimal tasaUsada;
 
-    @Column(name = "fondo_acreditado", nullable = false)
+    @Column(name = "fondo_acreditado", nullable = false, length = 30)
     private String fondoAcreditado;
 
     @Column(nullable = false)
     private LocalDate fecha;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(name = "creado_en", nullable = false, updatable = false)

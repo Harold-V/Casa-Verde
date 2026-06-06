@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.casaverde.backend.fachadaServices.dto.GastoDTO;
 import com.casaverde.backend.fachadaServices.dto.GastoRequest;
-import com.casaverde.backend.fachadaServices.services.productoService.IGastoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IGastoService;
 
 import lombok.RequiredArgsConstructor;
 

@@ -1,7 +1,10 @@
-package com.casaverde.backend.fachadaServices.services.pagoService;
+package com.casaverde.backend.fachadaServices.services.cajaService;
 
 import java.time.LocalDate;
 import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import com.casaverde.backend.fachadaServices.dto.AjusteCapitalRequest;
 import com.casaverde.backend.fachadaServices.dto.EntradaFondoRequest;
@@ -31,4 +34,6 @@ public interface IFondoService {
     List<MovimientoFondoDTO> historial();
 
     List<MovimientoFondoDTO> historial(LocalDate fecha, String moneda, String tipo);
+
+    Page<MovimientoFondoDTO> historialPaginado(LocalDate fecha, String moneda, String tipo, Pageable pageable);
 }

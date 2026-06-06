@@ -17,18 +17,16 @@ import lombok.*;
 public class Fondo {
 
     @Id
+    @Column(length = 30)
     private String moneda; // COP, USD, NEQUI, NEQUI_2, NEQUI_HAROLD, etc.
 
     @Version
     private Long version;
 
-    /**
-     * Nombre amigable para mostrar al usuario. Obligatorio para fondos NEQUI
-     * adicionales.
-     */
+    @Column(length = 100)
     private String alias;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal saldo;
 
     @Column(name = "actualizado_en")

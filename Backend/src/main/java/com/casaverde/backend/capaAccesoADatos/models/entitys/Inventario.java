@@ -18,12 +18,13 @@ public class Inventario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
     private Long version;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 100)
     private String insumo;
 
     @Column(name = "stock_actual", nullable = false, precision = 19, scale = 4)
@@ -33,7 +34,7 @@ public class Inventario {
     @Column(name = "alerta_minima", precision = 19, scale = 4)
     private BigDecimal alertaMinima;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     @Builder.Default
     private String unidad = "unidad";
 

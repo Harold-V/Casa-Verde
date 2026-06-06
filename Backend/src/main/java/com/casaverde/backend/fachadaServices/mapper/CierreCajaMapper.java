@@ -5,11 +5,13 @@ import com.casaverde.backend.fachadaServices.dto.CierreCajaDTO;
 
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring")
 public interface CierreCajaMapper {
 
+    @Mapping(target = "paraEntregar", ignore = true)
     CierreCajaDTO toDTO(CierreCaja c);
 
     @AfterMapping

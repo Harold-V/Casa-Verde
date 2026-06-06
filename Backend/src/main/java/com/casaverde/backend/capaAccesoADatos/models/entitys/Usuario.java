@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "usuario", indexes = @Index(name = "idx_usuario_activo", columnList = "activo"))
+@Table(name = "usuario")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,6 +17,7 @@ public class Usuario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Column(nullable = false, unique = true)

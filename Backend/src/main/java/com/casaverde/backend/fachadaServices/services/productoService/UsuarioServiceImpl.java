@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.capaAccesoADatos.models.enums.RolUsuario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Usuario;
+import com.casaverde.backend.config.security.AuthTokenService;
 import com.casaverde.backend.fachadaServices.dto.CambiarPasswordRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearOperadorRequest;
 import com.casaverde.backend.fachadaServices.dto.LoginRequest;
@@ -28,6 +29,7 @@ public class UsuarioServiceImpl implements IUsuarioService {
     private final UsuarioRepository usuarioRepo;
     private final IAuditoriaService auditoriaService;
     private final UsuarioMapper usuarioMapper;
+    private final AuthTokenService authTokenService;
 
     private static final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -66,7 +68,9 @@ public class UsuarioServiceImpl implements IUsuarioService {
             }
         }
 
-        return usuarioMapper.toDTO(usuario);
+        UsuarioDTO dto = usuarioMapper.toDTO(usuario);
+        dto.setToken(authTokenService.generar(usuario));
+        return dto;
     }
 
     @Transactional

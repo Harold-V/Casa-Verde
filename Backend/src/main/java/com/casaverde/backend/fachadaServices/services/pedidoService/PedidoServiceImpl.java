@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +17,7 @@ import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryS
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.ProductoComposicionInventario;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
@@ -66,6 +68,12 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     @Transactional(readOnly = true)
+    public Page<PedidoDTO> listarTodosPaginado(Pageable pageable) {
+        return pedidoRepo.findAllByOrderByCreadoEnDesc(pageable)
+                .map(pedidoMapper::toDTO);
+    }
+
+    @Transactional(readOnly = true)
     public PedidoDTO obtener(Long id) {
         return pedidoMapper.toDTO(findOrThrow(id));
     }
@@ -85,9 +93,11 @@ public class PedidoServiceImpl implements IPedidoService {
                 .nombre(req.getNombre().trim())
                 .mesa(req.getMesa())
                 .fechaReserva(req.getFechaReserva() != null && !req.getFechaReserva().isBlank()
-                        ? LocalDate.parse(req.getFechaReserva()) : null)
+                        ? LocalDate.parse(req.getFechaReserva())
+                        : null)
                 .horaReserva(req.getHoraReserva() != null && !req.getHoraReserva().isBlank()
-                        ? LocalTime.parse(req.getHoraReserva()) : null)
+                        ? LocalTime.parse(req.getHoraReserva())
+                        : null)
                 .cantPersonas(req.getCantPersonas())
                 .observacion(req.getObservacion())
                 .paraLlevar(Boolean.TRUE.equals(req.getParaLlevar()))
@@ -136,9 +146,11 @@ public class PedidoServiceImpl implements IPedidoService {
             pedido.setNombre(req.getNombre().trim());
 
         pedido.setFechaReserva(req.getFechaReserva() != null && !req.getFechaReserva().isBlank()
-                ? LocalDate.parse(req.getFechaReserva()) : null);
+                ? LocalDate.parse(req.getFechaReserva())
+                : null);
         pedido.setHoraReserva(req.getHoraReserva() != null && !req.getHoraReserva().isBlank()
-                ? LocalTime.parse(req.getHoraReserva()) : null);
+                ? LocalTime.parse(req.getHoraReserva())
+                : null);
         pedido.setMesa(req.getMesa());
         pedido.setCantPersonas(req.getCantPersonas());
         pedido.setObservacion(req.getObservacion());

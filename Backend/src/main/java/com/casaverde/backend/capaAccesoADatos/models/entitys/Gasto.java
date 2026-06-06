@@ -9,7 +9,8 @@ import lombok.*;
 
 @Entity
 @Table(name = "gasto", indexes = {
-        @Index(name = "idx_gasto_registrado_en", columnList = "registrado_en")
+        @Index(name = "idx_gasto_moneda_registrado", columnList = "moneda, registrado_en"),
+        @Index(name = "idx_gasto_categoria_registrado", columnList = "categoria, registrado_en")
 })
 @Getter
 @Setter
@@ -20,18 +21,19 @@ public class Gasto {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
     private Long version;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 300)
     private String concepto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String categoria; // insumos, servicios, equipos, otros
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda; // COP, USD, NEQUI
 
     @Column(nullable = false, precision = 19, scale = 2)
@@ -40,15 +42,16 @@ public class Gasto {
     @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal montoCop;
 
-    @Column(name = "tasa_usada")
+    @Column(name = "tasa_usada", precision = 19, scale = 2)
     private BigDecimal tasaUsada;
 
-    @Column(name = "insumo_inventario")
+    @Column(name = "insumo_inventario", length = 100)
     private String insumoInventario;
 
     @Column(name = "cantidad_inventario", precision = 19, scale = 4)
     private BigDecimal cantidadInventario;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(name = "registrado_en", nullable = false)

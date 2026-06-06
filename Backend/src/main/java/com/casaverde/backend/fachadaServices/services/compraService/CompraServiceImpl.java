@@ -35,7 +35,7 @@ import com.casaverde.backend.fachadaServices.dto.CompraRequest;
 import com.casaverde.backend.fachadaServices.mapper.AbonoCompraMapper;
 import com.casaverde.backend.fachadaServices.mapper.CompraMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
@@ -86,6 +86,11 @@ public class CompraServiceImpl implements ICompraService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Proveedor no encontrado: " + req.getProveedorId()));
         if (!proveedor.getActivo())
             throw new ValidacionException("El proveedor está inactivo");
+
+        if (req.getCantidad() == null || req.getCantidad().compareTo(BigDecimal.ZERO) <= 0)
+            throw new ValidacionException("La cantidad debe ser mayor a 0");
+        if (req.getPrecioUnitario() == null || req.getPrecioUnitario().compareTo(BigDecimal.ZERO) <= 0)
+            throw new ValidacionException("El precio unitario debe ser mayor a 0");
 
         String insumoNorm = req.getInsumo().trim().toLowerCase();
         if (!List.of("gallina", "cuy").contains(insumoNorm))
@@ -291,13 +296,15 @@ public class CompraServiceImpl implements ICompraService {
                 .orElseThrow(() -> new ValidacionException("Insumo no encontrado en inventario: " + insumo));
         BigDecimal nuevo = inv.getStockActual().subtract(cantidad);
         if (nuevo.compareTo(BigDecimal.ZERO) < 0)
-            nuevo = BigDecimal.ZERO;
+            throw new ValidacionException(
+                    "Stock insuficiente para revertir la compra. Stock actual de " + insumo
+                    + ": " + inv.getStockActual() + ", a revertir: " + cantidad);
         inv.setStockActual(nuevo);
         inventarioRepo.save(inv);
         movimientoRepo.save(MovimientoInventario.builder()
                 .insumo(insumo)
                 .tipo("ajuste")
-                .cantidad(nuevo)
+                .cantidad(cantidad.negate())
                 .stockResultante(nuevo)
                 .referenciaTipo("compra_anulada")
                 .referenciaId(compraId)

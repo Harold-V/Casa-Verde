@@ -11,7 +11,8 @@ import lombok.*;
 
 @Entity
 @Table(name = "cuenta_cobrar", indexes = {
-        @Index(name = "idx_cc_estado_creado", columnList = "estado, creado_en")
+        @Index(name = "idx_cc_estado_creado", columnList = "estado, creado_en"),
+        @Index(name = "idx_cc_cliente_nombre", columnList = "cliente_nombre")
 })
 @Getter
 @Setter
@@ -22,12 +23,13 @@ public class CuentaCobrar {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
     private Long version;
 
-    @Column(name = "cliente_nombre", nullable = false)
+    @Column(name = "cliente_nombre", nullable = false, length = 150)
     private String clienteNombre;
 
     private String concepto;
@@ -40,6 +42,7 @@ public class CuentaCobrar {
     @Builder.Default
     private EstadoCuentaCobrar estado = EstadoCuentaCobrar.PENDIENTE;
 
+    @Column(length = 20)
     private String celular;
 
     @Column(nullable = false)

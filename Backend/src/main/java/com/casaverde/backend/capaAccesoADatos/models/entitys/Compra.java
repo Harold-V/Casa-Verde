@@ -24,6 +24,7 @@ public class Compra {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
@@ -33,10 +34,10 @@ public class Compra {
     @JoinColumn(name = "proveedor_id", nullable = false)
     private Proveedor proveedor;
 
-    @Column(name = "proveedor_nombre", nullable = false)
+    @Column(name = "proveedor_nombre", nullable = false, length = 150)
     private String proveedorNombre;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String insumo;
 
     @Column(precision = 19, scale = 4, nullable = false)
@@ -49,9 +50,10 @@ public class Compra {
     private BigDecimal totalCop;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 20)
     private EstadoCompra estado;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(nullable = false)

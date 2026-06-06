@@ -21,12 +21,13 @@ public class CajaMovimiento {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
-    @Column(nullable = false)
-    private String tipo; // AJUSTE_FONDO
+    @Column(nullable = false, length = 50)
+    private String tipo;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String moneda;
 
     @Column(nullable = false, precision = 19, scale = 2)
@@ -35,18 +36,19 @@ public class CajaMovimiento {
     @Column(name = "monto_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal montoCop;
 
-    @Column(name = "saldo_resultante", nullable = false)
+    @Column(name = "saldo_resultante", nullable = false, precision = 19, scale = 2)
     private BigDecimal saldoResultante;
 
-    @Column(name = "referencia_tipo")
+    @Column(name = "referencia_tipo", length = 50)
     private String referenciaTipo;
 
     @Column(name = "referencia_id")
     private Long referenciaId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 300)
     private String concepto;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
     @Column(name = "registrado_en", nullable = false)

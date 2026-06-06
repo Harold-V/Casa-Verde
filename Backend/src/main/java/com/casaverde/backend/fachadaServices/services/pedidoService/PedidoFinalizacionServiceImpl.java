@@ -12,8 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pago;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
-import com.casaverde.backend.fachadaServices.services.productoService.IInventarioService;
+import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.fachadaServices.services.inventarioService.IInventarioService;
 
 import lombok.RequiredArgsConstructor;
 

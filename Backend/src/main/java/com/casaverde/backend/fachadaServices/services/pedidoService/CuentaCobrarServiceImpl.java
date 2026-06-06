@@ -23,7 +23,7 @@ import com.casaverde.backend.fachadaServices.dto.CuentaCobrarDTO;
 import com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest;
 import com.casaverde.backend.fachadaServices.mapper.CuentaCobrarMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
@@ -107,6 +107,9 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         CuentaCobrar cuenta = findCuenta(cuentaId);
         if (cuenta.getEstado() == EstadoCuentaCobrar.CANCELADO)
             throw new ValidacionException("La cuenta ya está cancelada");
+
+        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
+            throw new ValidacionException("El monto del cobro debe ser mayor a 0");
 
         String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();

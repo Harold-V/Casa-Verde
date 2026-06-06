@@ -19,13 +19,14 @@ public class Proveedor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 150)
     private String nombre;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private TipoProveedor tipo;
 
     private String telefono;

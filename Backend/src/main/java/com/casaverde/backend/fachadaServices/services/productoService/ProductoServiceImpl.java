@@ -60,7 +60,7 @@ public class ProductoServiceImpl implements IProductoService {
     @Transactional(readOnly = true)
     public List<ProductoPrecioHistorialDTO> historialPrecios(Long id) {
         findOrThrow(id);
-        return precioHistorialRepo.findByProductoIdOrderByRegistradoEnDesc(id).stream()
+        return precioHistorialRepo.findByProducto_IdOrderByRegistradoEnDesc(id).stream()
                 .map(productoMapper::toPrecioHistorialDTO)
                 .toList();
     }
@@ -219,7 +219,7 @@ public class ProductoServiceImpl implements IProductoService {
 
     private void registrarPrecio(Producto producto, BigDecimal anterior, BigDecimal nuevo, String motivo) {
         precioHistorialRepo.save(ProductoPrecioHistorial.builder()
-                .productoId(producto.getId())
+                .producto(producto)
                 .productoNombre(producto.getNombre())
                 .precioAnterior(anterior)
                 .precioNuevo(nuevo)

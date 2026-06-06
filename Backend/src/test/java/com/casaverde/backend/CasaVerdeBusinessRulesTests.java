@@ -31,10 +31,10 @@ import com.casaverde.backend.fachadaServices.dto.LoginRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.dto.UsuarioDTO;
-import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.ICierreCajaService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.IPedidoService;
-import com.casaverde.backend.fachadaServices.services.productoService.IGastoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IGastoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IProductoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
 
@@ -86,6 +86,15 @@ class CasaVerdeBusinessRulesTests {
 
         @Autowired
         private ProductoPrecioHistorialRepository precioHistorialRepository;
+
+        @Autowired
+        private com.casaverde.backend.fachadaServices.services.pedidoService.ICuentaCobrarService cuentaCobrarService;
+
+        @Autowired
+        private com.casaverde.backend.fachadaServices.services.compraService.ICompraService compraService;
+
+        @Autowired
+        private com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository proveedorRepository;
 
         @Test
         void noFinalizaPedidoSiNoHayStockSuficiente() {
@@ -302,12 +311,119 @@ class CasaVerdeBusinessRulesTests {
 
                 productoService.actualizarPrecio(producto.getId(), BigDecimal.valueOf(3500), null);
 
-                assertThat(precioHistorialRepository.findByProductoIdOrderByRegistradoEnDesc(producto.getId()))
+                assertThat(precioHistorialRepository.findByProducto_IdOrderByRegistradoEnDesc(producto.getId()))
                                 .anySatisfy(h -> {
                                         assertThat(h.getPrecioAnterior()).isEqualByComparingTo(BigDecimal.ZERO);
                                         assertThat(h.getPrecioNuevo()).isEqualByComparingTo(BigDecimal.valueOf(3500));
                                         assertThat(h.getMotivo()).isEqualTo("ACTUALIZAR_PRECIO");
                                 });
+        }
+
+        @Test
+        void registrarAbonoCuentaCobrarConMontoNegativoEsRechazado() {
+                ajustarFondo("COP", BigDecimal.valueOf(50000));
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest();
+                req.setClienteNombre("Pedro Test");
+                req.setMonto(BigDecimal.valueOf(30000));
+                req.setFecha(LocalDate.now());
+                var cuenta = cuentaCobrarService.registrar(req);
+
+                var abonoReq = new com.casaverde.backend.fachadaServices.dto.AbonoCuentaCobrarRequest();
+                abonoReq.setMonto(BigDecimal.valueOf(-5000));
+                abonoReq.setMoneda("COP");
+                abonoReq.setFecha(LocalDate.now());
+
+                assertThatThrownBy(() -> cuentaCobrarService.registrarAbono(cuenta.getId(), abonoReq))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("mayor a 0");
+
+                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(BigDecimal.valueOf(50000));
+        }
+
+        @Test
+        void registrarCompraConCantidadNegativaEsRechazada() {
+                var proveedor = proveedorRepository.save(
+                                com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                                .nombre("Proveedor Test Cantidad")
+                                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.GALLINA)
+                                                .activo(true)
+                                                .build());
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("gallina");
+                req.setCantidad(BigDecimal.valueOf(-5));
+                req.setPrecioUnitario(BigDecimal.valueOf(15000));
+                req.setFecha(LocalDate.now());
+
+                Inventario gallinaAntes = inventarioRepository.findByInsumo("gallina").orElseThrow();
+                BigDecimal stockAntes = gallinaAntes.getStockActual();
+
+                assertThatThrownBy(() -> compraService.registrar(req))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("mayor a 0");
+
+                // El stock no debe haber cambiado
+                assertThat(inventarioRepository.findByInsumo("gallina").orElseThrow().getStockActual())
+                                .isEqualByComparingTo(stockAntes);
+        }
+
+        @Test
+        void registrarCompraConPrecioNegativoEsRechazada() {
+                var proveedor = proveedorRepository.save(
+                                com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                                .nombre("Proveedor Test Precio")
+                                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.CUY)
+                                                .activo(true)
+                                                .build());
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("cuy");
+                req.setCantidad(BigDecimal.valueOf(3));
+                req.setPrecioUnitario(BigDecimal.valueOf(-1000));
+                req.setFecha(LocalDate.now());
+
+                assertThatThrownBy(() -> compraService.registrar(req))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("mayor a 0");
+        }
+
+        @Test
+        void anularCompraConStockInsuficienteEsRechazada() {
+                // Setup: create an active proveedor
+                var proveedor = com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                .nombre("Proveedor Test Anulacion")
+                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.GALLINA)
+                                .activo(true)
+                                .build();
+                proveedor = proveedorRepository.save(proveedor);
+
+                // Register a purchase of 5 gallinas (stock goes up by 5)
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("gallina");
+                req.setCantidad(BigDecimal.valueOf(5));
+                req.setPrecioUnitario(BigDecimal.valueOf(30000));
+                req.setFecha(LocalDate.now());
+                var compra = compraService.registrar(req);
+
+                // Manually reduce stock to 2 (simulate pedidos consuming stock between purchase
+                // and cancellation)
+                Inventario gallina = inventarioRepository.findByInsumo("gallina").orElseThrow();
+                gallina.setStockActual(BigDecimal.valueOf(2));
+                inventarioRepository.save(gallina);
+
+                // Act & Assert: anular should fail, NOT silently corrupt inventory
+                assertThatThrownBy(() -> compraService.anular(compra.getId()))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("Stock insuficiente");
+
+                // Stock should remain at 2 (unchanged after the failed anulacion)
+                assertThat(inventarioRepository.findByInsumo("gallina").orElseThrow().getStockActual())
+                                .isEqualByComparingTo(BigDecimal.valueOf(2));
         }
 
         private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {

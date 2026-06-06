@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.casaverde.backend.fachadaServices.services.pagoService.IFondoService;
+import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.fachadaServices.dto.MovimientoFondoDTO;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
 import com.casaverde.backend.fachadaServices.dto.ResumenDiaDTO;

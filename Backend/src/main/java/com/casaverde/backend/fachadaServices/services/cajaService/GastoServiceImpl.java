@@ -1,4 +1,4 @@
-package com.casaverde.backend.fachadaServices.services.productoService;
+package com.casaverde.backend.fachadaServices.services.cajaService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,7 +23,8 @@ import com.casaverde.backend.capaAccesoADatos.repositories.GastoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
-import com.casaverde.backend.fachadaServices.services.pagoService.ICajaMovimientoService;
+import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
 import lombok.RequiredArgsConstructor;
 

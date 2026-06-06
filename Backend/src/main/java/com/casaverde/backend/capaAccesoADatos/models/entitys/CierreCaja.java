@@ -19,6 +19,7 @@ public class CierreCaja {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Column(nullable = false)
@@ -27,7 +28,7 @@ public class CierreCaja {
     @Column(name = "usuario_id")
     private Long usuarioId;
 
-    @Column(name = "usuario_nombre")
+    @Column(name = "usuario_nombre", length = 150)
     private String usuarioNombre;
 
     @Column(nullable = false, precision = 19, scale = 0)
@@ -66,9 +67,10 @@ public class CierreCaja {
     @Column(name = "balance_neto", nullable = false, precision = 19, scale = 0)
     private BigDecimal balanceNeto;
 
+    @Column(columnDefinition = "TEXT")
     private String observacion;
 
-    @Column(name = "backup_path")
+    @Column(name = "backup_path", length = 500)
     private String backupPath;
 
     @Column(name = "cerrado_en", nullable = false)
@@ -76,7 +78,7 @@ public class CierreCaja {
 
     // ── Denominaciones arqueo COP ──────────────────────────────────────────
     @Column(name = "base_cop", precision = 19, scale = 0)
-    private BigDecimal baseCop;          // monto reservado para el día siguiente
+    private BigDecimal baseCop;
 
     @Column(name = "billetes_100k")
     private Integer billetes100k;
@@ -97,7 +99,7 @@ public class CierreCaja {
     private Integer billetes2k;
 
     @Column(name = "monedas_cop", precision = 19, scale = 0)
-    private BigDecimal monedasCop;       // valor total de monedas en COP
+    private BigDecimal monedasCop;
 
     @PrePersist
     void onCreate() {
