@@ -339,6 +339,11 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
     @Transactional
     public VacacionDTO registrarVacacion(Long empleadoId, VacacionRequest req) {
         Empleado emp = findEmpleado(empleadoId);
+        if (req.getFechaFin() != null && req.getFechaInicio() != null
+                && req.getFechaFin().isBefore(req.getFechaInicio())) {
+            throw new ValidacionException(
+                    "La fecha de fin de vacación no puede ser anterior a la fecha de inicio");
+        }
         Vacacion vac = vacacionRepo.save(Vacacion.builder()
                 .empleado(emp)
                 .fechaInicio(req.getFechaInicio())
