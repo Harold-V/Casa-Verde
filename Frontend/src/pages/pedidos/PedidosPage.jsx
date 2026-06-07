@@ -188,26 +188,23 @@ export default function PedidosPage() {
     setPagina(0);
   };
 
-  // Auto-reset del filtro si la lista filtrada queda vacía (p.ej. se finalizó el último pedido en curso)
-  useEffect(() => {
-    if (kpiFiltro === "en-curso"    && enCursoList.length    === 0) { setKpiFiltro(null); setPagina(0); }
-    if (kpiFiltro === "reservas"    && reservasList.length   === 0) { setKpiFiltro(null); setPagina(0); }
-    if (kpiFiltro === "para-llevar" && paraLlevarList.length === 0) { setKpiFiltro(null); setPagina(0); }
-  }, [kpiFiltro, enCursoList.length, reservasList.length, paraLlevarList.length]);
+  const kpiFiltroEfectivo =
+    (kpiFiltro === "en-curso"    && enCursoList.length    > 0) ? "en-curso"    :
+    (kpiFiltro === "reservas"    && reservasList.length   > 0) ? "reservas"    :
+    (kpiFiltro === "para-llevar" && paraLlevarList.length > 0) ? "para-llevar" :
+    null;
 
   const kpiLabel = {
-    null:          "Pendientes",
     "en-curso":    "En curso",
     "reservas":    "Reservas",
     "para-llevar": "Para llevar",
-  }[kpiFiltro] ?? "Pendientes";
+  }[kpiFiltroEfectivo] ?? "Pendientes";
 
-  const listaActivos = (() => {
-    if (kpiFiltro === "en-curso")    return enCursoList;
-    if (kpiFiltro === "reservas")    return reservasList;
-    if (kpiFiltro === "para-llevar") return paraLlevarList;
-    return abiertos;
-  })();
+  const listaActivos =
+    kpiFiltroEfectivo === "en-curso"    ? enCursoList    :
+    kpiFiltroEfectivo === "reservas"    ? reservasList   :
+    kpiFiltroEfectivo === "para-llevar" ? paraLlevarList :
+    abiertos;
 
   const listaBase     = tab === "historial" ? historialFiltrado : listaActivos;
   const listaFiltrada = busqueda
