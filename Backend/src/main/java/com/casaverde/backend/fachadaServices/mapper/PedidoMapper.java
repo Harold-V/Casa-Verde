@@ -1,6 +1,9 @@
 package com.casaverde.backend.fachadaServices.mapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
@@ -34,6 +37,7 @@ public class PedidoMapper {
                 .estado(p.getEstado() != null ? p.getEstado().name() : null)
                 .observacion(p.getObservacion())
                 .paraLlevar(Boolean.TRUE.equals(p.getParaLlevar()))
+                .enCurso(calcularEnCurso(p))
                 .totalCop(totales.totalCop())
                 .totalAbonado(totales.totalAbonado())
                 .saldoPendiente(totales.saldoPendiente())
@@ -44,6 +48,21 @@ public class PedidoMapper {
                 .detalles(p.getDetalles().stream().map(this::toDetalleDTO).collect(Collectors.toList()))
                 .pagos(p.getPagos().stream().map(this::toPagoDTO).collect(Collectors.toList()))
                 .build();
+    }
+
+    private boolean calcularEnCurso(Pedido p) {
+        if (p.getEstado() == null || !p.getEstado().esActivo()) return false;
+        if (p.getFechaReserva() == null && p.getHoraReserva() == null) return true;
+
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Bogota"));
+        LocalDate today = now.toLocalDate();
+        LocalDate rFecha = p.getFechaReserva() != null ? p.getFechaReserva() : today;
+
+        if (rFecha.isBefore(today)) return true;
+        if (rFecha.isAfter(today))  return false;
+        // Es hoy
+        if (p.getHoraReserva() == null) return true;
+        return !p.getHoraReserva().isAfter(now.toLocalTime());
     }
 
     public PedidoDetalleDTO toDetalleDTO(PedidoDetalle d) {

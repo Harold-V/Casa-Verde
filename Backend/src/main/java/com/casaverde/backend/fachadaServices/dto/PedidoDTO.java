@@ -22,6 +22,7 @@ public class PedidoDTO {
     private String estado;
     private String observacion;
     private Boolean paraLlevar;
+    private boolean enCurso;
     private BigDecimal totalCop;
     private BigDecimal totalAbonado;
     private BigDecimal saldoPendiente;
