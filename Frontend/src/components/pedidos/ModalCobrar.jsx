@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Calendar, CheckCircle, CreditCard, X } from "lucide-react";
 import { formatCOP, formatFecha } from "../../utils/format";
-import { esActivo, esEnCursoPedido, formatReservaDisplay } from "../../utils/pedidoHelpers";
+import { esActivo, formatReservaDisplay } from "../../utils/pedidoHelpers";
 import MoneyInput from "../shared/MoneyInput";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
@@ -14,7 +14,7 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
   const [error, setError]               = useState("");
   const [confirm, setConfirm]           = useState(false);
   const abierto       = esActivo(pedido.estado);
-  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !esEnCursoPedido(pedido);
+  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
 
   const run = async (fn) => {
     setLoading(true); setError("");

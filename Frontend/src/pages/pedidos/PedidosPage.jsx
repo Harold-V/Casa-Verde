@@ -8,7 +8,7 @@ import { productoService } from "../../services/productoService";
 import { salonService } from "../../services/salonService";
 import { inventarioService } from "../../services/inventarioService";
 import { formatCOP } from "../../utils/format";
-import { esActivo, esEnCursoPedido, sortByReserva, calcularInsumos, formatInsumo } from "../../utils/pedidoHelpers";
+import { esActivo, sortByReserva, calcularInsumos, formatInsumo } from "../../utils/pedidoHelpers";
 import { usePedidoMutations } from "../../hooks/usePedidoMutations";
 import OrdenCard from "../../components/pedidos/OrdenCard";
 import ModalCrearPedido from "../../components/pedidos/ModalCrearPedido";
@@ -153,22 +153,6 @@ export default function PedidosPage() {
     window.history.replaceState({}, "");
   }, [pendienteAbrirId, pedidos, pageSize]);
 
-  // Fuerza un re-render exactamente cuando la próxima reserva alcanza su hora.
-  // "YYYY-MM-DDTHH:mm" sin Z → Date lo parsea en hora local (Colombia).
-  const [, setReservasTick] = useState(0);
-  useEffect(() => {
-    const now   = Date.now();
-    const today = new Date().toLocaleDateString("en-CA");
-    const proximoFlip = pedidos
-      .filter((p) => esActivo(p.estado) && p.horaReserva)
-      .map((p) => new Date(`${p.fechaReserva ?? today}T${p.horaReserva}`).getTime())
-      .filter((t) => t > now)
-      .sort((a, b) => a - b)[0];
-
-    if (!proximoFlip) return;
-    const timer = setTimeout(() => setReservasTick((n) => n + 1), proximoFlip - now + 500);
-    return () => clearTimeout(timer);
-  }, [pedidos]);
 
   const {
     crearMut, agregarMut, actualizarDetalleMut, quitarDetalleMut,
@@ -178,7 +162,7 @@ export default function PedidosPage() {
 
   // ── Listas derivadas ──────────────────────────────────────────────────────
   const abiertos       = pedidos.filter((p) => esActivo(p.estado));
-  const enCursoList    = abiertos.filter((p) => esEnCursoPedido(p));
+  const enCursoList    = abiertos.filter((p) => p.enCurso);
   const reservasList   = abiertos.filter((p) => !!(p.fechaReserva || p.horaReserva));
   const paraLlevarList = abiertos.filter((p) => !!p.paraLlevar);
 

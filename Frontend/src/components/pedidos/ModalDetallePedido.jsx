@@ -3,7 +3,7 @@ import { Ban, CheckCircle, Pencil, Plus, Trash2, Utensils, X } from "lucide-reac
 import { formatCOP, formatFecha } from "../../utils/format";
 import { ESTADO_BADGE } from "../../utils/constants";
 import {
-  calcularInsumosDetallado, formatInsumo, esActivo, esEnCursoPedido,
+  calcularInsumosDetallado, formatInsumo, esActivo,
   normalizarFracciones, toTitleCase, formatReservaDisplay,
 } from "../../utils/pedidoHelpers";
 import MoneyInput from "../shared/MoneyInput";
@@ -76,7 +76,7 @@ export default function ModalDetallePedido({
   });
 
   const abierto       = esActivo(pedido.estado);
-  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !esEnCursoPedido(pedido);
+  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
   const { totales: itotales, almuerzo: ialmuerzo } = calcularInsumosDetallado(pedido.detalles);
 
   const buildUpdateReq = (overrides) => ({

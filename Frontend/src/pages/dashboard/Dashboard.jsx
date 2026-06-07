@@ -82,20 +82,6 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [hoy]);
 
-  // Re-render exactamente cuando la próxima reserva alcanza su hora
-  const [, setReservasTick] = useState(0);
-  useEffect(() => {
-    const now   = Date.now();
-    const today = new Date().toLocaleDateString("en-CA");
-    const proximoFlip = pedidosActivos
-      .filter((p) => p.horaReserva)
-      .map((p) => new Date(`${p.fechaReserva ?? today}T${p.horaReserva}`).getTime())
-      .filter((t) => t > now)
-      .sort((a, b) => a - b)[0];
-    if (!proximoFlip) return;
-    const timer = setTimeout(() => setReservasTick((n) => n + 1), proximoFlip - now + 500);
-    return () => clearTimeout(timer);
-  }, [pedidosActivos]);
 
   const r = resumen;
   const porCobrar      = pedidosActivos.reduce((s, p) => s + (p.saldoPendiente ?? 0), 0);
