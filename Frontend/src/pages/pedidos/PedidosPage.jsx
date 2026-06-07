@@ -19,7 +19,7 @@ import Pagination from "../../components/shared/Pagination";
 const CARD_MIN = 280; // minmax(280px, ...) del grid
 const CARD_GAP = 14;  // gap-[14px]
 const ROWS     = 2;   // filas por página
-const HOY = new Date().toLocaleDateString("en-CA");
+const getHoy = () => new Date().toLocaleDateString("en-CA");
 
 // ── Overlay de éxito después de crear pedido ─────────────────────────────────
 function PedidoCreado({ pedido, onVerPedido, onCerrar }) {
@@ -412,8 +412,8 @@ export default function PedidosPage() {
                   />
                 </div>
                 <button
-                  className={`btn btn-sm ${fechaHistorial === HOY ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => { setFechaHistorial(HOY); setPagina(0); }}
+                  className={`btn btn-sm ${fechaHistorial === getHoy() ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => { setFechaHistorial(getHoy()); setPagina(0); }}
                 >
                   Hoy
                 </button>

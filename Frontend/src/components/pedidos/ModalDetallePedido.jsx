@@ -210,29 +210,31 @@ export default function ModalDetallePedido({
     try {
       if (diffs.length > 0) {
         normalizandoRef.current = true;
-        for (const diff of diffs.filter((d) => d.cantidadAntes === 0))
-          await onAgregarDetalle({ productoId: diff.productoId, cantidad: diff.cantidadDespues });
-        for (const diff of diffs.filter((d) => d.cantidadAntes > 0 && d.cantidadDespues > 0)) {
-          const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
-          if (det) await onActualizarDetalle(det.id, { cantidad: diff.cantidadDespues });
+        try {
+          for (const diff of diffs.filter((d) => d.cantidadAntes === 0))
+            await onAgregarDetalle({ productoId: diff.productoId, cantidad: diff.cantidadDespues });
+          for (const diff of diffs.filter((d) => d.cantidadAntes > 0 && d.cantidadDespues > 0)) {
+            const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
+            if (det) await onActualizarDetalle(det.id, { cantidad: diff.cantidadDespues });
+          }
+          const idsQuitar = diffs
+            .filter((d) => d.cantidadDespues === 0)
+            .map((d) => pedido.detalles.find((det) => det.productoId === d.productoId)?.id)
+            .filter(Boolean);
+          if (idsQuitar.length > 0) {
+            setRemovingIds(new Set(idsQuitar));
+            await new Promise((r) => setTimeout(r, 190));
+          }
+          for (const diff of diffs.filter((d) => d.cantidadDespues === 0)) {
+            const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
+            if (det) await onQuitarDetalle(det.id);
+          }
+        } finally {
+          normalizandoRef.current = false;
         }
-        const idsQuitar = diffs
-          .filter((d) => d.cantidadDespues === 0)
-          .map((d) => pedido.detalles.find((det) => det.productoId === d.productoId)?.id)
-          .filter(Boolean);
-        if (idsQuitar.length > 0) {
-          setRemovingIds(new Set(idsQuitar));
-          await new Promise((r) => setTimeout(r, 190));
-        }
-        for (const diff of diffs.filter((d) => d.cantidadDespues === 0)) {
-          const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
-          if (det) await onQuitarDetalle(det.id);
-        }
-        normalizandoRef.current = false;
       }
       for (const m of manuales) await onAgregarDetalle(m);
     } catch (err) {
-      normalizandoRef.current = false;
       setRemovingIds(new Set());
       setError(err.message);
     } finally {
