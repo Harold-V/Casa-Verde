@@ -3,6 +3,8 @@ package com.casaverde.backend.fachadaServices.services.pedidoService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -96,6 +98,21 @@ public class PedidoServiceImpl implements IPedidoService {
     public PedidoDTO crear(CrearPedidoRequest req) {
         if (req.getNombre() == null || req.getNombre().isBlank())
             throw new ValidacionException("El nombre del cliente es obligatorio");
+
+        boolean tieneFecha = req.getFechaReserva() != null && !req.getFechaReserva().isBlank();
+        boolean tieneHora  = req.getHoraReserva()  != null && !req.getHoraReserva().isBlank();
+        if (tieneFecha || tieneHora) {
+            ZonedDateTime now   = ZonedDateTime.now(ZoneId.of("America/Bogota"));
+            LocalDate     today = now.toLocalDate();
+            LocalDate rFecha = tieneFecha ? LocalDate.parse(req.getFechaReserva()) : today;
+            if (rFecha.isBefore(today))
+                throw new ValidacionException("La fecha de reserva ya pasó");
+            if (rFecha.isEqual(today) && tieneHora) {
+                LocalTime rHora = LocalTime.parse(req.getHoraReserva());
+                if (!rHora.isAfter(now.toLocalTime()))
+                    throw new ValidacionException("La hora de reserva ya pasó");
+            }
+        }
 
         log.info("[crear] nombre='{}' detalles={}", req.getNombre(), req.getDetalles() != null ? req.getDetalles().size() : 0);
 

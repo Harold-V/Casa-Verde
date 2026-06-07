@@ -223,6 +223,23 @@ class CasaVerdeBusinessRulesTests {
         }
 
         @Test
+        void listarPedidosActivosSoportaDetallesYPagosSinMultipleBagFetch() {
+                PedidoDTO pedido = crearPedidoManual("Cliente listado", BigDecimal.valueOf(1000));
+                pedidoService.registrarPago(
+                                pedido.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(500)));
+
+                List<PedidoDTO> activos = pedidoService.listarActivos();
+
+                assertThat(activos)
+                                .anySatisfy(p -> {
+                                        assertThat(p.getId()).isEqualTo(pedido.getId());
+                                        assertThat(p.getDetalles()).hasSize(1);
+                                        assertThat(p.getPagos()).hasSize(1);
+                                });
+        }
+
+        @Test
         void pagoRegistraLibroCajaAuditoriaYActualizaFondo() {
                 PedidoDTO pedido = crearPedidoManual("Cliente caja", BigDecimal.valueOf(1000));
 
@@ -424,6 +441,28 @@ class CasaVerdeBusinessRulesTests {
                 // Stock should remain at 2 (unchanged after the failed anulacion)
                 assertThat(inventarioRepository.findByInsumo("gallina").orElseThrow().getStockActual())
                                 .isEqualByComparingTo(BigDecimal.valueOf(2));
+        }
+
+        @Test
+        void crearPedidoConFechaReservaPasadaEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva pasada");
+                req.setFechaReserva(LocalDate.now().minusDays(1).toString());
+
+                assertThatThrownBy(() -> pedidoService.crear(req))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("La fecha de reserva ya pasó");
+        }
+
+        @Test
+        void crearPedidoConFechaFuturaEsAceptado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva futura");
+                req.setFechaReserva(LocalDate.now().plusDays(1).toString());
+
+                PedidoDTO pedido = pedidoService.crear(req);
+                assertThat(pedido.getId()).isNotNull();
+                assertThat(pedido.getFechaReserva()).isEqualTo(LocalDate.now().plusDays(1).toString());
         }
 
         private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {
