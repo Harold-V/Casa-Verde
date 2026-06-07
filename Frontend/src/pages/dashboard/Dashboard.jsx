@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, AlertTriangle, Calendar } from "lucide-react";
@@ -87,6 +87,12 @@ export default function Dashboard() {
   const porCobrar      = pedidosActivos.reduce((s, p) => s + (p.saldoPendiente ?? 0), 0);
   const insumosActivos = calcularInsumos(pedidosActivos.flatMap((p) => p.detalles ?? []));
   const reservasCount = pedidosActivos.filter((p) => !!(p.fechaReserva || p.horaReserva)).length;
+
+  const insumosMap = useMemo(() => {
+    const map = new Map();
+    pedidosActivos.forEach((p) => map.set(p.id, calcularInsumos(p.detalles ?? [])));
+    return map;
+  }, [pedidosActivos]);
 
   const listaFiltrada = sortByReserva(
     soloReservas
@@ -201,7 +207,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {listaPagina.map((p) => {
-                    const insumos = calcularInsumos(p.detalles ?? []);
+                    const insumos = insumosMap.get(p.id) ?? {};
                     const gallina = insumos["gallina"];
                     const cuy = insumos["cuy"];
                     const tieneReserva = !!(p.fechaReserva || p.horaReserva);

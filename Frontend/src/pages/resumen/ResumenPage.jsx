@@ -62,6 +62,11 @@ export default function ResumenPage() {
     () => (r?.pedidos ?? []).filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO").sort((a, b) => b.id - a.id),
     [r]
   );
+  const insumosMapResumen = useMemo(() => {
+    const map = new Map();
+    pedidosRealizados.forEach((p) => map.set(p.id, calcularInsumos(p.detalles ?? [])));
+    return map;
+  }, [pedidosRealizados]);
   const totalPaginasPedidos = Math.max(1, Math.ceil(pedidosRealizados.length / PAGE_SIZE));
   const paginaActualPedidos = Math.min(paginaPedidos, totalPaginasPedidos - 1);
   const listaPaginaPedidos  = pedidosRealizados.slice(paginaActualPedidos * PAGE_SIZE, (paginaActualPedidos + 1) * PAGE_SIZE);
@@ -222,7 +227,7 @@ export default function ResumenPage() {
                       </thead>
                       <tbody>
                         {listaPaginaPedidos.map((p) => {
-                          const insumos = calcularInsumos(p.detalles ?? []);
+                          const insumos = insumosMapResumen.get(p.id) ?? {};
                           const gallina = insumos["gallina"];
                           const cuy     = insumos["cuy"];
                           return (
