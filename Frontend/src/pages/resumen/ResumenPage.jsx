@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Download } from "lucide-react";
 import { resumenService } from "../../services/resumenService";
 import { cierreCajaService } from "../../services/cierreCajaService";
-import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
 import { useSessionStore } from "../../store/useSessionStore";
 import { formatCOP, formatFechaLabel, formatHora, formatUSD } from "../../utils/format";
@@ -21,8 +20,6 @@ export default function ResumenPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const usuario = useSessionStore((s) => s.usuario);
-  const { data: tasaData } = useQuery({ queryKey: ["tasa-vigente"], queryFn: tasaService.vigente, staleTime: 60_000, retry: false });
-  const tasaUsd = tasaData?.valorCop ?? null;
   const [hoy, setHoy] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [fecha, setFecha] = useState(() => location.state?.fecha ?? new Date().toLocaleDateString("en-CA"));
   const [paginaPedidos, setPaginaPedidos] = useState(0);
@@ -130,7 +127,7 @@ export default function ResumenPage() {
               <KpiCard
                 label="Dólares USD"
                 value={formatUSD(r.cobradoUsd)}
-                sub={tasaUsd ? `≈ ${formatCOP(r.cobradoUsd * tasaUsd)}` : undefined}
+                sub={`≈ ${formatCOP(r.cobradoTotalCop - r.cobradoCop - r.cobradoNequi)}`}
               />
             )}
             {r.cobradoNequi > 0 && (
