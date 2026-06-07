@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search, X, CheckCircle, ChevronDown, ChevronUp, Calendar } from "lucide-react";
@@ -161,13 +161,13 @@ export default function PedidosPage() {
   } = usePedidoMutations();
 
   // ── Listas derivadas ──────────────────────────────────────────────────────
-  const abiertos       = pedidos.filter((p) => esActivo(p.estado));
-  const enCursoList    = abiertos.filter((p) => p.enCurso);
-  const reservasList   = abiertos.filter((p) => !!(p.fechaReserva || p.horaReserva));
-  const paraLlevarList = abiertos.filter((p) => !!p.paraLlevar);
+  const abiertos       = useMemo(() => pedidos.filter((p) => esActivo(p.estado)), [pedidos]);
+  const enCursoList    = useMemo(() => abiertos.filter((p) => p.enCurso), [abiertos]);
+  const reservasList   = useMemo(() => abiertos.filter((p) => !!(p.fechaReserva || p.horaReserva)), [abiertos]);
+  const paraLlevarList = useMemo(() => abiertos.filter((p) => !!p.paraLlevar), [abiertos]);
 
   // Insumos totales necesarios para todos los pedidos activos
-  const insumosTotal  = calcularInsumos(abiertos.flatMap((p) => p.detalles ?? []));
+  const insumosTotal  = useMemo(() => calcularInsumos(abiertos.flatMap((p) => p.detalles ?? [])), [abiertos]);
   const totalGallina  = insumosTotal["gallina"] ?? 0;
   const totalCuy      = insumosTotal["cuy"]     ?? 0;
 
@@ -178,15 +178,19 @@ export default function PedidosPage() {
   const defGallina   = Math.max(0, totalGallina - stockGallina);
   const defCuy       = Math.max(0, totalCuy     - stockCuy);
 
-  const historial = pedidos.filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO");
-  const historialFiltrado = fechaHistorial
+  const historial = useMemo(() => pedidos.filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO"), [pedidos]);
+  const historialFiltrado = useMemo(() => fechaHistorial
     ? historial.filter((p) => (p.creadoEn ?? "").slice(0, 10) === fechaHistorial)
-    : historial;
+    : historial,
+  [historial, fechaHistorial]);
 
-  const toggleKpi = (filtro) => {
+  const handleEditar = useCallback((p) => setPedidoActivo(p), []);
+  const handleCobrar = useCallback((p) => setPedidoCobrar(p), []);
+
+  const toggleKpi = useCallback((filtro) => {
     setKpiFiltro((prev) => (prev === filtro ? null : filtro));
     setPagina(0);
-  };
+  }, []);
 
   const kpiFiltroEfectivo =
     (kpiFiltro === "en-curso"    && enCursoList.length    > 0) ? "en-curso"    :
@@ -207,10 +211,11 @@ export default function PedidosPage() {
     abiertos;
 
   const listaBase     = tab === "historial" ? historialFiltrado : listaActivos;
-  const listaFiltrada = busqueda
+  const listaFiltrada = useMemo(() => busqueda
     ? listaBase.filter((p) => (p.nombre ?? "").toLowerCase().includes(busqueda.toLowerCase()))
-    : listaBase;
-  const pedidosMostrados = tab === "activos" ? sortByReserva(listaFiltrada) : listaFiltrada;
+    : listaBase,
+  [listaBase, busqueda]);
+  const pedidosMostrados = useMemo(() => tab === "activos" ? sortByReserva(listaFiltrada) : listaFiltrada, [tab, listaFiltrada]);
 
   // ── Paginación ────────────────────────────────────────────────────────────
   const totalPaginas = Math.max(1, Math.ceil(pedidosMostrados.length / pageSize));
@@ -472,8 +477,8 @@ export default function PedidosPage() {
             {pedidosPagina.map((p, idx) => (
               <OrdenCard key={p.id} pedido={p} idx={idx}
                 expandidoInicial={p.id === pedidoExpandidoId}
-                onEditar={(p) => setPedidoActivo(p)}
-                onCobrar={(p) => setPedidoCobrar(p)}
+                onEditar={handleEditar}
+                onCobrar={handleCobrar}
               />
             ))}
           </div>
