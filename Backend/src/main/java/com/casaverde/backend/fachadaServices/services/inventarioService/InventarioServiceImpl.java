@@ -131,13 +131,7 @@ public class InventarioServiceImpl implements IInventarioService {
     }
 
     private void validarRequest(MovimientoRequest req) {
-        if (req.getInsumo() == null || req.getInsumo().isBlank()) {
-            throw new ValidacionException("El insumo es obligatorio");
-        }
-        if (req.getCantidad() == null || req.getCantidad().compareTo(BigDecimal.ZERO) < 0) {
-            throw new ValidacionException("La cantidad debe ser mayor o igual a 0");
-        }
-        if (req.getTipo() == null || !List.of("entrada", "salida", "ajuste").contains(req.getTipo())) {
+        if (!List.of("entrada", "salida", "ajuste").contains(req.getTipo())) {
             throw new ValidacionException("Tipo inválido. Use: entrada, salida, ajuste");
         }
     }

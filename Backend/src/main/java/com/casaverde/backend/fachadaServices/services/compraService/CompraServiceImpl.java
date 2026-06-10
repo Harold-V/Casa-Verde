@@ -95,11 +95,6 @@ public class CompraServiceImpl implements ICompraService {
         if (!proveedor.getActivo())
             throw new ValidacionException("El proveedor está inactivo");
 
-        if (req.getCantidad() == null || req.getCantidad().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("La cantidad debe ser mayor a 0");
-        if (req.getPrecioUnitario() == null || req.getPrecioUnitario().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El precio unitario debe ser mayor a 0");
-
         String insumoNorm = req.getInsumo().trim().toLowerCase();
         if (inventarioRepo.findByInsumo(insumoNorm).isEmpty())
             throw new ValidacionException("El insumo '" + insumoNorm + "' no existe en el inventario");

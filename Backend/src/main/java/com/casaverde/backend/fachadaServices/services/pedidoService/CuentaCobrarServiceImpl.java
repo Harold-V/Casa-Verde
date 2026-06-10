@@ -82,13 +82,6 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
     @Override
     @Transactional
     public CuentaCobrarDTO registrar(CuentaCobrarRequest req) {
-        if (req.getClienteNombre() == null || req.getClienteNombre().isBlank())
-            throw new ValidacionException("El nombre del cliente es obligatorio");
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto de la deuda debe ser mayor a 0");
-        if (req.getFecha() == null)
-            throw new ValidacionException("La fecha es obligatoria");
-
         CuentaCobrar cuenta = cuentaRepo.save(CuentaCobrar.builder()
                 .clienteNombre(req.getClienteNombre().trim())
                 .concepto(req.getConcepto())
@@ -123,9 +116,6 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         CuentaCobrar cuenta = findCuenta(cuentaId);
         if (cuenta.getEstado() == EstadoCuentaCobrar.CANCELADO)
             throw new ValidacionException("La cuenta ya está cancelada");
-
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto del cobro debe ser mayor a 0");
 
         String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();

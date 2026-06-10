@@ -96,9 +96,6 @@ public class PedidoServiceImpl implements IPedidoService {
 
     @Transactional
     public PedidoDTO crear(CrearPedidoRequest req) {
-        if (req.getNombre() == null || req.getNombre().isBlank())
-            throw new ValidacionException("El nombre del cliente es obligatorio");
-
         boolean tieneFecha = req.getFechaReserva() != null && !req.getFechaReserva().isBlank();
         boolean tieneHora  = req.getHoraReserva()  != null && !req.getHoraReserva().isBlank();
         if (tieneFecha || tieneHora) {
@@ -205,9 +202,6 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido pedido = findOrThrow(pedidoId);
         validarAbierto(pedido, "agregar ítems");
 
-        if (req.getCantidad() == null || req.getCantidad() < 1)
-            throw new ValidacionException("La cantidad debe ser al menos 1");
-
         Optional<PedidoDetalle> existente = buscarDetalleExistente(pedido, req);
         if (existente.isPresent()) {
             existente.get().setCantidad(existente.get().getCantidad() + req.getCantidad());
@@ -240,8 +234,6 @@ public class PedidoServiceImpl implements IPedidoService {
     public PedidoDTO actualizarDetalle(Long pedidoId, Long detalleId, ActualizarDetalleRequest req) {
         Pedido pedido = findOrThrow(pedidoId);
         validarAbierto(pedido, "editar ítems");
-        if (req.getCantidad() == null || req.getCantidad() < 0)
-            throw new ValidacionException("La cantidad no puede ser negativa");
 
         PedidoDetalle detalle = pedido.getDetalles().stream()
                 .filter(d -> d.getId().equals(detalleId))
@@ -267,8 +259,6 @@ public class PedidoServiceImpl implements IPedidoService {
             throw new ValidacionException("No se puede registrar pago en un pedido ANULADO");
         if (EstadoPedido.FINALIZADO == pedido.getEstado())
             throw new ValidacionException("El pedido ya está FINALIZADO");
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto debe ser mayor a 0");
 
         String moneda = monetaryService.normalizarMoneda(resolverMoneda(req.getMoneda()));
         BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getMonto());
@@ -386,8 +376,6 @@ public class PedidoServiceImpl implements IPedidoService {
     public PedidoDTO actualizarPago(Long pedidoId, Long pagoId, ActualizarPagoRequest req) {
         Pedido pedido = findOrThrow(pedidoId);
         validarAbierto(pedido, "editar pagos");
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto debe ser mayor a 0");
 
         Pago pago = pedido.getPagos().stream()
                 .filter(p -> p.getId().equals(pagoId))
@@ -432,9 +420,6 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     private PedidoDetalle buildDetalle(Pedido pedido, DetalleItemRequest req) {
-        if (req.getCantidad() == null || req.getCantidad() < 1)
-            throw new ValidacionException("La cantidad debe ser al menos 1");
-
         PedidoDetalle detalle = new PedidoDetalle();
         detalle.setPedido(pedido);
         detalle.setCantidad(req.getCantidad());
@@ -453,8 +438,6 @@ public class PedidoServiceImpl implements IPedidoService {
                 detalle.setComposicionSnapshot(serializarComposicion(prod.getComposicion()));
             }
         } else {
-            if (req.getNombreManual() == null || req.getNombreManual().isBlank())
-                throw new ValidacionException("El nombre del ítem manual es obligatorio");
             detalle.setNombreSnapshot(req.getNombreManual().trim());
             detalle.setPrecioUnitarioCop(monetaryService.normalizarPrecioCop(req.getPrecioManual()));
         }

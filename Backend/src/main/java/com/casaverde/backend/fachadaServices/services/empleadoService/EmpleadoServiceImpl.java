@@ -112,10 +112,6 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
         Empleado emp = findEmpleado(empleadoId);
         TipoAdelanto tipo = req.getTipo() != null ? req.getTipo() : TipoAdelanto.EFECTIVO;
 
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto del adelanto debe ser mayor a 0");
-        if (req.getFecha() == null)
-            throw new ValidacionException("La fecha es obligatoria");
         if (tipo == TipoAdelanto.ESPECIE && (req.getObservacion() == null || req.getObservacion().isBlank()))
             throw new ValidacionException("La observación es obligatoria para descuentos en especie");
 

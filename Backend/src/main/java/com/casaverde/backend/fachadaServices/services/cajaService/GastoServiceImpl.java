@@ -118,10 +118,6 @@ public class GastoServiceImpl implements IGastoService {
     // ---- helpers ----
 
     private void validar(GastoRequest req) {
-        if (req.getConcepto() == null || req.getConcepto().isBlank())
-            throw new ValidacionException("El concepto es obligatorio");
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto debe ser mayor a 0");
         if (!CATEGORIAS.contains(req.getCategoria()))
             throw new ValidacionException("Categoría inválida. Use: " + CATEGORIAS);
     }
