@@ -11,6 +11,7 @@ import com.casaverde.backend.fachadaServices.mapper.CompraMapper;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,6 +40,7 @@ class CompraServiceTest {
     @Mock private CajaMovimientoRepository cajaMovimientoRepo;
     @Mock private ICajaMovimientoService cajaMovimientoService;
     @Mock private ITasaCambioService tasaCambioService;
+    @Mock private IMonetaryService monetaryService;
     @Mock private IAuditoriaService auditoriaService;
     @Mock private CompraMapper compraMapper;
     @Mock private AbonoCompraMapper abonoMapper;
@@ -74,7 +76,6 @@ class CompraServiceTest {
         when(movimientoRepo.save(any())).thenReturn(new MovimientoInventario());
         // enrichCompraDTO stubs
         when(compraMapper.toDTO(any())).thenReturn(new CompraDTO());
-        when(abonoRepo.sumMontoCopByCompraId(any())).thenReturn(BigDecimal.ZERO);
         when(abonoRepo.findByCompraIdOrderByCreadoEnDesc(any())).thenReturn(List.of());
 
         CompraRequest req = new CompraRequest();

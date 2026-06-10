@@ -1,38 +1,36 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { KeyRound, LogIn, UserRound } from "lucide-react";
 import { usuarioService } from "../../services/usuarioService";
 import { useSessionStore } from "../../store/useSessionStore";
 
 export default function LoginScreen() {
   const setUsuario = useSessionStore((s) => s.setUsuario);
-  const [usuarios, setUsuarios] = useState([]);
   const [usuarioId, setUsuarioId] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loginError, setLoginError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    usuarioService.listar()
-      .then((data) => {
-        setUsuarios(data);
-        if (data.length > 0) setUsuarioId(String(data[0].id));
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: usuarios = [], isLoading, error: queryError } = useQuery({
+    queryKey: ["usuarios"],
+    queryFn: usuarioService.listar,
+    staleTime: 30_000,
+    retry: 1,
+  });
 
-  const usuario = usuarios.find((u) => String(u.id) === String(usuarioId));
+  // Primer usuario como default sin useEffect
+  const selectedId = usuarioId || (usuarios.length > 0 ? String(usuarios[0].id) : "");
+  const usuario = usuarios.find((u) => String(u.id) === selectedId);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setLoginError("");
     setSaving(true);
     try {
-      const sesion = await usuarioService.login(Number(usuarioId), password);
+      const sesion = await usuarioService.login(Number(selectedId), password);
       setUsuario(sesion);
     } catch (err) {
-      setError(err.message);
+      setLoginError(err.message);
     } finally {
       setSaving(false);
     }
@@ -49,8 +47,10 @@ export default function LoginScreen() {
           <UserRound size={22} className="text-verde-claro" />
         </div>
         <form onSubmit={handleSubmit} className="card-body">
-          {error && <div className="alert alert-error">{error}</div>}
-          {loading ? (
+          {(loginError || queryError) && (
+            <div className="alert alert-error">{loginError || queryError.message}</div>
+          )}
+          {isLoading ? (
             <div className="loading-center"><div className="spinner" /></div>
           ) : (
             <>
@@ -58,7 +58,7 @@ export default function LoginScreen() {
                 <label className="form-label">Usuario</label>
                 <select
                   className="form-control"
-                  value={usuarioId}
+                  value={selectedId}
                   onChange={(e) => {
                     setUsuarioId(e.target.value);
                     setPassword("");
@@ -87,7 +87,7 @@ export default function LoginScreen() {
                 </div>
               )}
 
-              <button className="btn btn-primary w-full justify-center" disabled={saving || !usuarioId}>
+              <button className="btn btn-primary w-full justify-center" disabled={saving || !selectedId}>
                 <LogIn size={16} />
                 {saving ? "Entrando..." : "Entrar"}
               </button>

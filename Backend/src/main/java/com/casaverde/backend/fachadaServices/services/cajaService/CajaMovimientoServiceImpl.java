@@ -61,7 +61,7 @@ public class CajaMovimientoServiceImpl implements ICajaMovimientoService {
                 fondoRepo.save(fondo);
 
                 return cajaMovimientoRepo.save(CajaMovimiento.builder()
-                                .tipo(tipo.name())
+                                .tipo(tipo)
                                 .moneda(monedaNormalizada)
                                 .monto(montoNormalizado)
                                 .montoCop(montoCopNormalizado)

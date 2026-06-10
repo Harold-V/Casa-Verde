@@ -12,13 +12,13 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
 
 public interface PedidoRepository extends JpaRepository<Pedido, Long> {
-    @EntityGraph(attributePaths = { "salon", "detalles", "pagos" })
+    @EntityGraph(attributePaths = { "salon", "detalles" })
     List<Pedido> findByEstadoOrderByCreadoEnDesc(EstadoPedido estado);
 
-    @EntityGraph(attributePaths = { "salon", "detalles", "pagos" })
+    @EntityGraph(attributePaths = { "salon", "detalles" })
     List<Pedido> findByEstadoInOrderByCreadoEnDesc(List<EstadoPedido> estados);
 
-    @EntityGraph(attributePaths = { "salon", "detalles", "pagos" })
+    @EntityGraph(attributePaths = { "salon", "detalles" })
     List<Pedido> findAllByOrderByCreadoEnDesc();
 
     @EntityGraph(attributePaths = { "salon" })

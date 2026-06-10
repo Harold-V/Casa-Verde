@@ -28,6 +28,7 @@ import com.casaverde.backend.fachadaServices.services.configuracionService.ITasa
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,6 +42,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
     private final AbonoCuentaCobrarRepository abonoRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
+    private final IMonetaryService monetaryService;
     private final IAuditoriaService auditoriaService;
     private final CuentaCobrarMapper mapper;
 
@@ -119,9 +121,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
         String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = MonedaConstants.USD.equals(moneda)
-                ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
-                : req.getMonto().setScale(0, RoundingMode.HALF_UP);
+        BigDecimal montoCop = monetaryService.convertirACop(moneda, req.getMonto(), tasaUsd);
         BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
         BigDecimal totalAbonado = abonoRepo.sumMontoCopByCuentaId(cuentaId);
@@ -180,11 +180,13 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
     private CuentaCobrarDTO enrich(CuentaCobrar c) {
         CuentaCobrarDTO dto = mapper.toDTO(c);
-        BigDecimal totalAbonado = abonoRepo.sumMontoCopByCuentaId(c.getId());
+        List<AbonoCuentaCobrar> abonos = abonoRepo.findByCuentaIdOrderByCreadoEnDesc(c.getId());
+        BigDecimal totalAbonado = abonos.stream()
+                .map(AbonoCuentaCobrar::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        dto.setAbonos(abonos.stream().map(mapper::toAbonoDTO).collect(Collectors.toList()));
         dto.setTotalAbonado(totalAbonado);
         dto.setSaldoPendiente(c.getMonto().subtract(totalAbonado));
-        dto.setAbonos(abonoRepo.findByCuentaIdOrderByCreadoEnDesc(c.getId())
-                .stream().map(mapper::toAbonoDTO).collect(Collectors.toList()));
         return dto;
     }
 }

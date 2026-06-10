@@ -10,6 +10,7 @@ import com.casaverde.backend.fachadaServices.mapper.EmpleadoMapper;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -36,6 +37,7 @@ class EmpleadoServiceTest {
     @Mock private VacacionRepository vacacionRepo;
     @Mock private ICajaMovimientoService cajaMovimientoService;
     @Mock private ITasaCambioService tasaCambioService;
+    @Mock private IMonetaryService monetaryService;
     @Mock private IAuditoriaService auditoriaService;
     @Mock private EmpleadoMapper empleadoMapper;
 
@@ -106,6 +108,7 @@ class EmpleadoServiceTest {
         Empleado emp = empleado(TipoEmpleado.QUINCENAL, new BigDecimal("800000"));
         when(empleadoRepo.findById(1L)).thenReturn(Optional.of(emp));
         when(tasaCambioService.getValorVigente()).thenReturn(new BigDecimal("4200"));
+        when(monetaryService.convertirACop(any(), any(), any())).thenReturn(new BigDecimal("50000"));
         when(adelantoRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(empleadoMapper.toAdelantoDTO(any())).thenReturn(new AdelantoDTO());
 

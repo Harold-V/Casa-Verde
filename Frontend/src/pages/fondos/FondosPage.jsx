@@ -10,6 +10,7 @@ import { gastoService } from "../../services/gastoService";
 import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
 import { formatCOP, formatHora, formatUSD } from "../../utils/format";
+import { TIPO_MOV, TIPO_MOV_LABEL } from "../../utils/movimientoTipos";
 import Pagination from "../../components/shared/Pagination";
 import ModalEntrada from "../../components/fondos/ModalEntrada";
 import ModalTransferencia from "../../components/fondos/ModalTransferencia";
@@ -68,21 +69,21 @@ function getMonedaBadge(moneda) {
 
 /** Agrupa todos los movimientos tipo "cobro" por día + moneda en una única fila "Venta del día". */
 function procesarHistorial(movs) {
-  const cobros = movs.filter((m) => m.tipo === "cobro");
-  const otros  = movs.filter((m) => m.tipo !== "cobro");
+  const cobros = movs.filter((m) => m.tipo === TIPO_MOV.COBRO);
+  const otros  = movs.filter((m) => m.tipo !== TIPO_MOV.COBRO);
 
   const grupos = {};
   cobros.forEach((m) => {
     const dia = m.fecha.substring(0, 10);
     const key = `${dia}__${m.moneda}`;
     if (!grupos[key]) grupos[key] = { dia, moneda: m.moneda, monto: 0, montoCop: 0 };
-    grupos[key].monto    += Number(m.monto);
-    grupos[key].montoCop += Number(m.montoCop);
+    grupos[key].monto    += Number(m.monto    ?? 0);
+    grupos[key].montoCop += Number(m.montoCop ?? 0);
   });
 
   const ventasDia = Object.values(grupos).map((g) => ({
     id:          `venta-${g.dia}-${g.moneda}`,
-    tipo:        "cobro",
+    tipo:        TIPO_MOV.COBRO,
     concepto:    "Venta del día",
     moneda:      g.moneda,
     monto:       g.monto,
@@ -312,11 +313,9 @@ export default function FondosPage() {
           </select>
           <select className="form-control w-36" value={filtroTipo} onChange={(e) => { setFiltroTipo(e.target.value); setPagina(0); }}>
             <option value="">Todo tipo</option>
-            <option value="cobro">Ventas</option>
-            <option value="entrada">Entradas</option>
-            <option value="salida">Salidas</option>
-            <option value="ajuste">Ajustes</option>
-            <option value="reverso">Reversos</option>
+            {Object.entries(TIPO_MOV_LABEL).map(([valor, label]) => (
+              <option key={valor} value={valor}>{label}</option>
+            ))}
           </select>
           <button
             className="btn btn-secondary btn-sm"
@@ -369,9 +368,9 @@ export default function FondosPage() {
               <tbody>
                 {historialPag.map((m) => {
                   const esVentaDia = !!m._esVentaDia;
-                  const esEntrada  = esVentaDia || m.tipo === "cobro" || m.tipo === "entrada";
-                  const esSalida   = m.tipo === "salida";
-                  const esReverso  = m.tipo === "reverso";
+                  const esEntrada  = esVentaDia || m.tipo === TIPO_MOV.COBRO || m.tipo === TIPO_MOV.ENTRADA;
+                  const esSalida   = m.tipo === TIPO_MOV.SALIDA;
+                  const esReverso  = m.tipo === TIPO_MOV.REVERSO;
                   const esCobro    = esEntrada || esReverso;
                   const Icon  = esEntrada ? TrendingUp : esSalida ? TrendingDown : esReverso ? RotateCcw : DollarSign;
                   const badge = esEntrada || esReverso ? "badge-success" : esSalida ? "badge-danger" : "badge-warning";
@@ -381,7 +380,7 @@ export default function FondosPage() {
                     ? `Nequi ${nequiFondo.alias}`
                     : m.moneda;
                   const { cls: monedaCls, style: monedaStyle } = getMonedaBadge(m.moneda);
-                  const labelTipo = m.tipo === "cobro" ? "Venta" : m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : "";
+                  const labelTipo = m.tipo === TIPO_MOV.COBRO ? "Venta" : m.tipo ? m.tipo.charAt(0).toUpperCase() + m.tipo.slice(1) : "";
                   return (
                     <tr
                       key={m.id}

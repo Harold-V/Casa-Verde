@@ -205,9 +205,9 @@ public class ProductoServiceImpl implements IProductoService {
             return;
         for (ComposicionDTO item : items) {
             if (item.getInsumo() == null || item.getInsumo().isBlank())
-                continue;
+                throw new ValidacionException("La composición tiene un ítem sin nombre de insumo");
             if (item.getCantidad() == null || item.getCantidad().compareTo(BigDecimal.ZERO) <= 0)
-                continue;
+                throw new ValidacionException("La composición tiene una cantidad inválida para el insumo '" + item.getInsumo() + "'");
             ProductoComposicionInventario comp = ProductoComposicionInventario.builder()
                     .producto(producto)
                     .insumo(item.getInsumo().trim().toLowerCase())

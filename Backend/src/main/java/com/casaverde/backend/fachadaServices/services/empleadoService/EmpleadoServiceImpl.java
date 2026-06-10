@@ -21,6 +21,7 @@ import com.casaverde.backend.fachadaServices.services.configuracionService.ITasa
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
 import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,6 +38,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
     private final VacacionRepository vacacionRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
+    private final IMonetaryService monetaryService;
     private final IAuditoriaService auditoriaService;
     private final EmpleadoMapper empleadoMapper;
 
@@ -119,9 +121,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
 
         String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = MonedaConstants.USD.equals(moneda)
-                ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
-                : req.getMonto().setScale(0, RoundingMode.HALF_UP);
+        BigDecimal montoCop = monetaryService.convertirACop(moneda, req.getMonto(), tasaUsd);
         BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
         if (tipo == TipoAdelanto.EFECTIVO) {

@@ -141,7 +141,7 @@ class CasaVerdeBusinessRulesTests {
                 assertThat(actualizado.getStockActual()).isEqualByComparingTo(stockInicial.add(new BigDecimal("3")));
                 assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
                                 .anySatisfy(m -> {
-                                        assertThat(m.getTipo()).isEqualTo(CajaMovimientoTipo.GASTO.name());
+                                        assertThat(m.getTipo()).isEqualTo(CajaMovimientoTipo.GASTO);
                                         assertThat(m.getMonto()).isEqualByComparingTo(BigDecimal.valueOf(-10000));
                                 });
         }
@@ -274,8 +274,8 @@ class CasaVerdeBusinessRulesTests {
                 assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
                                 .isEqualByComparingTo(BigDecimal.ZERO);
                 assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
-                                .noneMatch(m -> CajaMovimientoTipo.REVERSO_PAGO.name().equals(m.getTipo())
-                                                || CajaMovimientoTipo.COBRO_PEDIDO.name().equals(m.getTipo()));
+                                .noneMatch(m -> CajaMovimientoTipo.REVERSO_PAGO.equals(m.getTipo())
+                                                || CajaMovimientoTipo.COBRO_PEDIDO.equals(m.getTipo()));
         }
 
         @Test

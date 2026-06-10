@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoCuentaCobrar;
 import com.casaverde.backend.fachadaServices.dto.AbonoCuentaCobrarDTO;
 import com.casaverde.backend.fachadaServices.dto.AbonoCuentaCobrarRequest;
@@ -38,7 +40,7 @@ public class CuentaCobrarController {
     }
 
     @PostMapping
-    public ResponseEntity<CuentaCobrarDTO> registrar(@RequestBody CuentaCobrarRequest req) {
+    public ResponseEntity<CuentaCobrarDTO> registrar(@RequestBody @Valid CuentaCobrarRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(cuentaCobrarService.registrar(req));
     }
 
@@ -55,7 +57,7 @@ public class CuentaCobrarController {
 
     @PostMapping("/{id}/abonos")
     public ResponseEntity<AbonoCuentaCobrarDTO> registrarAbono(
-            @PathVariable Long id, @RequestBody AbonoCuentaCobrarRequest req) {
+            @PathVariable Long id, @RequestBody @Valid AbonoCuentaCobrarRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(cuentaCobrarService.registrarAbono(id, req));
     }
 }

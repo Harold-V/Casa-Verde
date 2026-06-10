@@ -13,6 +13,9 @@ import ModalAgregarItems from "./ModalAgregarItems";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 
+// Debe ser > duración de --animate-fade-out-card (180ms) definida en index.css
+const FADE_OUT_DELAY_MS = 190;
+
 /**
  * Modal de detalle y edición de un pedido activo.
  * Gestiona ítems, datos generales, finalización y anulación.
@@ -50,6 +53,7 @@ export default function ModalDetallePedido({
   const [editPagoForm, setEditPagoForm]     = useState({ moneda: "COP", monto: "" });
 
   // Sincroniza con los valores actuales del pedido al abrir el panel
+  // o cuando el pedido cambia mientras el panel está abierto (refetch)
   useEffect(() => {
     if (showEditReserva) {
       setEditOn({
@@ -65,7 +69,7 @@ export default function ModalDetallePedido({
       setEditParaLlevar(!!pedido.paraLlevar);
       setEditObservacion(pedido.observacion ?? "");
     }
-  }, [showEditReserva]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showEditReserva, pedido]);
 
   const togEdit = (k) => setEditOn((o) => {
     const val   = !o[k];
@@ -162,7 +166,7 @@ export default function ModalDetallePedido({
           .filter(Boolean);
         if (idsQuitar.length > 0) {
           setRemovingIds(new Set(idsQuitar));
-          await new Promise((r) => setTimeout(r, 190));
+          await new Promise((r) => setTimeout(r, FADE_OUT_DELAY_MS));
         }
         for (const { pid } of allDiffs.filter(({ d }) => d === 0)) {
           const det = conProducto.find((x) => x.productoId === pid);
@@ -223,7 +227,7 @@ export default function ModalDetallePedido({
             .filter(Boolean);
           if (idsQuitar.length > 0) {
             setRemovingIds(new Set(idsQuitar));
-            await new Promise((r) => setTimeout(r, 190));
+            await new Promise((r) => setTimeout(r, FADE_OUT_DELAY_MS));
           }
           for (const diff of diffs.filter((d) => d.cantidadDespues === 0)) {
             const det = pedido.detalles.find((d) => d.productoId === diff.productoId);

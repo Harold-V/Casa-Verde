@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,8 +25,9 @@ public class CajaMovimiento {
     @Column(columnDefinition = "integer")
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private String tipo;
+    private CajaMovimientoTipo tipo;
 
     @Column(nullable = false, length = 30)
     private String moneda;
