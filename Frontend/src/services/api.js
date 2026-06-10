@@ -18,6 +18,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    if (err.response?.status === 401) {
+      useSessionStore.getState().logout();
+    }
     const mensaje = err.response?.data?.mensaje || err.message || "Error de conexión";
     return Promise.reject(new Error(mensaje));
   }

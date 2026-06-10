@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.casaverde.backend.config.security.AuthTokenService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,8 +76,14 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
 
     private String resolverUsuario() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
-            return auth.getName();
+        if (auth != null && auth.isAuthenticated()) {
+            Object principal = auth.getPrincipal();
+            if (principal instanceof AuthTokenService.UsuarioAutenticado u) {
+                return u.nombre();
+            }
+            if (!"anonymousUser".equals(principal)) {
+                return auth.getName();
+            }
         }
         return "sistema-local";
     }

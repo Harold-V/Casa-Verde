@@ -12,9 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.AbonoCompra;
-import com.casaverde.backend.capaAccesoADatos.models.entitys.CajaMovimiento;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Compra;
-import com.casaverde.backend.capaAccesoADatos.models.entitys.Fondo;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.MovimientoInventario;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
@@ -22,9 +20,7 @@ import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoCompra;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.AdelantoProveedor;
 import com.casaverde.backend.capaAccesoADatos.repositories.AbonoCompraRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.AdelantoProveedorRepository;
-import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.CompraRepository;
-import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository;
@@ -56,8 +52,6 @@ public class CompraServiceImpl implements ICompraService {
     private final AdelantoProveedorRepository adelantoProveedorRepo;
     private final InventarioRepository inventarioRepo;
     private final MovimientoInventarioRepository movimientoRepo;
-    private final FondoRepository fondoRepo;
-    private final CajaMovimientoRepository cajaMovimientoRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
     private final IMonetaryService monetaryService;
@@ -177,28 +171,14 @@ public class CompraServiceImpl implements ICompraService {
             }
             adelantoProveedorRepo.save(adelanto);
 
-            // Calcular monto original en la moneda del adelanto antes de guardar el movimiento
+            // El fondo fue debitado al registrar el adelanto (ADELANTO_PROVEEDOR).
+            // Esta aplicación descuenta del saldo del adelanto sin tocar el fondo.
             String monedaAdelanto = adelanto.getMoneda();
             BigDecimal tasaUsd = tasaCambioService.getValorVigente();
             BigDecimal montoOriginal = MonedaConstants.USD.equals(monedaAdelanto)
                     ? montoCop.divide(tasaUsd, 2, RoundingMode.HALF_UP)
                     : montoCop;
             BigDecimal tasaUsadaAdelanto = MonedaConstants.USD.equals(monedaAdelanto) ? tasaUsd : null;
-
-            // Movimiento de trazabilidad con el fondo correcto del adelanto
-            // (el fondo ya fue debitado en ADELANTO_PROVEEDOR; este registro no lo toca)
-            Fondo fondoAdelanto = fondoRepo.findById(monedaAdelanto).orElse(null);
-            BigDecimal saldoAdelantoActual = fondoAdelanto != null ? fondoAdelanto.getSaldo() : BigDecimal.ZERO;
-            cajaMovimientoRepo.save(CajaMovimiento.builder()
-                    .tipo(CajaMovimientoTipo.APLICACION_ADELANTO_PROVEEDOR)
-                    .moneda(monedaAdelanto)
-                    .monto(montoOriginal)
-                    .montoCop(montoCop)
-                    .saldoResultante(saldoAdelantoActual)
-                    .referenciaTipo("compra")
-                    .referenciaId(compraId)
-                    .concepto("Aplicación adelanto proveedor #" + adelanto.getId() + " a compra #" + compraId)
-                    .build());
 
             abono = abonoRepo.save(AbonoCompra.builder()
                     .compra(compra)
