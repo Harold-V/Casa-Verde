@@ -23,6 +23,7 @@ import com.casaverde.backend.capaAccesoADatos.repositories.GastoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
@@ -65,7 +66,7 @@ public class GastoServiceImpl implements IGastoService {
         String moneda = monetaryService.normalizarMoneda(req.getMoneda());
         BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getMonto());
         BigDecimal montoCop = calcularMontoCop(moneda, monto);
-        BigDecimal tasaUsada = "USD".equals(moneda) ? tasaCambioService.getValorVigente() : null;
+        BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaCambioService.getValorVigente() : null;
 
         Gasto gasto = Gasto.builder()
                 .concepto(req.getConcepto().trim())

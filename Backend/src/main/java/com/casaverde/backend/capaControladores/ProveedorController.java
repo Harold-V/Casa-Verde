@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 import com.casaverde.backend.fachadaServices.dto.AdelantoProveedorDTO;
 import com.casaverde.backend.fachadaServices.dto.AdelantoProveedorRequest;
 import com.casaverde.backend.fachadaServices.dto.ProveedorDTO;
@@ -29,12 +31,12 @@ public class ProveedorController {
     }
 
     @PostMapping
-    public ResponseEntity<ProveedorDTO> crear(@RequestBody ProveedorRequest req) {
+    public ResponseEntity<ProveedorDTO> crear(@RequestBody @Valid ProveedorRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(proveedorService.crear(req));
     }
 
     @PutMapping("/{id}")
-    public ProveedorDTO actualizar(@PathVariable Long id, @RequestBody ProveedorRequest req) {
+    public ProveedorDTO actualizar(@PathVariable Long id, @RequestBody @Valid ProveedorRequest req) {
         return proveedorService.actualizar(id, req);
     }
 

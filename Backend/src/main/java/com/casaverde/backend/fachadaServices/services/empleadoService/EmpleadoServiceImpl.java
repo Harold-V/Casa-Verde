@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,13 +19,17 @@ import com.casaverde.backend.fachadaServices.dto.*;
 import com.casaverde.backend.fachadaServices.mapper.EmpleadoMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class EmpleadoServiceImpl implements IEmpleadoService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmpleadoServiceImpl.class);
 
     private final EmpleadoRepository empleadoRepo;
     private final AdelantoRepository adelantoRepo;
@@ -32,6 +38,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
     private final VacacionRepository vacacionRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
+    private final IMonetaryService monetaryService;
     private final IAuditoriaService auditoriaService;
     private final EmpleadoMapper empleadoMapper;
 
@@ -112,12 +119,10 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
         if (tipo == TipoAdelanto.ESPECIE && (req.getObservacion() == null || req.getObservacion().isBlank()))
             throw new ValidacionException("La observación es obligatoria para descuentos en especie");
 
-        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
+        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = "USD".equals(moneda)
-                ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
-                : req.getMonto().setScale(0, RoundingMode.HALF_UP);
-        BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
+        BigDecimal montoCop = monetaryService.convertirACop(moneda, req.getMonto(), tasaUsd);
+        BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
         if (tipo == TipoAdelanto.EFECTIVO) {
             cajaMovimientoService.registrar(
@@ -145,6 +150,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
 
         auditoriaService.registrar("Adelanto", adelanto.getId(), "REGISTRAR",
                 "Adelanto " + tipo.name() + " $" + req.getMonto() + " " + moneda + " a " + emp.getNombre());
+        log.info("[adelanto] empleadoId={} tipo={} monto={} moneda={}", empleadoId, tipo, req.getMonto(), moneda);
         return empleadoMapper.toAdelantoDTO(adelanto);
     }
 
@@ -271,7 +277,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
         BigDecimal montoPagado;
         BigDecimal tasaUsada = null;
 
-        if ("USD".equals(moneda)) {
+        if (MonedaConstants.USD.equals(moneda)) {
             tasaUsada = tasaUsd;
             montoPagado = neto.divide(tasaUsd, 2, RoundingMode.HALF_UP);
         } else {
@@ -296,6 +302,7 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
             trabajoDiaRepo.saveAll(diasPend);
         }
 
+        log.info("[liquidar] empleadoId={} bruto={} adelantos={} neto={}", empleadoId, bruto, totalAdelantos, neto);
         PagoEmpleado pago = pagoRepo.save(PagoEmpleado.builder()
                 .empleado(emp)
                 .tipo(tipoPago)
@@ -332,6 +339,11 @@ public class EmpleadoServiceImpl implements IEmpleadoService {
     @Transactional
     public VacacionDTO registrarVacacion(Long empleadoId, VacacionRequest req) {
         Empleado emp = findEmpleado(empleadoId);
+        if (req.getFechaFin() != null && req.getFechaInicio() != null
+                && req.getFechaFin().isBefore(req.getFechaInicio())) {
+            throw new ValidacionException(
+                    "La fecha de fin de vacación no puede ser anterior a la fecha de inicio");
+        }
         Vacacion vac = vacacionRepo.save(Vacacion.builder()
                 .empleado(emp)
                 .fechaInicio(req.getFechaInicio())

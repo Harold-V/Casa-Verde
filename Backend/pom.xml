@@ -79,6 +79,12 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!-- Cache para TasaCambio y otros datos de lectura frecuente -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+
         <!-- Spring Security para proteger la API en modo cliente-servidor -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -6,6 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,13 +38,17 @@ import com.casaverde.backend.fachadaServices.mapper.AbonoCompraMapper;
 import com.casaverde.backend.fachadaServices.mapper.CompraMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class CompraServiceImpl implements ICompraService {
+
+    private static final Logger log = LoggerFactory.getLogger(CompraServiceImpl.class);
 
     private final CompraRepository compraRepo;
     private final ProveedorRepository proveedorRepo;
@@ -54,6 +60,7 @@ public class CompraServiceImpl implements ICompraService {
     private final CajaMovimientoRepository cajaMovimientoRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
+    private final IMonetaryService monetaryService;
     private final IAuditoriaService auditoriaService;
     private final CompraMapper compraMapper;
     private final AbonoCompraMapper abonoMapper;
@@ -93,8 +100,8 @@ public class CompraServiceImpl implements ICompraService {
             throw new ValidacionException("El precio unitario debe ser mayor a 0");
 
         String insumoNorm = req.getInsumo().trim().toLowerCase();
-        if (!List.of("gallina", "cuy").contains(insumoNorm))
-            throw new ValidacionException("El insumo debe ser 'gallina' o 'cuy'");
+        if (inventarioRepo.findByInsumo(insumoNorm).isEmpty())
+            throw new ValidacionException("El insumo '" + insumoNorm + "' no existe en el inventario");
 
         BigDecimal totalCop = req.getCantidad().multiply(req.getPrecioUnitario())
                 .setScale(0, RoundingMode.HALF_UP);
@@ -115,12 +122,14 @@ public class CompraServiceImpl implements ICompraService {
         auditoriaService.registrar("Compra", compra.getId(),
                 "REGISTRAR", "Compra de " + req.getCantidad() + " " + insumoNorm
                         + " a " + proveedor.getNombre() + " por $" + totalCop);
+        log.info("[registrar] insumo='{}' cantidad={} proveedor='{}' totalCop={}", insumoNorm, req.getCantidad(), proveedor.getNombre(), totalCop);
 
         return enrichCompraDTO(compra);
     }
 
     @Transactional
     public void anular(Long id) {
+        log.info("[anular] compraId={}", id);
         Compra compra = compraRepo.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Compra no encontrada: " + id));
         if (compra.getEstado() != EstadoCompra.PENDIENTE)
@@ -141,13 +150,16 @@ public class CompraServiceImpl implements ICompraService {
         if (compra.getEstado() == EstadoCompra.PAGADO)
             throw new ValidacionException("La compra ya está pagada completamente");
 
-        BigDecimal totalAbonado = abonoRepo.sumMontoCopByCompraId(compraId);
+        // Una sola query de abonos; totalAbonado se deriva de la lista sin query extra
+        List<AbonoCompra> abonosExistentes = abonoRepo.findByCompraIdOrderByCreadoEnDesc(compraId);
+        BigDecimal totalAbonado = abonosExistentes.stream()
+                .map(AbonoCompra::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal saldoPendiente = compra.getTotalCop().subtract(totalAbonado);
 
         AbonoCompra abono;
 
         if (req.getAdelantoProveedorId() != null) {
-            // Pago con adelanto prepagado al proveedor — no debita fondo
             AdelantoProveedor adelanto = adelantoProveedorRepo.findById(req.getAdelantoProveedorId())
                     .orElseThrow(() -> new RecursoNoEncontradoException(
                             "Adelanto proveedor no encontrado: " + req.getAdelantoProveedorId()));
@@ -165,27 +177,28 @@ public class CompraServiceImpl implements ICompraService {
             }
             adelantoProveedorRepo.save(adelanto);
 
-            // Registro de trazabilidad: el fondo ya fue debitado en ADELANTO_PROVEEDOR,
-            // este movimiento solo deja constancia de la aplicación sin modificar el saldo.
-            Fondo fondoCop = fondoRepo.findById("COP").orElse(null);
-            BigDecimal saldoCopActual = fondoCop != null ? fondoCop.getSaldo() : BigDecimal.ZERO;
+            // Calcular monto original en la moneda del adelanto antes de guardar el movimiento
+            String monedaAdelanto = adelanto.getMoneda();
+            BigDecimal tasaUsd = tasaCambioService.getValorVigente();
+            BigDecimal montoOriginal = MonedaConstants.USD.equals(monedaAdelanto)
+                    ? montoCop.divide(tasaUsd, 2, RoundingMode.HALF_UP)
+                    : montoCop;
+            BigDecimal tasaUsadaAdelanto = MonedaConstants.USD.equals(monedaAdelanto) ? tasaUsd : null;
+
+            // Movimiento de trazabilidad con el fondo correcto del adelanto
+            // (el fondo ya fue debitado en ADELANTO_PROVEEDOR; este registro no lo toca)
+            Fondo fondoAdelanto = fondoRepo.findById(monedaAdelanto).orElse(null);
+            BigDecimal saldoAdelantoActual = fondoAdelanto != null ? fondoAdelanto.getSaldo() : BigDecimal.ZERO;
             cajaMovimientoRepo.save(CajaMovimiento.builder()
-                    .tipo(CajaMovimientoTipo.APLICACION_ADELANTO_PROVEEDOR.name())
-                    .moneda("COP")
-                    .monto(montoCop)
+                    .tipo(CajaMovimientoTipo.APLICACION_ADELANTO_PROVEEDOR)
+                    .moneda(monedaAdelanto)
+                    .monto(montoOriginal)
                     .montoCop(montoCop)
-                    .saldoResultante(saldoCopActual)
+                    .saldoResultante(saldoAdelantoActual)
                     .referenciaTipo("compra")
                     .referenciaId(compraId)
                     .concepto("Aplicación adelanto proveedor #" + adelanto.getId() + " a compra #" + compraId)
                     .build());
-
-            String monedaAdelanto = adelanto.getMoneda();
-            BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-            BigDecimal montoOriginal = "USD".equals(monedaAdelanto)
-                    ? montoCop.divide(tasaUsd, 2, RoundingMode.HALF_UP)
-                    : montoCop;
-            BigDecimal tasaUsadaAdelanto = "USD".equals(monedaAdelanto) ? tasaUsd : null;
 
             abono = abonoRepo.save(AbonoCompra.builder()
                     .compra(compra)
@@ -202,20 +215,19 @@ public class CompraServiceImpl implements ICompraService {
                     "Abono $" + montoOriginal + " " + monedaAdelanto + " (=" + montoCop + " COP) aplicado de adelanto proveedor #"
                             + adelanto.getId() + " a compra #" + compraId);
 
-            BigDecimal nuevoTotal = totalAbonado.add(montoCop);
-            compra.setEstado(EstadoCompra.calcular(compra.getTotalCop(), nuevoTotal));
+            compra.setEstado(EstadoCompra.calcular(compra.getTotalCop(), totalAbonado.add(montoCop)));
             compraRepo.save(compra);
 
         } else {
-            // Pago normal desde fondo
+            if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
+                throw new ValidacionException("El monto del abono debe ser mayor a 0");
             if (req.getMoneda() == null || req.getMoneda().isBlank())
                 throw new ValidacionException("La moneda es obligatoria");
+
             String moneda = req.getMoneda().trim().toUpperCase();
             BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-            BigDecimal montoCop = "USD".equals(moneda)
-                    ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
-                    : req.getMonto().setScale(0, RoundingMode.HALF_UP);
-            BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
+            BigDecimal montoCop = monetaryService.convertirACop(moneda, req.getMonto(), tasaUsd);
+            BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
             if (montoCop.compareTo(saldoPendiente) > 0)
                 throw new ValidacionException(
@@ -241,14 +253,14 @@ public class CompraServiceImpl implements ICompraService {
                     .fecha(req.getFecha())
                     .build());
 
-            BigDecimal nuevoTotal = totalAbonado.add(montoCop);
-            compra.setEstado(EstadoCompra.calcular(compra.getTotalCop(), nuevoTotal));
+            compra.setEstado(EstadoCompra.calcular(compra.getTotalCop(), totalAbonado.add(montoCop)));
             compraRepo.save(compra);
 
             auditoriaService.registrar("AbonoCompra", abono.getId(), "REGISTRAR",
                     "Abono $" + req.getMonto() + " " + moneda + " a compra #" + compraId);
         }
 
+        log.info("[abono] compraId={} monto={} moneda={} conAdelanto={}", compraId, req.getMonto(), req.getMoneda(), req.getAdelantoProveedorId() != null);
         return abonoMapper.toDTO(abono);
     }
 
@@ -265,12 +277,13 @@ public class CompraServiceImpl implements ICompraService {
 
     private CompraDTO enrichCompraDTO(Compra compra) {
         CompraDTO dto = compraMapper.toDTO(compra);
-        BigDecimal totalAbonado = abonoRepo.sumMontoCopByCompraId(compra.getId());
+        List<AbonoCompra> abonos = abonoRepo.findByCompraIdOrderByCreadoEnDesc(compra.getId());
+        BigDecimal totalAbonado = abonos.stream()
+                .map(AbonoCompra::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         dto.setTotalAbonado(totalAbonado);
         dto.setSaldoPendiente(compra.getTotalCop().subtract(totalAbonado));
-        List<AbonoCompraDTO> abonos = abonoRepo.findByCompraIdOrderByCreadoEnDesc(compra.getId())
-                .stream().map(abonoMapper::toDTO).collect(Collectors.toList());
-        dto.setAbonos(abonos);
+        dto.setAbonos(abonos.stream().map(abonoMapper::toDTO).collect(Collectors.toList()));
         return dto;
     }
 

@@ -1,20 +1,29 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Calendar, CheckCircle, CreditCard, X } from "lucide-react";
 import { formatCOP, formatFecha } from "../../utils/format";
-import { esActivo, esEnCursoPedido, formatReservaDisplay } from "../../utils/pedidoHelpers";
+import { esActivo, formatReservaDisplay } from "../../utils/pedidoHelpers";
 import MoneyInput from "../shared/MoneyInput";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
+import { fondoService } from "../../services/fondoService";
 
 /** Modal de cobro rápido: factura + registro de pagos (solo lectura) + finalizar. */
 export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
+  const { data: fondos = [] } = useQuery({
+    queryKey: ["fondos"],
+    queryFn: fondoService.listar,
+    staleTime: 60_000,
+  });
+  const cuentasNequi = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
+
   const [pagoForm, setPagoForm]         = useState({ moneda: "COP", monto: "" });
   const [showPagoForm, setShowPagoForm] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [confirm, setConfirm]           = useState(false);
   const abierto       = esActivo(pedido.estado);
-  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !esEnCursoPedido(pedido);
+  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
 
   const run = async (fn) => {
     setLoading(true); setError("");
@@ -152,7 +161,13 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
                     </div>
                     <div className="flex gap-2">
                       <select className="form-control text-sm w-28" value={pagoForm.moneda} onChange={(e) => setPagoForm((f) => ({ ...f, moneda: e.target.value }))}>
-                        <option value="COP">COP</option><option value="USD">USD</option><option value="NEQUI">Nequi</option>
+                        <option value="COP">COP</option>
+                        <option value="USD">USD</option>
+                        {cuentasNequi.map((f) => (
+                          <option key={f.moneda} value={f.moneda}>
+                            {f.alias ? `Nequi — ${f.alias}` : "Nequi"}
+                          </option>
+                        ))}
                       </select>
                       <MoneyInput className="form-control flex-1 text-sm" moneda={pagoForm.moneda}
                         placeholder={pagoForm.moneda === "USD" ? "Dólares" : "Pesos COP"}

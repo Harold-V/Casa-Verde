@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoCompra;
 import com.casaverde.backend.fachadaServices.dto.AbonoCompraDTO;
 import com.casaverde.backend.fachadaServices.dto.AbonoCompraRequest;
@@ -49,7 +51,7 @@ public class CompraController {
             @ApiResponse(responseCode = "201", description = "Compra registrada"),
             @ApiResponse(responseCode = "400", description = "Datos invalidos")
     })
-    public ResponseEntity<CompraDTO> registrar(@RequestBody CompraRequest req) {
+    public ResponseEntity<CompraDTO> registrar(@RequestBody @Valid CompraRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(compraService.registrar(req));
     }
 
@@ -69,7 +71,7 @@ public class CompraController {
     @Operation(summary = "Registrar abono", description = "Registra un abono normal o aplicado desde adelanto de proveedor")
     public ResponseEntity<AbonoCompraDTO> registrarAbono(
             @PathVariable Long id,
-            @RequestBody AbonoCompraRequest req) {
+            @RequestBody @Valid AbonoCompraRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(compraService.registrarAbono(id, req));
     }
 }

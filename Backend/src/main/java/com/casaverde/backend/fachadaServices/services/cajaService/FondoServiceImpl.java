@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,7 @@ import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.mapper.FondoMapper;
 import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
@@ -40,6 +43,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class FondoServiceImpl implements IFondoService {
+
+    private static final Logger log = LoggerFactory.getLogger(FondoServiceImpl.class);
 
     private final FondoRepository fondoRepo;
     private final CajaMovimientoRepository cajaMovimientoRepo;
@@ -74,6 +79,7 @@ public class FondoServiceImpl implements IFondoService {
         BigDecimal delta = nuevoSaldo.subtract(saldoAnterior);
 
         if (delta.compareTo(BigDecimal.ZERO) != 0) {
+            log.info("[ajustar] moneda={} nuevoSaldo={}", monedaNormalizada, nuevoSaldo);
             cajaMovimientoService.registrar(
                     CajaMovimientoTipo.AJUSTE_FONDO,
                     monedaNormalizada,
@@ -110,6 +116,7 @@ public class FondoServiceImpl implements IFondoService {
                 req.getConcepto(),
                 req.getObservacion());
 
+        log.info("[entrada] moneda={} monto={} concepto='{}'", monedaNorm, req.getMonto(), req.getConcepto());
         auditoriaService.registrar("fondo", null, "ENTRADA_MANUAL",
                 "Entrada manual " + monedaNorm + " " + req.getMonto() + ": " + req.getConcepto());
 
@@ -171,7 +178,7 @@ public class FondoServiceImpl implements IFondoService {
 
         // --- GMF 4x1000 — solo sobre la porción que excede el cupo libre mensual ---
         BigDecimal montoOrigenEfectivo = req.getMontoOrigen();
-        if (Boolean.TRUE.equals(req.getAplicar4x1000()) && origen.startsWith("NEQUI")) {
+        if (Boolean.TRUE.equals(req.getAplicar4x1000()) && origen.startsWith(MonedaConstants.NEQUI)) {
             // Cupo libre restante en este mes para la cuenta origen
             BigDecimal disponibleLibre = estadoNequiMes(origen).getDisponibleLibre();
             // Si el cupo ya está agotado (libre=0), grava todo; si no, solo el excedente
@@ -196,6 +203,7 @@ public class FondoServiceImpl implements IFondoService {
         BigDecimal montoCopSalida = calcMontoCop(origen, montoOrigenEfectivo, destino, req.getMontoDestino());
         BigDecimal montoCopEntrada = calcMontoCop(destino, req.getMontoDestino(), origen, montoOrigenEfectivo);
 
+        log.info("[transferencia] origen={} destino={} montoOrigen={}", origen, destino, montoOrigenEfectivo);
         cajaMovimientoService.registrar(
                 CajaMovimientoTipo.TRANSFERENCIA_SALIDA,
                 origen,
@@ -227,20 +235,20 @@ public class FondoServiceImpl implements IFondoService {
 
         // Verificar que no exista otro fondo NEQUI con el mismo alias
         boolean aliasExiste = fondoRepo.findAll().stream()
-                .filter(f -> f.getMoneda().startsWith("NEQUI"))
+                .filter(f -> f.getMoneda().startsWith(MonedaConstants.NEQUI))
                 .anyMatch(f -> aliasTrimmed.equalsIgnoreCase(f.getAlias()));
         if (aliasExiste)
             throw new ValidacionException("Ya existe una cuenta Nequi con el alias: " + aliasTrimmed);
 
         // Generar ID único: NEQUI_2, NEQUI_3, …
         long countNequi = fondoRepo.findAll().stream()
-                .filter(f -> f.getMoneda().startsWith("NEQUI"))
+                .filter(f -> f.getMoneda().startsWith(MonedaConstants.NEQUI))
                 .count();
-        String nuevaMoneda = "NEQUI_" + (countNequi + 1);
+        String nuevaMoneda = MonedaConstants.PREFIJO_NEQUI + (countNequi + 1);
         // Asegurar unicidad por si hay brechas por eliminaciones
         while (fondoRepo.findById(nuevaMoneda).isPresent()) {
             countNequi++;
-            nuevaMoneda = "NEQUI_" + (countNequi + 1);
+            nuevaMoneda = MonedaConstants.PREFIJO_NEQUI + (countNequi + 1);
         }
 
         Fondo nuevo = fondoRepo.save(Fondo.builder()
@@ -256,7 +264,7 @@ public class FondoServiceImpl implements IFondoService {
     @Transactional
     public void eliminarCuentaNequi(String moneda) {
         String m = moneda.toUpperCase();
-        if (!m.startsWith("NEQUI") || "NEQUI".equals(m))
+        if (!m.startsWith(MonedaConstants.NEQUI) || MonedaConstants.NEQUI.equals(m))
             throw new ValidacionException("Solo se pueden eliminar cuentas Nequi adicionales (no la principal)");
         Fondo fondo = fondoRepo.findById(m)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Cuenta Nequi no encontrada: " + m));
@@ -268,7 +276,7 @@ public class FondoServiceImpl implements IFondoService {
         String activa = getCuentaNequiActiva();
         if (m.equals(activa)) {
             configRepo.findById("cuenta_nequi_activa").ifPresent(c -> {
-                c.setValor("NEQUI");
+                c.setValor(MonedaConstants.NEQUI);
                 configRepo.save(c);
             });
         }
@@ -281,7 +289,7 @@ public class FondoServiceImpl implements IFondoService {
         return configRepo.findById("cuenta_nequi_activa")
                 .map(c -> c.getValor())
                 .filter(v -> v != null && !v.isBlank())
-                .orElse("NEQUI");
+                .orElse(MonedaConstants.NEQUI);
     }
 
     @Transactional(readOnly = true)
@@ -315,7 +323,7 @@ public class FondoServiceImpl implements IFondoService {
      */
     private BigDecimal calcMontoCop(String moneda, BigDecimal monto,
             String monedaOtra, BigDecimal montoOtro) {
-        if ("USD".equals(moneda) && !"USD".equals(monedaOtra)) {
+        if (MonedaConstants.USD.equals(moneda) && !MonedaConstants.USD.equals(monedaOtra)) {
             return montoOtro.setScale(0, java.math.RoundingMode.HALF_UP);
         }
         return monto.setScale(0, java.math.RoundingMode.HALF_UP);

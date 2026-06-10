@@ -3,10 +3,15 @@ package com.casaverde.backend.fachadaServices.services.pedidoService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -14,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
@@ -35,6 +41,7 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.PedidoTotales;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.mapper.PedidoMapper;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +49,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class PedidoServiceImpl implements IPedidoService {
+
+    private static final Logger log = LoggerFactory.getLogger(PedidoServiceImpl.class);
 
     private final PedidoRepository pedidoRepo;
     private final ProductoRepository productoRepo;
@@ -58,36 +67,54 @@ public class PedidoServiceImpl implements IPedidoService {
     @Transactional(readOnly = true)
     public List<PedidoDTO> listarActivos() {
         return pedidoRepo.findByEstadoInOrderByCreadoEnDesc(EstadoPedido.activos())
-                .stream().map(pedidoMapper::toDTO).collect(Collectors.toList());
+                .stream().map(p -> pedidoMapper.toDTO(p, calcularTotales(p))).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<PedidoDTO> listarTodos() {
         return pedidoRepo.findAllByOrderByCreadoEnDesc()
-                .stream().map(pedidoMapper::toDTO).collect(Collectors.toList());
+                .stream().map(p -> pedidoMapper.toDTO(p, calcularTotales(p))).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public Page<PedidoDTO> listarTodosPaginado(Pageable pageable) {
         return pedidoRepo.findAllByOrderByCreadoEnDesc(pageable)
-                .map(pedidoMapper::toDTO);
+                .map(p -> pedidoMapper.toDTO(p, calcularTotales(p)));
     }
 
     @Transactional(readOnly = true)
     public PedidoDTO obtener(Long id) {
-        return pedidoMapper.toDTO(findOrThrow(id));
+        Pedido pedido = findOrThrow(id);
+        return pedidoMapper.toDTO(pedido, calcularTotales(pedido));
     }
 
     @Transactional(readOnly = true)
     public String comprobanteTexto(Long id) {
         Pedido pedido = findOrThrow(id);
-        return comprobanteService.generar(pedidoMapper.toDTO(pedido));
+        return comprobanteService.generar(pedidoMapper.toDTO(pedido, calcularTotales(pedido)));
     }
 
     @Transactional
     public PedidoDTO crear(CrearPedidoRequest req) {
         if (req.getNombre() == null || req.getNombre().isBlank())
             throw new ValidacionException("El nombre del cliente es obligatorio");
+
+        boolean tieneFecha = req.getFechaReserva() != null && !req.getFechaReserva().isBlank();
+        boolean tieneHora  = req.getHoraReserva()  != null && !req.getHoraReserva().isBlank();
+        if (tieneFecha || tieneHora) {
+            ZonedDateTime now   = ZonedDateTime.now(ZoneId.of("America/Bogota"));
+            LocalDate     today = now.toLocalDate();
+            LocalDate rFecha = tieneFecha ? LocalDate.parse(req.getFechaReserva()) : today;
+            if (rFecha.isBefore(today))
+                throw new ValidacionException("La fecha de reserva ya pasó");
+            if (rFecha.isEqual(today) && tieneHora) {
+                LocalTime rHora = LocalTime.parse(req.getHoraReserva());
+                if (!rHora.isAfter(now.toLocalTime()))
+                    throw new ValidacionException("La hora de reserva ya pasó");
+            }
+        }
+
+        log.info("[crear] nombre='{}' detalles={}", req.getNombre(), req.getDetalles() != null ? req.getDetalles().size() : 0);
 
         Pedido pedido = Pedido.builder()
                 .nombre(req.getNombre().trim())
@@ -119,9 +146,9 @@ public class PedidoServiceImpl implements IPedidoService {
 
         if (req.getAbono() != null && req.getAbono().compareTo(BigDecimal.ZERO) > 0) {
             String moneda = monetaryService
-                    .normalizarMoneda(resolverMoneda(req.getMonedaAbono() != null ? req.getMonedaAbono() : "COP"));
+                    .normalizarMoneda(resolverMoneda(req.getMonedaAbono() != null ? req.getMonedaAbono() : MonedaConstants.COP));
             BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getAbono());
-            BigDecimal tasa = "USD".equals(moneda) ? getTasaVigente() : null;
+            BigDecimal tasa = MonedaConstants.USD.equals(moneda) ? getTasaVigente() : null;
             BigDecimal montoCop = monetaryService.convertirACop(moneda, monto, tasa);
             // El abono queda registrado en el pedido; el fondo solo se acredita al
             // finalizar
@@ -134,7 +161,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "CREAR",
                 "Pedido creado para " + guardado.getNombre());
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -170,7 +197,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR",
                 "Datos generales del pedido actualizados");
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -181,33 +208,10 @@ public class PedidoServiceImpl implements IPedidoService {
         if (req.getCantidad() == null || req.getCantidad() < 1)
             throw new ValidacionException("La cantidad debe ser al menos 1");
 
-        boolean merged = false;
-
-        if (req.getProductoId() != null) {
-            // Producto de catálogo: sumar si ya existe el mismo productoId
-            for (PedidoDetalle d : pedido.getDetalles()) {
-                if (d.getProducto() != null && d.getProducto().getId().equals(req.getProductoId())) {
-                    d.setCantidad(d.getCantidad() + req.getCantidad());
-                    merged = true;
-                    break;
-                }
-            }
+        Optional<PedidoDetalle> existente = buscarDetalleExistente(pedido, req);
+        if (existente.isPresent()) {
+            existente.get().setCantidad(existente.get().getCantidad() + req.getCantidad());
         } else {
-            // Ítem manual: sumar si mismo nombre y precio
-            String nombre = req.getNombreManual() != null ? req.getNombreManual().trim() : "";
-            BigDecimal precio = monetaryService.normalizarPrecioCop(req.getPrecioManual());
-            for (PedidoDetalle d : pedido.getDetalles()) {
-                if (d.getProducto() == null
-                        && nombre.equalsIgnoreCase(d.getNombreSnapshot())
-                        && precio.compareTo(d.getPrecioUnitarioCop()) == 0) {
-                    d.setCantidad(d.getCantidad() + req.getCantidad());
-                    merged = true;
-                    break;
-                }
-            }
-        }
-
-        if (!merged) {
             pedido.getDetalles().add(buildDetalle(pedido, req));
         }
 
@@ -215,7 +219,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "AGREGAR_ITEM",
                 "Item agregado o acumulado en el pedido");
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -229,7 +233,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "QUITAR_ITEM",
                 "Item eliminado del pedido: " + detalleId);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -253,7 +257,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR_ITEM",
                 "Item actualizado en el pedido: " + detalleId);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -268,7 +272,7 @@ public class PedidoServiceImpl implements IPedidoService {
 
         String moneda = monetaryService.normalizarMoneda(resolverMoneda(req.getMoneda()));
         BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getMonto());
-        BigDecimal tasaUsada = "USD".equals(moneda) ? getTasaVigente() : null;
+        BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? getTasaVigente() : null;
         BigDecimal montoCop = monetaryService.convertirACop(moneda, monto, tasaUsada);
 
         // El cobro queda en el pedido; el fondo solo se acredita al finalizar
@@ -278,22 +282,25 @@ public class PedidoServiceImpl implements IPedidoService {
         pedido.getPagos().add(pago);
 
         recalcularEstadoPago(pedido);
+        log.info("[registrarPago] pedidoId={} moneda={} montoCop={}", pedidoId, moneda, montoCop);
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "REGISTRAR_PAGO",
                 "Pago " + moneda + " " + monto + " equivalente COP " + montoCop);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
     public PedidoDTO finalizarPedido(Long pedidoId) {
         Pedido pedido = findOrThrow(pedidoId);
+        log.info("[finalizar] pedidoId={}", pedidoId);
         validarAbierto(pedido, "finalizar");
 
         if (pedido.getDetalles().isEmpty())
             throw new ValidacionException("El pedido no tiene ítems");
 
-        BigDecimal total = pedidoMapper.calcularTotal(pedido);
-        BigDecimal abonado = pedidoMapper.calcularAbonado(pedido);
+        PedidoTotales totalesFinalizacion = calcularTotales(pedido);
+        BigDecimal total = totalesFinalizacion.totalCop();
+        BigDecimal abonado = totalesFinalizacion.totalAbonado();
         recalcularEstadoPago(pedido);
         if (EstadoPedido.PAGADO != pedido.getEstado()) {
             throw new ValidacionException(String.format(
@@ -331,14 +338,16 @@ public class PedidoServiceImpl implements IPedidoService {
 
         finalizacionService.ejecutar(guardado, total);
 
+        log.info("[finalizar] pedidoId={} COMPLETADO", pedidoId);
         auditoriaService.registrar("pedido", guardado.getId(), "FINALIZAR",
                 "Pedido finalizado con total COP " + total);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
     public PedidoDTO anularPedido(Long pedidoId) {
         Pedido pedido = findOrThrow(pedidoId);
+        log.info("[anular] pedidoId={}", pedidoId);
         if (EstadoPedido.ANULADO == pedido.getEstado())
             throw new ValidacionException("El pedido ya está ANULADO");
         if (EstadoPedido.FINALIZADO == pedido.getEstado())
@@ -351,7 +360,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ANULAR",
                 "Pedido anulado con " + pedido.getPagos().size() + " pago(s) sin impacto en fondos");
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -370,7 +379,7 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "QUITAR_PAGO",
                 "Pago eliminado: " + pagoId);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
@@ -389,7 +398,7 @@ public class PedidoServiceImpl implements IPedidoService {
         // finalizar)
         String nuevaMoneda = monetaryService.normalizarMoneda(resolverMoneda(req.getMoneda()));
         BigDecimal nuevoMonto = monetaryService.normalizarMontoEntrada(nuevaMoneda, req.getMonto());
-        BigDecimal nuevaTasa = "USD".equals(nuevaMoneda) ? getTasaVigente() : null;
+        BigDecimal nuevaTasa = MonedaConstants.USD.equals(nuevaMoneda) ? getTasaVigente() : null;
         BigDecimal nuevoMontoCop = monetaryService.convertirACop(nuevaMoneda, nuevoMonto, nuevaTasa);
 
         pago.setMoneda(nuevaMoneda);
@@ -401,10 +410,26 @@ public class PedidoServiceImpl implements IPedidoService {
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR_PAGO",
                 "Pago actualizado: " + pagoId + " a " + nuevaMoneda + " " + nuevoMonto);
-        return pedidoMapper.toDTO(guardado);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     // ---- private helpers ----
+
+    private Optional<PedidoDetalle> buscarDetalleExistente(Pedido pedido, DetalleItemRequest req) {
+        if (req.getProductoId() != null) {
+            return pedido.getDetalles().stream()
+                    .filter(d -> d.getProducto() != null
+                            && d.getProducto().getId().equals(req.getProductoId()))
+                    .findFirst();
+        }
+        String nombre = req.getNombreManual() != null ? req.getNombreManual().trim() : "";
+        BigDecimal precio = monetaryService.normalizarPrecioCop(req.getPrecioManual());
+        return pedido.getDetalles().stream()
+                .filter(d -> d.getProducto() == null
+                        && nombre.equalsIgnoreCase(d.getNombreSnapshot())
+                        && precio.compareTo(d.getPrecioUnitarioCop()) == 0)
+                .findFirst();
+    }
 
     private PedidoDetalle buildDetalle(Pedido pedido, DetalleItemRequest req) {
         if (req.getCantidad() == null || req.getCantidad() < 1)
@@ -456,8 +481,8 @@ public class PedidoServiceImpl implements IPedidoService {
      */
     private String resolverMoneda(String moneda) {
         if (moneda == null)
-            return "COP";
-        return "NEQUI".equalsIgnoreCase(moneda.trim()) ? fondoService.getCuentaNequiActiva() : moneda.trim();
+            return MonedaConstants.COP;
+        return MonedaConstants.NEQUI.equalsIgnoreCase(moneda.trim()) ? fondoService.getCuentaNequiActiva() : moneda.trim();
     }
 
     private BigDecimal getTasaVigente() {
@@ -465,15 +490,20 @@ public class PedidoServiceImpl implements IPedidoService {
     }
 
     private void recalcularEstadoPago(Pedido pedido) {
-        if (!pedido.getEstado().permiteEdicion())
-            return;
-        pedido.setEstado(
-                EstadoPedido.calcular(pedidoMapper.calcularTotal(pedido), pedidoMapper.calcularAbonado(pedido)));
+        if (!pedido.getEstado().permiteEdicion()) return;
+        PedidoTotales t = calcularTotales(pedido);
+        pedido.setEstado(EstadoPedido.calcular(t.totalCop(), t.totalAbonado()));
     }
 
     private void validarAbierto(Pedido pedido, String accion) {
-        if (!pedido.getEstado().permiteEdicion())
+        if (!pedido.getEstado().permiteEdicion()) {
+            log.warn("[validarAbierto] pedidoId={} accion='{}' estado={}", pedido.getId(), accion, pedido.getEstado());
             throw new ValidacionException("No se puede " + accion + " en un pedido " + pedido.getEstado());
+        }
+    }
+
+    private PedidoTotales calcularTotales(Pedido pedido) {
+        return PedidoTotales.of(pedido);
     }
 
     private Pedido findOrThrow(Long id) {

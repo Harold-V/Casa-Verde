@@ -192,26 +192,6 @@ export function formatReservaDisplay(fechaStr, horaStr) {
   return [fecha, hora].filter(Boolean).join(" · ");
 }
 
-// ── Estado "en curso" de un pedido ────────────────────────────────────────────
-/**
- * Un pedido está "en curso" si está activo Y su momento ya llegó:
- * - Sin reserva → siempre en curso
- * - Reserva futura → NO en curso
- * - Reserva de hoy → en curso si la hora ya pasó (o no tiene hora)
- * - Reserva de día anterior → en curso (ya debería haberse atendido)
- */
-export function esEnCursoPedido(pedido) {
-  if (!esActivo(pedido.estado)) return false;
-  if (!pedido.fechaReserva && !pedido.horaReserva) return true;
-  const hoy = new Date().toLocaleDateString("en-CA");
-  const fechaRes = pedido.fechaReserva ?? hoy;
-  if (fechaRes > hoy) return false;
-  if (fechaRes < hoy) return true;
-  if (!pedido.horaReserva) return true;
-  const [hh, mm] = pedido.horaReserva.split(":").map(Number);
-  const now = new Date();
-  return hh * 60 + mm <= now.getHours() * 60 + now.getMinutes();
-}
 
 export const formatFraccion = (cantidad) => {
   if (cantidad === 1)      return "1";

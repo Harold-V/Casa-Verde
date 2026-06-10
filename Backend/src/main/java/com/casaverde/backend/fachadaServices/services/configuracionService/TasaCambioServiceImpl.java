@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,7 @@ public class TasaCambioServiceImpl implements ITasaCambioService {
     }
 
     @Transactional
+    @CacheEvict(value = "tasa-vigente", allEntries = true)
     public TasaCambioDTO registrar(BigDecimal valorCop) {
         valorCop = monetaryService.normalizarTasa(valorCop);
         TasaCambio tasa = TasaCambio.builder().valorCop(valorCop).build();
@@ -55,6 +58,7 @@ public class TasaCambioServiceImpl implements ITasaCambioService {
      * Lanza ValidacionException si no hay tasa configurada.
      * Usar en servicios que necesitan convertir USD a COP.
      */
+    @Cacheable("tasa-vigente")
     @Transactional(readOnly = true)
     public BigDecimal getValorVigente() {
         return repo.findVigente()

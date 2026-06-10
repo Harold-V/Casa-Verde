@@ -15,6 +15,7 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.Usuario;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 import com.casaverde.backend.fachadaServices.dto.BackupDTO;
 import com.casaverde.backend.fachadaServices.services.productoService.IBackupService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaDTO;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaRequest;
@@ -78,16 +79,16 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                     .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado o inactivo"));
         }
 
-        BigDecimal esperadoCop = saldoFondo("COP");
-        BigDecimal esperadoUsd = saldoFondo("USD");
-        BigDecimal esperadoNequi = saldoFondo("NEQUI");
+        BigDecimal esperadoCop = saldoFondo(MonedaConstants.COP);
+        BigDecimal esperadoUsd = saldoFondo(MonedaConstants.USD);
+        BigDecimal esperadoNequi = saldoFondo(MonedaConstants.NEQUI);
 
         if (tieneDenominaciones(request)) {
             request.setContadoCop(calcularContadoCopDesdeDenominaciones(request));
         }
-        BigDecimal contadoCop = normalizarOCero("COP", request.getContadoCop(), esperadoCop);
-        BigDecimal contadoUsd = normalizarOCero("USD", request.getContadoUsd(), esperadoUsd);
-        BigDecimal contadoNequi = normalizarOCero("NEQUI", request.getContadoNequi(), esperadoNequi);
+        BigDecimal contadoCop = normalizarOCero(MonedaConstants.COP, request.getContadoCop(), esperadoCop);
+        BigDecimal contadoUsd = normalizarOCero(MonedaConstants.USD, request.getContadoUsd(), esperadoUsd);
+        BigDecimal contadoNequi = normalizarOCero(MonedaConstants.NEQUI, request.getContadoNequi(), esperadoNequi);
 
         ResumenDiaDTO resumen = resumenService.obtener(fecha);
         BackupDTO backup = backupService.crearBackup("cierre-" + fecha);

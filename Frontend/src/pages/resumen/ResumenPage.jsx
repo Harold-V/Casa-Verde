@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, Download } from "lucide-react";
 import { resumenService } from "../../services/resumenService";
 import { cierreCajaService } from "../../services/cierreCajaService";
-import { tasaService } from "../../services/tasaService";
 import { exportacionService } from "../../services/exportacionService";
 import { useSessionStore } from "../../store/useSessionStore";
 import { formatCOP, formatFechaLabel, formatHora, formatUSD } from "../../utils/format";
@@ -21,8 +20,6 @@ export default function ResumenPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const usuario = useSessionStore((s) => s.usuario);
-  const { data: tasaData } = useQuery({ queryKey: ["tasa-vigente"], queryFn: tasaService.vigente, staleTime: 60_000, retry: false });
-  const tasaUsd = tasaData?.valorCop ?? null;
   const [hoy, setHoy] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [fecha, setFecha] = useState(() => location.state?.fecha ?? new Date().toLocaleDateString("en-CA"));
   const [paginaPedidos, setPaginaPedidos] = useState(0);
@@ -60,6 +57,23 @@ export default function ResumenPage() {
       qc.invalidateQueries({ queryKey: ["fondos"] });
     },
   });
+
+  const pedidosRealizados = useMemo(
+    () => (r?.pedidos ?? []).filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO").sort((a, b) => b.id - a.id),
+    [r]
+  );
+  const insumosMapResumen = useMemo(() => {
+    const map = new Map();
+    pedidosRealizados.forEach((p) => map.set(p.id, calcularInsumos(p.detalles ?? [])));
+    return map;
+  }, [pedidosRealizados]);
+  const totalPaginasPedidos = Math.max(1, Math.ceil(pedidosRealizados.length / PAGE_SIZE));
+  const paginaActualPedidos = Math.min(paginaPedidos, totalPaginasPedidos - 1);
+  const listaPaginaPedidos  = pedidosRealizados.slice(paginaActualPedidos * PAGE_SIZE, (paginaActualPedidos + 1) * PAGE_SIZE);
+  const gastos              = r?.gastos ?? [];
+  const totalPaginasGastos  = Math.max(1, Math.ceil(gastos.length / PAGE_SIZE));
+  const paginaActualGastos  = Math.min(paginaGastos, totalPaginasGastos - 1);
+  const listaPaginaGastos   = gastos.slice(paginaActualGastos * PAGE_SIZE, (paginaActualGastos + 1) * PAGE_SIZE);
 
   return (
     <div>
@@ -130,7 +144,7 @@ export default function ResumenPage() {
               <KpiCard
                 label="Dólares USD"
                 value={formatUSD(r.cobradoUsd)}
-                sub={tasaUsd ? `≈ ${formatCOP(r.cobradoUsd * tasaUsd)}` : undefined}
+                sub={`≈ ${formatCOP(r.cobradoTotalCop - r.cobradoCop - r.cobradoNequi)}`}
               />
             )}
             {r.cobradoNequi > 0 && (
@@ -176,20 +190,11 @@ export default function ResumenPage() {
             <div className="alert alert-error">{cerrarMut.error.message}</div>
           )}
 
-          {(() => {
-            const pedidosRealizados = r.pedidos
-              .filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO")
-              .sort((a, b) => b.id - a.id);
-            const fechaDisplay = formatFechaLabel(fecha);
-            const totalPaginasPedidos = Math.max(1, Math.ceil(pedidosRealizados.length / PAGE_SIZE));
-            const paginaActualPedidos = Math.min(paginaPedidos, totalPaginasPedidos - 1);
-            const listaPaginaPedidos = pedidosRealizados.slice(paginaActualPedidos * PAGE_SIZE, (paginaActualPedidos + 1) * PAGE_SIZE);
-            return (
-              <div className="card mb-4">
+          <div className="card mb-4">
                 <div className="card-header">
                   <span className="card-title shrink-0">
                     Pedidos realizados
-                    <span className="ml-2 text-[13px] font-normal text-gray-400">{fechaDisplay}</span>
+                    <span className="ml-2 text-[13px] font-normal text-gray-400">{formatFechaLabel(fecha)}</span>
                   </span>
                   <div className="flex-1 flex justify-center">
                     {pedidosRealizados.length > PAGE_SIZE && (
@@ -222,7 +227,7 @@ export default function ResumenPage() {
                       </thead>
                       <tbody>
                         {listaPaginaPedidos.map((p) => {
-                          const insumos = calcularInsumos(p.detalles ?? []);
+                          const insumos = insumosMapResumen.get(p.id) ?? {};
                           const gallina = insumos["gallina"];
                           const cuy     = insumos["cuy"];
                           return (
@@ -261,33 +266,26 @@ export default function ResumenPage() {
                     </table>
                   )}
                 </div>
-              </div>
-            );
-          })()}
+          </div>
 
           {/* Tabla gastos del día */}
-          {(() => {
-            const totalPaginasGastos = Math.max(1, Math.ceil(r.gastos.length / PAGE_SIZE));
-            const paginaActualGastos = Math.min(paginaGastos, totalPaginasGastos - 1);
-            const listaPaginaGastos = r.gastos.slice(paginaActualGastos * PAGE_SIZE, (paginaActualGastos + 1) * PAGE_SIZE);
-            return (
-              <div className="card">
+          <div className="card">
                 <div className="card-header">
                   <span className="card-title shrink-0">Gastos {formatFechaLabel(fecha)}</span>
                   <div className="flex-1 flex justify-center">
-                    {r.gastos.length > PAGE_SIZE && (
+                    {gastos.length > PAGE_SIZE && (
                       <Pagination
                         pagina={paginaActualGastos}
-                        totalItems={r.gastos.length}
+                        totalItems={gastos.length}
                         pageSize={PAGE_SIZE}
                         onChange={setPaginaGastos}
                       />
                     )}
                   </div>
-                  <span className="text-[13px] text-gray-500 shrink-0">{r.gastos.length} registro{r.gastos.length !== 1 ? "s" : ""}</span>
+                  <span className="text-[13px] text-gray-500 shrink-0">{gastos.length} registro{gastos.length !== 1 ? "s" : ""}</span>
                 </div>
                 <div className="table-wrap">
-                  {r.gastos.length === 0 ? (
+                  {gastos.length === 0 ? (
                     <div className="empty-state"><p>Sin gastos registrados para esta fecha</p></div>
                   ) : (
                     <table>
@@ -318,9 +316,7 @@ export default function ResumenPage() {
                     </table>
                   )}
                 </div>
-              </div>
-            );
-          })()}
+          </div>
         </>
       )}
     </div>

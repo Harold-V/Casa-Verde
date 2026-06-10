@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import com.casaverde.backend.fachadaServices.dto.*;
 import com.casaverde.backend.fachadaServices.services.empleadoService.IEmpleadoService;
 
@@ -48,7 +49,7 @@ public class EmpleadoController {
 
     @PostMapping("/{id}/adelantos")
     public ResponseEntity<AdelantoDTO> registrarAdelanto(
-            @PathVariable Long id, @RequestBody AdelantoRequest req) {
+            @PathVariable Long id, @RequestBody @Valid AdelantoRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(empleadoService.registrarAdelanto(id, req));
     }
@@ -90,7 +91,7 @@ public class EmpleadoController {
 
     @PostMapping("/{id}/pagos")
     public ResponseEntity<PagoEmpleadoDTO> liquidar(
-            @PathVariable Long id, @RequestBody PagoEmpleadoRequest req) {
+            @PathVariable Long id, @RequestBody @Valid PagoEmpleadoRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(empleadoService.liquidar(id, req));
     }

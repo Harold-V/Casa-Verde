@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { CheckCircle, ChevronDown, CreditCard, Pencil } from "lucide-react";
 import { formatCOP, formatCreadoEn } from "../../utils/format";
 import { ESTADO_BADGE } from "../../utils/constants";
-import { calcularInsumos, formatInsumo, esActivo, esEnCursoPedido, formatReservaDisplay } from "../../utils/pedidoHelpers";
+import { calcularInsumos, formatInsumo, esActivo, formatReservaDisplay } from "../../utils/pedidoHelpers";
 
-/** Tarjeta de pedido activo en la cuadrícula de PedidosPage. */
-export default function OrdenCard({ pedido, onEditar, onCobrar, expandidoInicial = false, idx = 0 }) {
+function OrdenCard({ pedido, onEditar, onCobrar, expandidoInicial = false, idx = 0 }) {
   const [expandido, setExpandido] = useState(expandidoInicial);
   useEffect(() => { if (expandidoInicial) setExpandido(true); }, [expandidoInicial]);
   const saldo        = Math.max(0, pedido.saldoPendiente ?? 0);
@@ -14,7 +13,7 @@ export default function OrdenCard({ pedido, onEditar, onCobrar, expandidoInicial
   const gallina      = insumos["gallina"];
   const cuy          = insumos["cuy"];
   const tieneReserva = !!(pedido.fechaReserva || pedido.horaReserva);
-  const enCurso      = esEnCursoPedido(pedido);
+  const enCurso      = pedido.enCurso;
   const nItems       = pedido.detalles?.length ?? 0;
   const pagado       = saldo <= 0 && (pedido.detalles?.length ?? 0) > 0;
 
@@ -172,3 +171,11 @@ export default function OrdenCard({ pedido, onEditar, onCobrar, expandidoInicial
     </div>
   );
 }
+
+export default memo(OrdenCard, (prev, next) =>
+  prev.pedido === next.pedido &&
+  prev.onEditar === next.onEditar &&
+  prev.onCobrar === next.onCobrar &&
+  prev.expandidoInicial === next.expandidoInicial &&
+  prev.idx === next.idx
+);

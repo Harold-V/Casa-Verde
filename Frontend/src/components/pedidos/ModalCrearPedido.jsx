@@ -67,22 +67,6 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
   const handleCrear = async () => {
     if (!nombre.trim()) { setError("El nombre del cliente es obligatorio"); return; }
     if (totalItems === 0) { setError("Agrega al menos un ítem al pedido"); return; }
-    if (on.fecha || on.hora) {
-      const now   = new Date();
-      const today = now.toLocaleDateString("en-CA");
-      const rFecha = on.fecha ? fecha : today;
-      if (rFecha < today) {
-        setError("La fecha de reserva ya pasó. Elige una fecha futura.");
-        return;
-      }
-      if (rFecha === today && on.hora) {
-        const [hh, mm] = hora.split(":").map(Number);
-        if (hh * 60 + mm <= now.getHours() * 60 + now.getMinutes()) {
-          setError("La hora de reserva ya pasó. Elige una hora posterior a la actual.");
-          return;
-        }
-      }
-    }
     setSaving(true); setError("");
     try {
       const detalles = [

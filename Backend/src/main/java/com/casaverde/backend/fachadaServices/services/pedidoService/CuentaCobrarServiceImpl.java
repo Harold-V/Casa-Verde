@@ -6,6 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +26,9 @@ import com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest;
 import com.casaverde.backend.fachadaServices.mapper.CuentaCobrarMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
+import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,10 +36,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
+    private static final Logger log = LoggerFactory.getLogger(CuentaCobrarServiceImpl.class);
+
     private final CuentaCobrarRepository cuentaRepo;
     private final AbonoCuentaCobrarRepository abonoRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
+    private final IMonetaryService monetaryService;
     private final IAuditoriaService auditoriaService;
     private final CuentaCobrarMapper mapper;
 
@@ -85,6 +92,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
         auditoriaService.registrar("CuentaCobrar", cuenta.getId(), "REGISTRAR",
                 "Deuda de " + req.getClienteNombre() + " por $" + req.getMonto());
+        log.info("[registrar] cliente='{}' monto={}", req.getClienteNombre(), req.getMonto());
         return enrich(cuenta);
     }
 
@@ -111,12 +119,10 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
             throw new ValidacionException("El monto del cobro debe ser mayor a 0");
 
-        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
+        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = "USD".equals(moneda)
-                ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
-                : req.getMonto().setScale(0, RoundingMode.HALF_UP);
-        BigDecimal tasaUsada = "USD".equals(moneda) ? tasaUsd : null;
+        BigDecimal montoCop = monetaryService.convertirACop(moneda, req.getMonto(), tasaUsd);
+        BigDecimal tasaUsada = MonedaConstants.USD.equals(moneda) ? tasaUsd : null;
 
         BigDecimal totalAbonado = abonoRepo.sumMontoCopByCuentaId(cuentaId);
         BigDecimal saldoPendiente = cuenta.getMonto().subtract(totalAbonado);
@@ -152,6 +158,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
         auditoriaService.registrar("AbonoCuentaCobrar", abono.getId(), "REGISTRAR",
                 "Cobro $" + req.getMonto() + " " + moneda + " de " + cuenta.getClienteNombre());
+        log.info("[abono] cuentaId={} monto={} moneda={}", cuentaId, req.getMonto(), moneda);
         return mapper.toAbonoDTO(abono);
     }
 
@@ -173,11 +180,13 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
 
     private CuentaCobrarDTO enrich(CuentaCobrar c) {
         CuentaCobrarDTO dto = mapper.toDTO(c);
-        BigDecimal totalAbonado = abonoRepo.sumMontoCopByCuentaId(c.getId());
+        List<AbonoCuentaCobrar> abonos = abonoRepo.findByCuentaIdOrderByCreadoEnDesc(c.getId());
+        BigDecimal totalAbonado = abonos.stream()
+                .map(AbonoCuentaCobrar::getMontoCop)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        dto.setAbonos(abonos.stream().map(mapper::toAbonoDTO).collect(Collectors.toList()));
         dto.setTotalAbonado(totalAbonado);
         dto.setSaldoPendiente(c.getMonto().subtract(totalAbonado));
-        dto.setAbonos(abonoRepo.findByCuentaIdOrderByCreadoEnDesc(c.getId())
-                .stream().map(mapper::toAbonoDTO).collect(Collectors.toList()));
         return dto;
     }
 }

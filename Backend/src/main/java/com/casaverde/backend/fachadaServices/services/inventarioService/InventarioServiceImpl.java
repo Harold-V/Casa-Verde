@@ -18,6 +18,8 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.models.enums.TipoMovimientoInventario;
 import com.casaverde.backend.fachadaServices.dto.ComparativoMensualDTO;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class InventarioServiceImpl implements IInventarioService {
+
+    private static final Logger log = LoggerFactory.getLogger(InventarioServiceImpl.class);
 
     private final InventarioRepository inventarioRepo;
     private final MovimientoInventarioRepository movimientoRepo;
@@ -111,6 +115,7 @@ public class InventarioServiceImpl implements IInventarioService {
                 .build();
 
         MovimientoInventario guardado = movimientoRepo.save(mov);
+        log.info("[movimiento] insumo='{}' tipo={} cantidad={} stockResultante={}", req.getInsumo(), req.getTipo(), req.getCantidad(), nuevoStock);
         auditoriaService.registrar("inventario", inv.getId(), "MOVIMIENTO_MANUAL",
                 req.getTipo() + " " + req.getCantidad() + " " + req.getInsumo());
         return inventarioMapper.toMovimientoDTO(guardado);
@@ -145,6 +150,7 @@ public class InventarioServiceImpl implements IInventarioService {
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void descontarPorPedido(Pedido pedido) {
+        log.info("[descontar] pedidoId={} detalles={}", pedido.getId(), pedido.getDetalles().size());
         Map<String, BigDecimal> consumos = calcularConsumos(pedido);
         validarStock(consumos);
         for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
@@ -193,6 +199,7 @@ public class InventarioServiceImpl implements IInventarioService {
                     .orElseThrow(() -> new ValidacionException(
                             "No existe inventario configurado para el insumo: " + consumo.getKey()));
             if (inv.getStockActual().compareTo(consumo.getValue()) < 0) {
+                log.warn("[validarStock] stock insuficiente insumo='{}' stockActual={} requerido={}", consumo.getKey(), inv.getStockActual(), consumo.getValue());
                 throw new ValidacionException("Stock insuficiente de " + consumo.getKey()
                         + ". Disponible: " + inv.getStockActual()
                         + ", requerido: " + consumo.getValue());

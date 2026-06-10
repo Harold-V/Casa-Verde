@@ -19,6 +19,7 @@ import com.casaverde.backend.fachadaServices.dto.AdelantoProveedorRequest;
 import com.casaverde.backend.fachadaServices.mapper.AdelantoProveedorMapper;
 import com.casaverde.backend.fachadaServices.services.configuracionService.ITasaCambioService;
 import com.casaverde.backend.fachadaServices.services.cajaService.ICajaMovimientoService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 
 import lombok.RequiredArgsConstructor;
@@ -51,9 +52,9 @@ public class AdelantoProveedorServiceImpl implements IAdelantoProveedorService {
         if (req.getPrecioUnitarioAcordado() == null || req.getPrecioUnitarioAcordado().compareTo(BigDecimal.ZERO) <= 0)
             throw new ValidacionException("El precio unitario acordado debe ser mayor a 0");
 
-        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : "COP";
+        String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
-        BigDecimal montoCop = "USD".equals(moneda)
+        BigDecimal montoCop = MonedaConstants.USD.equals(moneda)
                 ? req.getMonto().multiply(tasaUsd).setScale(0, RoundingMode.HALF_UP)
                 : req.getMonto().setScale(0, RoundingMode.HALF_UP);
 

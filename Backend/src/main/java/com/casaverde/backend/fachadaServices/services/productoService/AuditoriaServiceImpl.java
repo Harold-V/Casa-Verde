@@ -4,8 +4,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +30,16 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
             return repo.findByEntidadAndEntidadIdOrderByRegistradoEnDesc(entidad.trim(), entidadId)
                     .stream().map(auditoriaMapper::toDTO).collect(Collectors.toList());
         }
+        if (entidad != null && !entidad.isBlank()) {
+            return repo.findByEntidadOrderByRegistradoEnDesc(entidad.trim())
+                    .stream().map(auditoriaMapper::toDTO).collect(Collectors.toList());
+        }
+        if (entidadId != null) {
+            return repo.findByEntidadIdOrderByRegistradoEnDesc(entidadId)
+                    .stream().map(auditoriaMapper::toDTO).collect(Collectors.toList());
+        }
         return repo.findAllByOrderByRegistradoEnDesc()
-                .stream()
-                .filter(a -> entidad == null || entidad.isBlank() || entidad.trim().equals(a.getEntidad()))
-                .filter(a -> entidadId == null || entidadId.equals(a.getEntidadId()))
-                .map(auditoriaMapper::toDTO)
-                .collect(Collectors.toList());
+                .stream().map(auditoriaMapper::toDTO).collect(Collectors.toList());
     }
 
     @Override
@@ -44,11 +49,16 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
             return repo.findByEntidadAndEntidadIdOrderByRegistradoEnDesc(entidad.trim(), entidadId, pageable)
                     .map(auditoriaMapper::toDTO);
         }
-        if ((entidad == null || entidad.isBlank()) && entidadId == null) {
-            return repo.findAllByOrderByRegistradoEnDesc(pageable)
+        if (entidad != null && !entidad.isBlank()) {
+            return repo.findByEntidadOrderByRegistradoEnDesc(entidad.trim(), pageable)
                     .map(auditoriaMapper::toDTO);
         }
-        return paginarLista(listar(entidad, entidadId), pageable);
+        if (entidadId != null) {
+            return repo.findByEntidadIdOrderByRegistradoEnDesc(entidadId, pageable)
+                    .map(auditoriaMapper::toDTO);
+        }
+        return repo.findAllByOrderByRegistradoEnDesc(pageable)
+                .map(auditoriaMapper::toDTO);
     }
 
     @Transactional
@@ -58,13 +68,16 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
                 .entidadId(entidadId)
                 .accion(accion)
                 .detalle(detalle)
+                .usuario(resolverUsuario())
                 .build());
     }
 
-    private <T> Page<T> paginarLista(List<T> lista, Pageable pageable) {
-        int start = (int) Math.min(pageable.getOffset(), lista.size());
-        int end = Math.min(start + pageable.getPageSize(), lista.size());
-        return new PageImpl<>(lista.subList(start, end), pageable, lista.size());
+    private String resolverUsuario() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            return auth.getName();
+        }
+        return "sistema-local";
     }
 
 }
