@@ -469,7 +469,7 @@ public class PedidoServiceImpl implements IPedidoService {
                     .collect(Collectors.toList());
             return objectMapper.writeValueAsString(list);
         } catch (Exception e) {
-            return null;
+            throw new ValidacionException("Error serializando composición de inventario: " + e.getMessage());
         }
     }
 

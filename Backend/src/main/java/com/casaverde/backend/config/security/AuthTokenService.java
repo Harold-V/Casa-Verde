@@ -26,7 +26,8 @@ public class AuthTokenService {
 
     public String generar(Usuario usuario) {
         long expiraEn = Instant.now().plusSeconds(expirationHours * 3600).getEpochSecond();
-        String payload = usuario.getId() + ":" + usuario.getRol() + ":" + expiraEn;
+        // Payload: id:rol:expiraEn:nombre  (split limit=4 para tolerar ":" en el nombre)
+        String payload = usuario.getId() + ":" + usuario.getRol() + ":" + expiraEn + ":" + usuario.getNombre();
         return encode(payload) + "." + firmar(payload);
     }
 
@@ -47,15 +48,16 @@ public class AuthTokenService {
         if (!firmar(payload).equals(parts[1])) {
             return null;
         }
-        String[] campos = payload.split(":", 3);
-        if (campos.length != 3) {
+        String[] campos = payload.split(":", 4);
+        if (campos.length < 3) {
             return null;
         }
         long expiraEn = Long.parseLong(campos[2]);
         if (Instant.now().getEpochSecond() > expiraEn) {
             return null;
         }
-        return new UsuarioAutenticado(Long.valueOf(campos[0]), "usuario-" + campos[0], campos[1]);
+        String nombre = campos.length == 4 ? campos[3] : "usuario-" + campos[0];
+        return new UsuarioAutenticado(Long.valueOf(campos[0]), nombre, campos[1]);
     }
 
     private String firmar(String payload) {
