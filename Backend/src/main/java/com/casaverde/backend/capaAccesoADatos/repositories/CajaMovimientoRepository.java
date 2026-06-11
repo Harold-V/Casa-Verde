@@ -43,6 +43,18 @@ public interface CajaMovimientoRepository extends JpaRepository<CajaMovimiento, 
                      @Param("fin") LocalDateTime fin,
                      Pageable pageable);
 
+       @Query("SELECT c FROM CajaMovimiento c WHERE " +
+                     "(:moneda IS NULL OR c.moneda = :moneda) AND " +
+                     "(:tipo IS NULL OR c.tipo = :tipo) AND " +
+                     "(:inicio IS NULL OR c.registradoEn >= :inicio) AND " +
+                     "(:fin IS NULL OR c.registradoEn < :fin) " +
+                     "ORDER BY c.registradoEn DESC")
+       List<CajaMovimiento> findConFiltrosSinPaginar(
+                     @Param("moneda") String moneda,
+                     @Param("tipo") CajaMovimientoTipo tipo,
+                     @Param("inicio") LocalDateTime inicio,
+                     @Param("fin") LocalDateTime fin);
+
        /**
         * Suma el valor absoluto de todas las salidas (monto &lt; 0) de un fondo en el
         * rango dado.

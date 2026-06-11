@@ -54,8 +54,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         if (q != null && !q.isBlank()) {
             lista = cuentaRepo.findByClienteNombreContainingIgnoreCaseOrderByCreadoEnDesc(q.trim());
         } else if (estado != null && fecha != null) {
-            lista = cuentaRepo.findByEstadoOrderByCreadoEnDesc(estado)
-                    .stream().filter(c -> c.getFecha().equals(fecha)).collect(Collectors.toList());
+            lista = cuentaRepo.findByEstadoAndFechaOrderByCreadoEnDesc(estado, fecha);
         } else if (estado != null) {
             lista = cuentaRepo.findByEstadoOrderByCreadoEnDesc(estado);
         } else if (fecha != null) {

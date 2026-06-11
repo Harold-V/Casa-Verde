@@ -2,7 +2,17 @@ package com.casaverde.backend.fachadaServices.services.empleadoService;
 
 import java.util.List;
 
-import com.casaverde.backend.fachadaServices.dto.*;
+import com.casaverde.backend.fachadaServices.dto.AdelantoDTO;
+import com.casaverde.backend.fachadaServices.dto.AdelantoRequest;
+import com.casaverde.backend.fachadaServices.dto.EmpleadoDTO;
+import com.casaverde.backend.fachadaServices.dto.EmpleadoRequest;
+import com.casaverde.backend.fachadaServices.dto.EmpleadoResumenDTO;
+import com.casaverde.backend.fachadaServices.dto.PagoEmpleadoDTO;
+import com.casaverde.backend.fachadaServices.dto.PagoEmpleadoRequest;
+import com.casaverde.backend.fachadaServices.dto.TrabajoDiaDTO;
+import com.casaverde.backend.fachadaServices.dto.TrabajoDiaRequest;
+import com.casaverde.backend.fachadaServices.dto.VacacionDTO;
+import com.casaverde.backend.fachadaServices.dto.VacacionRequest;
 
 public interface IEmpleadoService {
 

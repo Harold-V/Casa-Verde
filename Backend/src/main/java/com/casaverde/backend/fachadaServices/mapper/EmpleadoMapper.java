@@ -3,8 +3,16 @@ package com.casaverde.backend.fachadaServices.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-import com.casaverde.backend.capaAccesoADatos.models.entitys.*;
-import com.casaverde.backend.fachadaServices.dto.*;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Adelanto;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Empleado;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.PagoEmpleado;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.TrabajoDia;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Vacacion;
+import com.casaverde.backend.fachadaServices.dto.AdelantoDTO;
+import com.casaverde.backend.fachadaServices.dto.EmpleadoDTO;
+import com.casaverde.backend.fachadaServices.dto.PagoEmpleadoDTO;
+import com.casaverde.backend.fachadaServices.dto.TrabajoDiaDTO;
+import com.casaverde.backend.fachadaServices.dto.VacacionDTO;
 
 @Mapper(componentModel = "spring")
 public interface EmpleadoMapper {

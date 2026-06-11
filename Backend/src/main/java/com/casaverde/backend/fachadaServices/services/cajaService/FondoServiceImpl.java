@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,20 +131,17 @@ public class FondoServiceImpl implements IFondoService {
 
     @Transactional(readOnly = true)
     public List<MovimientoFondoDTO> historial(LocalDate fecha, String moneda, String tipo) {
-        List<CajaMovimiento> caja = fecha != null
-                ? cajaMovimientoRepo.findByRegistradoEnBetweenOrderByRegistradoEnDesc(
-                        fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay())
-                : cajaMovimientoRepo.findAllByOrderByRegistradoEnDesc();
-
-        String monedaNormalizada = moneda == null || moneda.isBlank() ? null : monetaryService.normalizarMoneda(moneda);
-        String tipoNormalizado = tipo == null || tipo.isBlank() ? null : tipo.trim().toLowerCase(Locale.ROOT);
-
-        return caja.stream()
-                .map(fondoMapper::toMovimientoDTO)
-                .filter(m -> monedaNormalizada == null || monedaNormalizada.equals(m.getMoneda()))
-                .filter(m -> tipoNormalizado == null || tipoNormalizado.equalsIgnoreCase(m.getTipo()))
-                .sorted(Comparator.comparing(MovimientoFondoDTO::getFecha).reversed())
-                .collect(Collectors.toList());
+        String monedaNorm = (moneda != null && !moneda.isBlank()) ? monetaryService.normalizarMoneda(moneda) : null;
+        CajaMovimientoTipo tipoEnum = null;
+        if (tipo != null && !tipo.isBlank()) {
+            try {
+                tipoEnum = CajaMovimientoTipo.valueOf(tipo.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {}
+        }
+        LocalDateTime inicio = fecha != null ? fecha.atStartOfDay() : null;
+        LocalDateTime fin = fecha != null ? fecha.plusDays(1).atStartOfDay() : null;
+        return cajaMovimientoRepo.findConFiltrosSinPaginar(monedaNorm, tipoEnum, inicio, fin)
+                .stream().map(fondoMapper::toMovimientoDTO).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -335,12 +331,6 @@ public class FondoServiceImpl implements IFondoService {
             return montoOtro.setScale(0, java.math.RoundingMode.HALF_UP);
         }
         return monto.setScale(0, java.math.RoundingMode.HALF_UP);
-    }
-
-    private <T> Page<T> paginarLista(List<T> lista, Pageable pageable) {
-        int start = (int) Math.min(pageable.getOffset(), lista.size());
-        int end = Math.min(start + pageable.getPageSize(), lista.size());
-        return new PageImpl<>(lista.subList(start, end), pageable, lista.size());
     }
 
 }
