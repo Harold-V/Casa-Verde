@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -62,25 +63,25 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         } else {
             lista = cuentaRepo.findAllByOrderByCreadoEnDesc();
         }
-        return lista.stream().map(this::enrich).collect(Collectors.toList());
+        if (lista.isEmpty()) return List.of();
+        List<Long> ids = lista.stream().map(CuentaCobrar::getId).toList();
+        Map<Long, List<AbonoCuentaCobrar>> abonosPor = abonoRepo.findByCuentaIdIn(ids)
+                .stream().collect(Collectors.groupingBy(a -> a.getCuenta().getId()));
+        return lista.stream()
+                .map(c -> enrich(c, abonosPor.getOrDefault(c.getId(), List.of())))
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public CuentaCobrarDTO obtener(Long id) {
-        return enrich(findCuenta(id));
+        CuentaCobrar c = findCuenta(id);
+        return enrich(c, abonoRepo.findByCuentaIdOrderByCreadoEnDesc(id));
     }
 
     @Override
     @Transactional
     public CuentaCobrarDTO registrar(CuentaCobrarRequest req) {
-        if (req.getClienteNombre() == null || req.getClienteNombre().isBlank())
-            throw new ValidacionException("El nombre del cliente es obligatorio");
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto de la deuda debe ser mayor a 0");
-        if (req.getFecha() == null)
-            throw new ValidacionException("La fecha es obligatoria");
-
         CuentaCobrar cuenta = cuentaRepo.save(CuentaCobrar.builder()
                 .clienteNombre(req.getClienteNombre().trim())
                 .concepto(req.getConcepto())
@@ -93,7 +94,7 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         auditoriaService.registrar("CuentaCobrar", cuenta.getId(), "REGISTRAR",
                 "Deuda de " + req.getClienteNombre() + " por $" + req.getMonto());
         log.info("[registrar] cliente='{}' monto={}", req.getClienteNombre(), req.getMonto());
-        return enrich(cuenta);
+        return enrich(cuenta, List.of());
     }
 
     @Override
@@ -115,9 +116,6 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
         CuentaCobrar cuenta = findCuenta(cuentaId);
         if (cuenta.getEstado() == EstadoCuentaCobrar.CANCELADO)
             throw new ValidacionException("La cuenta ya está cancelada");
-
-        if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El monto del cobro debe ser mayor a 0");
 
         String moneda = req.getMoneda() != null ? req.getMoneda().trim().toUpperCase() : MonedaConstants.COP;
         BigDecimal tasaUsd = tasaCambioService.getValorVigente();
@@ -178,9 +176,8 @@ public class CuentaCobrarServiceImpl implements ICuentaCobrarService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Cuenta por cobrar no encontrada: " + id));
     }
 
-    private CuentaCobrarDTO enrich(CuentaCobrar c) {
+    private CuentaCobrarDTO enrich(CuentaCobrar c, List<AbonoCuentaCobrar> abonos) {
         CuentaCobrarDTO dto = mapper.toDTO(c);
-        List<AbonoCuentaCobrar> abonos = abonoRepo.findByCuentaIdOrderByCreadoEnDesc(c.getId());
         BigDecimal totalAbonado = abonos.stream()
                 .map(AbonoCuentaCobrar::getMontoCop)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

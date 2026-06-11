@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.AdelantoProveedor;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.capaAccesoADatos.repositories.AdelantoProveedorRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository;
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
@@ -30,6 +31,7 @@ public class AdelantoProveedorServiceImpl implements IAdelantoProveedorService {
 
     private final AdelantoProveedorRepository adelantoRepo;
     private final ProveedorRepository proveedorRepo;
+    private final InventarioRepository inventarioRepo;
     private final ICajaMovimientoService cajaMovimientoService;
     private final ITasaCambioService tasaCambioService;
     private final IAuditoriaService auditoriaService;
@@ -45,9 +47,11 @@ public class AdelantoProveedorServiceImpl implements IAdelantoProveedorService {
         if (req.getMonto() == null || req.getMonto().compareTo(BigDecimal.ZERO) <= 0)
             throw new ValidacionException("El monto del adelanto debe ser mayor a 0");
 
-        String insumoNorm = req.getInsumo() != null ? req.getInsumo().trim().toLowerCase() : "";
-        if (!List.of("gallina", "cuy").contains(insumoNorm))
-            throw new ValidacionException("El insumo debe ser 'gallina' o 'cuy'");
+        if (req.getInsumo() == null || req.getInsumo().isBlank())
+            throw new ValidacionException("El insumo es obligatorio");
+        String insumoNorm = req.getInsumo().trim().toLowerCase();
+        if (inventarioRepo.findByInsumo(insumoNorm).isEmpty())
+            throw new ValidacionException("El insumo '" + insumoNorm + "' no existe en el inventario");
 
         if (req.getPrecioUnitarioAcordado() == null || req.getPrecioUnitarioAcordado().compareTo(BigDecimal.ZERO) <= 0)
             throw new ValidacionException("El precio unitario acordado debe ser mayor a 0");

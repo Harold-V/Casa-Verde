@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -71,14 +72,20 @@ public class CompraServiceImpl implements ICompraService {
         } else {
             compras = compraRepo.findAllByOrderByCreadoEnDesc();
         }
-        return compras.stream().map(this::enrichCompraDTO).collect(Collectors.toList());
+        if (compras.isEmpty()) return List.of();
+        List<Long> ids = compras.stream().map(Compra::getId).toList();
+        Map<Long, List<AbonoCompra>> abonosPorCompra = abonoRepo.findByCompraIdIn(ids)
+                .stream().collect(Collectors.groupingBy(a -> a.getCompra().getId()));
+        return compras.stream()
+                .map(c -> enrichCompraDTO(c, abonosPorCompra.getOrDefault(c.getId(), List.of())))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public CompraDTO obtener(Long id) {
         Compra compra = compraRepo.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Compra no encontrada: " + id));
-        return enrichCompraDTO(compra);
+        return enrichCompraDTO(compra, abonoRepo.findByCompraIdOrderByCreadoEnDesc(id));
     }
 
     @Transactional
@@ -87,11 +94,6 @@ public class CompraServiceImpl implements ICompraService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Proveedor no encontrado: " + req.getProveedorId()));
         if (!proveedor.getActivo())
             throw new ValidacionException("El proveedor está inactivo");
-
-        if (req.getCantidad() == null || req.getCantidad().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("La cantidad debe ser mayor a 0");
-        if (req.getPrecioUnitario() == null || req.getPrecioUnitario().compareTo(BigDecimal.ZERO) <= 0)
-            throw new ValidacionException("El precio unitario debe ser mayor a 0");
 
         String insumoNorm = req.getInsumo().trim().toLowerCase();
         if (inventarioRepo.findByInsumo(insumoNorm).isEmpty())
@@ -118,7 +120,7 @@ public class CompraServiceImpl implements ICompraService {
                         + " a " + proveedor.getNombre() + " por $" + totalCop);
         log.info("[registrar] insumo='{}' cantidad={} proveedor='{}' totalCop={}", insumoNorm, req.getCantidad(), proveedor.getNombre(), totalCop);
 
-        return enrichCompraDTO(compra);
+        return enrichCompraDTO(compra, List.of());
     }
 
     @Transactional
@@ -255,9 +257,8 @@ public class CompraServiceImpl implements ICompraService {
 
     // --- helpers ---
 
-    private CompraDTO enrichCompraDTO(Compra compra) {
+    private CompraDTO enrichCompraDTO(Compra compra, List<AbonoCompra> abonos) {
         CompraDTO dto = compraMapper.toDTO(compra);
-        List<AbonoCompra> abonos = abonoRepo.findByCompraIdOrderByCreadoEnDesc(compra.getId());
         BigDecimal totalAbonado = abonos.stream()
                 .map(AbonoCompra::getMontoCop)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

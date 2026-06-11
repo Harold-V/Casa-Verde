@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.CajaMovimiento;
+import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 
 import java.math.BigDecimal;
 
@@ -24,6 +25,23 @@ public interface CajaMovimientoRepository extends JpaRepository<CajaMovimiento, 
                      LocalDateTime inicio, LocalDateTime fin, Pageable pageable);
 
        boolean existsByReferenciaTipoAndReferenciaIdAndTipo(String referenciaTipo, Long referenciaId, String tipo);
+
+       /**
+        * Historial paginado con filtros opcionales — todos los parámetros son nullable.
+        * Cuando un parámetro es null, ese filtro no se aplica.
+        */
+       @Query("SELECT c FROM CajaMovimiento c WHERE " +
+                     "(:moneda IS NULL OR c.moneda = :moneda) AND " +
+                     "(:tipo IS NULL OR c.tipo = :tipo) AND " +
+                     "(:inicio IS NULL OR c.registradoEn >= :inicio) AND " +
+                     "(:fin IS NULL OR c.registradoEn < :fin) " +
+                     "ORDER BY c.registradoEn DESC")
+       Page<CajaMovimiento> findConFiltros(
+                     @Param("moneda") String moneda,
+                     @Param("tipo") CajaMovimientoTipo tipo,
+                     @Param("inicio") LocalDateTime inicio,
+                     @Param("fin") LocalDateTime fin,
+                     Pageable pageable);
 
        /**
         * Suma el valor absoluto de todas las salidas (monto &lt; 0) de un fondo en el

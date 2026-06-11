@@ -3,6 +3,7 @@ package com.casaverde.backend.fachadaServices.services.cajaService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.Comparator;
@@ -149,15 +150,22 @@ public class FondoServiceImpl implements IFondoService {
 
     @Transactional(readOnly = true)
     public Page<MovimientoFondoDTO> historialPaginado(LocalDate fecha, String moneda, String tipo, Pageable pageable) {
-        if ((moneda != null && !moneda.isBlank()) || (tipo != null && !tipo.isBlank())) {
-            return paginarLista(historial(fecha, moneda, tipo), pageable);
+        String monedaNorm = (moneda != null && !moneda.isBlank()) ? monetaryService.normalizarMoneda(moneda) : null;
+
+        CajaMovimientoTipo tipoEnum = null;
+        if (tipo != null && !tipo.isBlank()) {
+            try {
+                tipoEnum = CajaMovimientoTipo.valueOf(tipo.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                // tipo desconocido — sin filtro de tipo
+            }
         }
 
-        Page<CajaMovimiento> page = fecha != null
-                ? cajaMovimientoRepo.findByRegistradoEnBetweenOrderByRegistradoEnDesc(
-                        fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay(), pageable)
-                : cajaMovimientoRepo.findAllByOrderByRegistradoEnDesc(pageable);
-        return page.map(fondoMapper::toMovimientoDTO);
+        LocalDateTime inicio = fecha != null ? fecha.atStartOfDay() : null;
+        LocalDateTime fin = fecha != null ? fecha.plusDays(1).atStartOfDay() : null;
+
+        return cajaMovimientoRepo.findConFiltros(monedaNorm, tipoEnum, inicio, fin, pageable)
+                .map(fondoMapper::toMovimientoDTO);
     }
 
     @Transactional

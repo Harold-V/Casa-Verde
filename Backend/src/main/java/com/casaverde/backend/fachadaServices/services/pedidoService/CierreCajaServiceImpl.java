@@ -81,7 +81,7 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
 
         BigDecimal esperadoCop = saldoFondo(MonedaConstants.COP);
         BigDecimal esperadoUsd = saldoFondo(MonedaConstants.USD);
-        BigDecimal esperadoNequi = saldoFondo(MonedaConstants.NEQUI);
+        BigDecimal esperadoNequi = saldoTotalNequi();
 
         if (tieneDenominaciones(request)) {
             request.setContadoCop(calcularContadoCopDesdeDenominaciones(request));
@@ -131,6 +131,14 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
         return fondoRepo.findById(moneda)
                 .map(Fondo::getSaldo)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    // Suma COP equivalente de NEQUI principal + todas las cuentas NEQUI adicionales
+    private BigDecimal saldoTotalNequi() {
+        return fondoRepo.findAll().stream()
+                .filter(f -> f.getMoneda().startsWith(MonedaConstants.NEQUI))
+                .map(Fondo::getSaldo)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal denom(Integer cantidad, long valorUnitario) {

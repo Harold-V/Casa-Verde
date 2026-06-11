@@ -35,11 +35,6 @@ public class ProveedorServiceImpl implements IProveedorService {
 
     @Transactional
     public ProveedorDTO crear(ProveedorRequest req) {
-        if (req.getNombre() == null || req.getNombre().isBlank())
-            throw new ValidacionException("El nombre del proveedor es obligatorio");
-        if (req.getTipo() == null)
-            throw new ValidacionException("El tipo de proveedor es obligatorio");
-
         Proveedor p = Proveedor.builder()
                 .nombre(req.getNombre().trim())
                 .tipo(req.getTipo())
@@ -54,11 +49,6 @@ public class ProveedorServiceImpl implements IProveedorService {
     public ProveedorDTO actualizar(Long id, ProveedorRequest req) {
         Proveedor p = proveedorRepo.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Proveedor no encontrado: " + id));
-        if (req.getNombre() == null || req.getNombre().isBlank())
-            throw new ValidacionException("El nombre del proveedor es obligatorio");
-        if (req.getTipo() == null)
-            throw new ValidacionException("El tipo de proveedor es obligatorio");
-
         p.setNombre(req.getNombre().trim());
         p.setTipo(req.getTipo());
         p.setTelefono(req.getTelefono() != null ? req.getTelefono().trim() : null);

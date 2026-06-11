@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 public interface AbonoCompraRepository extends JpaRepository<AbonoCompra, Long> {
     List<AbonoCompra> findByCompraIdOrderByCreadoEnAsc(Long compraId);
     List<AbonoCompra> findByCompraIdOrderByCreadoEnDesc(Long compraId);
+    List<AbonoCompra> findByCompraIdIn(List<Long> compraIds);
 
     @Query("SELECT COALESCE(SUM(a.montoCop), 0) FROM AbonoCompra a WHERE a.compra.id = :compraId")
     BigDecimal sumMontoCopByCompraId(@Param("compraId") Long compraId);
