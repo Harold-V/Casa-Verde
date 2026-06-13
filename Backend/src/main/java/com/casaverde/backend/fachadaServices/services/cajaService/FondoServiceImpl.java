@@ -18,7 +18,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.casaverde.backend.capaAccesoADatos.models.entitys.CajaMovimiento;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Fondo;
 import com.casaverde.backend.capaAccesoADatos.repositories.ConfiguracionGeneralRepository;
@@ -136,7 +135,8 @@ public class FondoServiceImpl implements IFondoService {
         if (tipo != null && !tipo.isBlank()) {
             try {
                 tipoEnum = CajaMovimientoTipo.valueOf(tipo.trim().toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException ignored) {
+            }
         }
         LocalDateTime inicio = fecha != null ? fecha.atStartOfDay() : null;
         LocalDateTime fin = fecha != null ? fecha.plusDays(1).atStartOfDay() : null;

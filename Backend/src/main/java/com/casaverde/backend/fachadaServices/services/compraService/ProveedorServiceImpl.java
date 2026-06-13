@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository;
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
-import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 import com.casaverde.backend.fachadaServices.dto.ProveedorDTO;
 import com.casaverde.backend.fachadaServices.dto.ProveedorRequest;
 import com.casaverde.backend.fachadaServices.mapper.ProveedorMapper;
