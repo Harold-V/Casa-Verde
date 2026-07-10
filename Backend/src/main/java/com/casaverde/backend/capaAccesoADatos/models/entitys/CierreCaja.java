@@ -31,31 +31,31 @@ public class CierreCaja {
     @Column(name = "usuario_nombre", length = 150)
     private String usuarioNombre;
 
-    @Column(nullable = false, precision = 19, scale = 0)
+    @Column(name = "esperado_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal esperadoCop;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(name = "esperado_usd", nullable = false, precision = 19, scale = 2)
     private BigDecimal esperadoUsd;
 
-    @Column(nullable = false, precision = 19, scale = 0)
+    @Column(name = "esperado_nequi", nullable = false, precision = 19, scale = 0)
     private BigDecimal esperadoNequi;
 
-    @Column(nullable = false, precision = 19, scale = 0)
+    @Column(name = "contado_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal contadoCop;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(name = "contado_usd", nullable = false, precision = 19, scale = 2)
     private BigDecimal contadoUsd;
 
-    @Column(nullable = false, precision = 19, scale = 0)
+    @Column(name = "contado_nequi", nullable = false, precision = 19, scale = 0)
     private BigDecimal contadoNequi;
 
-    @Column(nullable = false, precision = 19, scale = 0)
+    @Column(name = "diferencia_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal diferenciaCop;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(name = "diferencia_usd", nullable = false, precision = 19, scale = 2)
     private BigDecimal diferenciaUsd;
 
-    @Column(nullable = false, precision = 19, scale = 0)
+    @Column(name = "diferencia_nequi", nullable = false, precision = 19, scale = 0)
     private BigDecimal diferenciaNequi;
 
     @Column(name = "cobrado_total_cop", nullable = false, precision = 19, scale = 0)
