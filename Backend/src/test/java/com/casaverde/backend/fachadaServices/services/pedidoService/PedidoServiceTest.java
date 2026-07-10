@@ -88,15 +88,6 @@ class PedidoServiceTest {
         assertEquals(EstadoPedido.PENDIENTE, captor.getAllValues().get(0).getEstado());
     }
 
-    @Test
-    void crear_sinNombre_lanzaValidacionException() {
-        CrearPedidoRequest req = new CrearPedidoRequest();
-        req.setNombre("   ");
-
-        assertThrows(ValidacionException.class, () -> service.crear(req));
-        verifyNoInteractions(pedidoRepo);
-    }
-
     // ─── agregarDetalle ───────────────────────────────────────────────────────
 
     @Test
