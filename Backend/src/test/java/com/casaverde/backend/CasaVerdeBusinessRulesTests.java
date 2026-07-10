@@ -2,12 +2,21 @@ package com.casaverde.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
@@ -43,10 +52,22 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
+// app.security.enabled=true en application.properties base (el perfil "test" no lo
+// pisa). Se desactiva aqui porque el objetivo de los tests MockMvc de esta clase es
+// Bean Validation (@Valid), no el filtro de autenticacion — evita mezclar dos
+// responsabilidades distintas en la misma prueba.
 @SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
+@TestPropertySource(properties = "app.security.enabled=false")
 @Transactional
 class CasaVerdeBusinessRulesTests {
+
+        @Autowired
+        private MockMvc mvc;
+
+        @Autowired
+        private ObjectMapper objectMapper;
 
         @Autowired
         private IPedidoService pedidoService;
@@ -336,8 +357,17 @@ class CasaVerdeBusinessRulesTests {
                                 });
         }
 
+        // Estos tres casos ejercitan @Valid/Bean Validation sobre CompraRequest y
+        // AbonoCuentaCobrarRequest. @Valid solo se dispara cuando el request pasa por
+        // el DispatcherServlet (MethodArgumentNotValidException se resuelve al
+        // enlazar los argumentos del controller); llamar al service directo, como
+        // antes, nunca la ejercita. Por eso se prueban vía MockMvc contra el
+        // endpoint real en lugar de invocar el service. app.security.enabled=false
+        // en el perfil "test" (ver application-test.properties), asi que no hace
+        // falta autenticacion para llegar al filtro de validacion.
+
         @Test
-        void registrarAbonoCuentaCobrarConMontoNegativoEsRechazado() {
+        void registrarAbonoCuentaCobrarConMontoNegativoEsRechazadoPorValidacion() throws Exception {
                 ajustarFondo("COP", BigDecimal.valueOf(50000));
 
                 var req = new com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest();
@@ -351,19 +381,63 @@ class CasaVerdeBusinessRulesTests {
                 abonoReq.setMoneda("COP");
                 abonoReq.setFecha(LocalDate.now());
 
-                assertThatThrownBy(() -> cuentaCobrarService.registrarAbono(cuenta.getId(), abonoReq))
-                                .isInstanceOf(ValidacionException.class)
-                                .hasMessageContaining("mayor a 0");
+                mvc.perform(post("/api/v1/cuentas-cobrar/{id}/abonos", cuenta.getId())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(abonoReq)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("El monto debe ser mayor a 0"));
 
                 assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
                                 .isEqualByComparingTo(BigDecimal.valueOf(50000));
         }
 
         @Test
-        void registrarCompraConCantidadNegativaEsRechazada() {
+        void registrarAbonoCuentaCobrarConMontoCeroEsRechazadoPorValidacion() throws Exception {
+                ajustarFondo("COP", BigDecimal.valueOf(50000));
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest();
+                req.setClienteNombre("Pedro Test Cero");
+                req.setMonto(BigDecimal.valueOf(30000));
+                req.setFecha(LocalDate.now());
+                var cuenta = cuentaCobrarService.registrar(req);
+
+                var abonoReq = new com.casaverde.backend.fachadaServices.dto.AbonoCuentaCobrarRequest();
+                abonoReq.setMonto(BigDecimal.ZERO);
+                abonoReq.setMoneda("COP");
+                abonoReq.setFecha(LocalDate.now());
+
+                mvc.perform(post("/api/v1/cuentas-cobrar/{id}/abonos", cuenta.getId())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(abonoReq)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("El monto debe ser mayor a 0"));
+        }
+
+        @Test
+        void registrarAbonoCuentaCobrarConMontoNuloEsRechazadoPorValidacion() throws Exception {
+                var req = new com.casaverde.backend.fachadaServices.dto.CuentaCobrarRequest();
+                req.setClienteNombre("Pedro Test Nulo");
+                req.setMonto(BigDecimal.valueOf(30000));
+                req.setFecha(LocalDate.now());
+                var cuenta = cuentaCobrarService.registrar(req);
+
+                var abonoReq = new com.casaverde.backend.fachadaServices.dto.AbonoCuentaCobrarRequest();
+                abonoReq.setMonto(null);
+                abonoReq.setMoneda("COP");
+                abonoReq.setFecha(LocalDate.now());
+
+                mvc.perform(post("/api/v1/cuentas-cobrar/{id}/abonos", cuenta.getId())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(abonoReq)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("El monto es obligatorio"));
+        }
+
+        @Test
+        void registrarCompraConCantidadNegativaEsRechazadaPorValidacion() throws Exception {
                 var proveedor = proveedorRepository.save(
                                 com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
-                                                .nombre("Proveedor Test Cantidad")
+                                                .nombre("Proveedor Test Cantidad Negativa")
                                                 .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.GALLINA)
                                                 .activo(true)
                                                 .build());
@@ -375,23 +449,69 @@ class CasaVerdeBusinessRulesTests {
                 req.setPrecioUnitario(BigDecimal.valueOf(15000));
                 req.setFecha(LocalDate.now());
 
-                Inventario gallinaAntes = inventarioRepository.findByInsumo("gallina").orElseThrow();
-                BigDecimal stockAntes = gallinaAntes.getStockActual();
+                BigDecimal stockAntes = inventarioRepository.findByInsumo("gallina").orElseThrow().getStockActual();
 
-                assertThatThrownBy(() -> compraService.registrar(req))
-                                .isInstanceOf(ValidacionException.class)
-                                .hasMessageContaining("mayor a 0");
+                mvc.perform(post("/api/v1/compras")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("La cantidad debe ser mayor a 0"));
 
-                // El stock no debe haber cambiado
                 assertThat(inventarioRepository.findByInsumo("gallina").orElseThrow().getStockActual())
                                 .isEqualByComparingTo(stockAntes);
         }
 
         @Test
-        void registrarCompraConPrecioNegativoEsRechazada() {
+        void registrarCompraConCantidadCeroEsRechazadaPorValidacion() throws Exception {
                 var proveedor = proveedorRepository.save(
                                 com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
-                                                .nombre("Proveedor Test Precio")
+                                                .nombre("Proveedor Test Cantidad Cero")
+                                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.GALLINA)
+                                                .activo(true)
+                                                .build());
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("gallina");
+                req.setCantidad(BigDecimal.ZERO);
+                req.setPrecioUnitario(BigDecimal.valueOf(15000));
+                req.setFecha(LocalDate.now());
+
+                mvc.perform(post("/api/v1/compras")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("La cantidad debe ser mayor a 0"));
+        }
+
+        @Test
+        void registrarCompraConCantidadNulaEsRechazadaPorValidacion() throws Exception {
+                var proveedor = proveedorRepository.save(
+                                com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                                .nombre("Proveedor Test Cantidad Nula")
+                                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.GALLINA)
+                                                .activo(true)
+                                                .build());
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("gallina");
+                req.setCantidad(null);
+                req.setPrecioUnitario(BigDecimal.valueOf(15000));
+                req.setFecha(LocalDate.now());
+
+                mvc.perform(post("/api/v1/compras")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("La cantidad es obligatoria"));
+        }
+
+        @Test
+        void registrarCompraConPrecioNegativoEsRechazadaPorValidacion() throws Exception {
+                var proveedor = proveedorRepository.save(
+                                com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                                .nombre("Proveedor Test Precio Negativo")
                                                 .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.CUY)
                                                 .activo(true)
                                                 .build());
@@ -403,9 +523,57 @@ class CasaVerdeBusinessRulesTests {
                 req.setPrecioUnitario(BigDecimal.valueOf(-1000));
                 req.setFecha(LocalDate.now());
 
-                assertThatThrownBy(() -> compraService.registrar(req))
-                                .isInstanceOf(ValidacionException.class)
-                                .hasMessageContaining("mayor a 0");
+                mvc.perform(post("/api/v1/compras")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("El precio unitario debe ser mayor a 0"));
+        }
+
+        @Test
+        void registrarCompraConPrecioCeroEsRechazadaPorValidacion() throws Exception {
+                var proveedor = proveedorRepository.save(
+                                com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                                .nombre("Proveedor Test Precio Cero")
+                                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.CUY)
+                                                .activo(true)
+                                                .build());
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("cuy");
+                req.setCantidad(BigDecimal.valueOf(3));
+                req.setPrecioUnitario(BigDecimal.ZERO);
+                req.setFecha(LocalDate.now());
+
+                mvc.perform(post("/api/v1/compras")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("El precio unitario debe ser mayor a 0"));
+        }
+
+        @Test
+        void registrarCompraConPrecioNuloEsRechazadaPorValidacion() throws Exception {
+                var proveedor = proveedorRepository.save(
+                                com.casaverde.backend.capaAccesoADatos.models.entitys.Proveedor.builder()
+                                                .nombre("Proveedor Test Precio Nulo")
+                                                .tipo(com.casaverde.backend.capaAccesoADatos.models.enums.TipoProveedor.CUY)
+                                                .activo(true)
+                                                .build());
+
+                var req = new com.casaverde.backend.fachadaServices.dto.CompraRequest();
+                req.setProveedorId(proveedor.getId());
+                req.setInsumo("cuy");
+                req.setCantidad(BigDecimal.valueOf(3));
+                req.setPrecioUnitario(null);
+                req.setFecha(LocalDate.now());
+
+                mvc.perform(post("/api/v1/compras")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.mensaje").value("El precio unitario es obligatorio"));
         }
 
         @Test

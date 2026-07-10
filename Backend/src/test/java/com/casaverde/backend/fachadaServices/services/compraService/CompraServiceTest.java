@@ -74,9 +74,9 @@ class CompraServiceTest {
         when(inventarioRepo.findByInsumo("gallina")).thenReturn(Optional.of(inv));
         when(inventarioRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(movimientoRepo.save(any())).thenReturn(new MovimientoInventario());
-        // enrichCompraDTO stubs
+        // registrar() pasa List.of() directo a enrichCompraDTO (no consulta abonoRepo,
+        // una compra recien creada no puede tener abonos) — solo se stubea compraMapper.
         when(compraMapper.toDTO(any())).thenReturn(new CompraDTO());
-        when(abonoRepo.findByCompraIdOrderByCreadoEnDesc(any())).thenReturn(List.of());
 
         CompraRequest req = new CompraRequest();
         req.setProveedorId(1L);
