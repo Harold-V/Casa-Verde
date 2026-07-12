@@ -67,7 +67,10 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
             throw new ValidacionException("La caja ya fue cerrada para la fecha: " + fecha);
         }
 
-        long pedidosAbiertos = pedidoRepo.countByEstadoIn(EstadoPedido.activos());
+        // Una reserva solo bloquea el cierre del día exacto al que corresponde
+        // (fechaReserva == fecha). Reservas de otro día (antes o después) no
+        // cuentan; pedidos sin reserva cuentan siempre que estén activos.
+        long pedidosAbiertos = pedidoRepo.countActivosParaFecha(EstadoPedido.activos(), fecha);
         if (pedidosAbiertos > 0) {
             throw new ValidacionException("No se puede cerrar caja con " + pedidosAbiertos + " pedido(s) pendiente(s)");
         }

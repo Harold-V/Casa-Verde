@@ -128,6 +128,21 @@ export default function ResumenPage() {
             )}
           </div>
 
+          {/* Animales vendidos */}
+          {((r.cuyesVendidos ?? 0) > 0 || (r.gallinasVendidas ?? 0) > 0) && (
+            <>
+              <div className="font-semibold text-verde-oscuro mb-2">Animales vendidos</div>
+              <div className="kpi-grid mb-5">
+                {(r.cuyesVendidos ?? 0) > 0 && (
+                  <KpiCard label="Cuyes vendidos" value={formatInsumo("cuy", r.cuyesVendidos) ?? "0"} />
+                )}
+                {(r.gallinasVendidas ?? 0) > 0 && (
+                  <KpiCard label="Gallinas vendidas" value={formatInsumo("gallina", r.gallinasVendidas) ?? "0"} />
+                )}
+              </div>
+            </>
+          )}
+
           {/* Cobros del día */}
           <div className="font-semibold text-verde-oscuro mb-2">Cobros del día</div>
           <div className="kpi-grid mb-5">

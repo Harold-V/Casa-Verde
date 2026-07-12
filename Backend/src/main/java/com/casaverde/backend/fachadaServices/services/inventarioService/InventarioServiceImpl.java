@@ -152,7 +152,8 @@ public class InventarioServiceImpl implements IInventarioService {
         }
     }
 
-    private Map<String, BigDecimal> calcularConsumos(Pedido pedido) {
+    @Override
+    public Map<String, BigDecimal> calcularConsumos(Pedido pedido) {
         Map<String, BigDecimal> consumos = new LinkedHashMap<>();
         for (PedidoDetalle detalle : pedido.getDetalles()) {
             if (detalle.getComposicionSnapshot() == null || detalle.getComposicionSnapshot().isBlank())
@@ -170,7 +171,11 @@ public class InventarioServiceImpl implements IInventarioService {
                     throw new ValidacionException("Cantidad de inventario invalida para " + insumo
                             + " en el item: " + detalle.getNombreSnapshot());
                 }
-                consumos.merge(insumo.trim(),
+                // Misma normalización que ProductoServiceImpl.aplicarComposicion() usa al
+                // guardar la composición (trim+lowercase) — así el insumo aquí (leído del
+                // snapshot) siempre coincide con las claves de "inventario", sin importar
+                // cómo se haya escrito originalmente.
+                consumos.merge(insumo.trim().toLowerCase(),
                         cantPorUnidad.multiply(BigDecimal.valueOf(detalle.getCantidad())),
                         BigDecimal::add);
             }

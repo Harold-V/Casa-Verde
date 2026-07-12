@@ -2,6 +2,7 @@ package com.casaverde.backend.fachadaServices.services.inventarioService;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +28,9 @@ public interface IInventarioService {
     MovimientoInventarioDTO registrarMovimiento(MovimientoRequest req);
 
     void descontarPorPedido(Pedido pedido);
+
+    /** Insumo -> cantidad requerida por el pedido, leída del composicionSnapshot de cada detalle. */
+    Map<String, BigDecimal> calcularConsumos(Pedido pedido);
 
     InventarioDTO actualizarAlerta(String insumo, BigDecimal alertaMinima);
 

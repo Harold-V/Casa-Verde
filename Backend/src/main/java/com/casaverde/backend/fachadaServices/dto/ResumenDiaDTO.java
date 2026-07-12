@@ -18,6 +18,11 @@ public class ResumenDiaDTO {
     private long pedidosFinalizados;
     private long pedidosAnulados;
 
+    // Animales vendidos (pedidos finalizados en la fecha, nunca anulados/pendientes/
+    // reservas futuras). Misma unidad fraccionada que usa inventario (0.5 = medio, etc.)
+    private BigDecimal cuyesVendidos;
+    private BigDecimal gallinasVendidas;
+
     private BigDecimal cobradoCop;
     private BigDecimal cobradoUsd;
     private BigDecimal cobradoNequi;

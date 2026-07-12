@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
@@ -26,6 +27,7 @@ import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoReposit
 import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.HistorialAuditoriaRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoPrecioHistorialRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.TasaCambioRepository;
@@ -43,6 +45,8 @@ import com.casaverde.backend.fachadaServices.dto.UsuarioDTO;
 import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.ICierreCajaService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.IPedidoService;
+import com.casaverde.backend.fachadaServices.services.pedidoService.IResumenService;
+import com.casaverde.backend.fachadaServices.dto.ResumenDiaDTO;
 import com.casaverde.backend.fachadaServices.services.cajaService.IGastoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IProductoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
@@ -116,6 +120,13 @@ class CasaVerdeBusinessRulesTests {
 
         @Autowired
         private com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository proveedorRepository;
+
+        @Autowired
+        private IResumenService resumenService;
+
+        @Autowired
+        private PedidoRepository pedidoRepository;
+
 
         @Test
         void noFinalizaPedidoSiNoHayStockSuficiente() {
@@ -631,6 +642,223 @@ class CasaVerdeBusinessRulesTests {
                 PedidoDTO pedido = pedidoService.crear(req);
                 assertThat(pedido.getId()).isNotNull();
                 assertThat(pedido.getFechaReserva()).isEqualTo(LocalDate.now().plusDays(1).toString());
+        }
+
+        // ── Resumen del día: animales vendidos (fracciones, exclusiones) ──────────
+
+        @Test
+        void resumenCuentaUnCuyCompletoVendido() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente cuy", List.of(detalleProducto("Cuy", 1)));
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void resumenCuentaCantidadFraccionadaDeCuy() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente medio cuy", List.of(detalleProducto("1/2 Cuy", 1)));
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(new BigDecimal("0.5"));
+        }
+
+        @Test
+        void resumenCuentaUnaGallinaCompletaVendida() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente gallina", List.of(detalleProducto("Gallina", 1)));
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getGallinasVendidas()).isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void resumenCuentaCantidadFraccionadaDeGallina() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente media gallina", List.of(detalleProducto("1/2 Gallina", 1)));
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getGallinasVendidas()).isEqualByComparingTo(new BigDecimal("0.5"));
+        }
+
+        @Test
+        void resumenCuentaCuyYGallinaEnElMismoPedido() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente mixto",
+                                List.of(detalleProducto("Cuy", 1), detalleProducto("Gallina", 1)));
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
+                assertThat(resumen.getGallinasVendidas()).isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void resumenNoCuentaPedidoAnuladoComoVendido() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente anulado");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.anularPedido(pedido.getId());
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(resumen.getPedidosAnulados()).isEqualTo(1);
+        }
+
+        // Criterio final: una reserva (fechaReserva != null) solo pertenece al
+        // resumen/cierre de "fecha" cuando fechaReserva es EXACTAMENTE esa fecha —
+        // ni antes (vencida de otro día) ni después (futura). Un pedido sin reserva
+        // (fechaReserva == null) conserva el criterio anterior sin cambios: por
+        // creadoEn en el resumen, sin restricción de fecha en el cierre.
+        //
+        // crear() rechaza fechaReserva en el pasado (no se puede reservar "ayer"),
+        // así que para simular una reserva vencida de un día anterior se crea con
+        // fechaReserva=hoy (válido) y se "envejece" directamente vía repositorio —
+        // exactamente el escenario real: una reserva de ayer que nadie resolvió.
+
+        @Test
+        void reservaDeAyerQuedaExcluidaDelResumenDeHoy() {
+                asegurarStockAlto();
+                Long pedidoId = crearReservaHoyYEnvejecerA(hoyBogota().minusDays(1));
+
+                ResumenDiaDTO resumenHoy = resumenService.obtener(hoyBogota());
+                assertThat(resumenHoy.getPedidosTotales()).isEqualTo(0);
+                assertThat(resumenHoy.getPedidosAbiertos()).isEqualTo(0);
+                assertThat(pedidoId).isNotNull();
+        }
+
+        @Test
+        void reservaDeHoyIncluidaEnElResumen() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva hoy");
+                req.setFechaReserva(hoyBogota().toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", pedido.getTotalCop()));
+                pedidoService.finalizarPedido(pedido.getId());
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
+                assertThat(resumen.getPedidosFinalizados()).isEqualTo(1);
+        }
+
+        @Test
+        void reservaDeMananaExcluidaDelResumenDeHoy() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva mañana");
+                req.setFechaReserva(hoyBogota().plusDays(1).toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                pedidoService.crear(req);
+
+                ResumenDiaDTO resumenHoy = resumenService.obtener(hoyBogota());
+                assertThat(resumenHoy.getPedidosTotales()).isEqualTo(0);
+                assertThat(resumenHoy.getPedidosAbiertos()).isEqualTo(0);
+                assertThat(resumenHoy.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        void reservaDeAyerNoBloqueaElCierreDeHoy() {
+                asegurarStockAlto();
+                crearReservaHoyYEnvejecerA(hoyBogota().minusDays(1));
+
+                CierreCajaRequest cierre = new CierreCajaRequest();
+                cierre.setFecha(hoyBogota());
+                assertThat(cierreCajaService.cerrar(cierre)).isNotNull();
+        }
+
+        @Test
+        void reservaDeMananaNoBloqueaElCierreDeHoy() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva mañana cierre");
+                req.setFechaReserva(hoyBogota().plusDays(1).toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                pedidoService.crear(req);
+
+                CierreCajaRequest cierre = new CierreCajaRequest();
+                cierre.setFecha(hoyBogota());
+                assertThat(cierreCajaService.cerrar(cierre)).isNotNull();
+        }
+
+        @Test
+        void reservaDeHoyActivaSiBloqueaElCierre() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva hoy sin resolver");
+                req.setFechaReserva(hoyBogota().toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                pedidoService.crear(req); // PENDIENTE — nunca se paga ni finaliza
+
+                CierreCajaRequest cierre = new CierreCajaRequest();
+                cierre.setFecha(hoyBogota());
+                assertThatThrownBy(() -> cierreCajaService.cerrar(cierre))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("pendiente");
+        }
+
+        // ── Helpers para los casos de arriba ────────────────────────────────────────
+
+        private LocalDate hoyBogota() {
+                return LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+        }
+
+        /**
+         * crear() rechaza fechaReserva en el pasado, así que para simular una
+         * reserva vencida (creada para hoy, nunca resuelta, ahora "de ayer" u
+         * otro día anterior) se crea válida para hoy y se envejece directo vía
+         * repositorio — el mismo estado en que quedaría una reserva real sin
+         * atender.
+         */
+        private Long crearReservaHoyYEnvejecerA(LocalDate fechaEnvejecida) {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Reserva envejecida a " + fechaEnvejecida);
+                req.setFechaReserva(hoyBogota().toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO creado = pedidoService.crear(req);
+
+                Pedido entidad = pedidoRepository.findById(creado.getId()).orElseThrow();
+                entidad.setFechaReserva(fechaEnvejecida);
+                pedidoRepository.save(entidad);
+                return creado.getId();
+        }
+
+        private void asegurarStockAlto() {
+                for (String insumo : new String[] { "cuy", "gallina" }) {
+                        Inventario inv = inventarioRepository.findByInsumo(insumo).orElseThrow();
+                        inv.setStockActual(BigDecimal.valueOf(50));
+                        inventarioRepository.save(inv);
+                }
+                // El seed inicial (DataInitializer) crea Cuy/Gallina y sus fracciones con
+                // precio 0.0 (se configuran luego desde la UI) — sin precio no hay saldo
+                // que cobrar y finalizarPedido() nunca llega a PAGADO.
+                for (String nombre : new String[] { "Cuy", "1/2 Cuy", "1/4 Cuy", "Gallina", "1/2 Gallina" }) {
+                        Producto p = productoPorNombre(nombre);
+                        p.setPrecio(BigDecimal.valueOf(10000));
+                        productoRepository.save(p);
+                }
+        }
+
+        private Producto productoPorNombre(String nombre) {
+                return productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                                .filter(p -> nombre.equals(p.getNombre()))
+                                .findFirst()
+                                .orElseThrow(() -> new AssertionError("Producto no encontrado en seed: " + nombre));
+        }
+
+        private DetalleItemRequest detalleProducto(String nombreProducto, int cantidad) {
+                return new DetalleItemRequest(productoPorNombre(nombreProducto).getId(), null, null, cantidad);
+        }
+
+        private PedidoDTO crearPagarYFinalizar(String cliente, List<DetalleItemRequest> detalles) {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre(cliente);
+                req.setDetalles(detalles);
+                PedidoDTO pedido = pedidoService.crear(req);
+                if (pedido.getTotalCop().compareTo(BigDecimal.ZERO) > 0) {
+                        pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", pedido.getTotalCop()));
+                }
+                return pedidoService.finalizarPedido(pedido.getId());
         }
 
         private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {

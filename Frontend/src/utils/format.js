@@ -5,21 +5,15 @@ const sysTZ = () => {
 };
 
 /**
- * Formatea una fecha YYYY-MM-DD para encabezados de tabla.
- * Ejemplos: "hoy · 1 de junio", "ayer · 31 de mayo", "15 de marzo", "15 de marzo de 2024"
+ * Formatea una fecha YYYY-MM-DD como dd/MM/yyyy para el módulo de Resumen del día.
+ * Solo presentación — el estado interno de fecha sigue siendo YYYY-MM-DD
+ * (query params, React Query keys, etc. no cambian).
+ * Ejemplo: "2026-07-10" → "10/07/2026"
  */
 export const formatFechaLabel = (fechaStr) => {
   if (!fechaStr) return "";
-  const hoy  = new Date().toLocaleDateString("en-CA");
-  const ayer = new Date(Date.now() - 86_400_000).toLocaleDateString("en-CA");
-  const d    = new Date(fechaStr + "T12:00:00");
-  const opts = d.getFullYear() === new Date().getFullYear()
-    ? { day: "numeric", month: "long" }
-    : { day: "numeric", month: "long", year: "numeric" };
-  const etiqueta = d.toLocaleDateString("es-CO", opts);
-  if (fechaStr === hoy)  return `hoy · ${etiqueta}`;
-  if (fechaStr === ayer) return `ayer · ${etiqueta}`;
-  return etiqueta;
+  const [y, m, d] = fechaStr.split("-");
+  return `${d}/${m}/${y}`;
 };
 
 export const formatFecha = (isoString) => {
