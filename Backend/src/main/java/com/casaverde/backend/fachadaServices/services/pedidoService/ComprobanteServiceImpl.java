@@ -19,6 +19,9 @@ public class ComprobanteServiceImpl implements IComprobanteService {
         sb.append("Comprobante pedido #").append(dto.getId()).append(System.lineSeparator());
         sb.append("--------------------------------").append(System.lineSeparator());
         sb.append("Cliente: ").append(dto.getNombre()).append(System.lineSeparator());
+        if (dto.getTelefono() != null) {
+            sb.append("Telefono: ").append(dto.getTelefono()).append(System.lineSeparator());
+        }
         sb.append("Estado: ").append(dto.getEstado()).append(System.lineSeparator());
         if (dto.getSalonNombre() != null || dto.getMesa() != null) {
             sb.append("Ubicacion: ")
@@ -39,6 +42,14 @@ public class ComprobanteServiceImpl implements IComprobanteService {
                     .append(System.lineSeparator());
         }
         sb.append("--------------------------------").append(System.lineSeparator());
+        if (dto.getDescuentoCop() != null && dto.getDescuentoCop().compareTo(BigDecimal.ZERO) > 0) {
+            sb.append("Subtotal COP: ").append(dto.getSubtotalCop()).append(System.lineSeparator());
+            sb.append("Descuento COP: -").append(dto.getDescuentoCop());
+            if (dto.getDescuentoAplicadoPor() != null) {
+                sb.append(" (").append(dto.getDescuentoAplicadoPor()).append(")");
+            }
+            sb.append(System.lineSeparator());
+        }
         sb.append("Total COP: ").append(dto.getTotalCop()).append(System.lineSeparator());
         sb.append("Abonado COP: ").append(dto.getTotalAbonado()).append(System.lineSeparator());
         if (dto.getSaldoPendiente().compareTo(BigDecimal.ZERO) > 0) {

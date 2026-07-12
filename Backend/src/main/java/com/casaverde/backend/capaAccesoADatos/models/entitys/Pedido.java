@@ -2,6 +2,7 @@ package com.casaverde.backend.capaAccesoADatos.models.entitys;
 
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -61,6 +62,16 @@ public class Pedido {
 
     @Column(name = "para_llevar")
     private Boolean paraLlevar;
+
+    @Column(length = 30)
+    private String telefono;
+
+    @Column(name = "descuento_cop", nullable = false, precision = 19, scale = 0)
+    @Builder.Default
+    private BigDecimal descuentoCop = BigDecimal.ZERO;
+
+    @Column(name = "descuento_aplicado_por", length = 150)
+    private String descuentoAplicadoPor;
 
     @Column(name = "creado_en", nullable = false)
     private LocalDateTime creadoEn;
