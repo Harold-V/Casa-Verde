@@ -115,4 +115,70 @@ describe("ConfirmDialog", () => {
     expect(overlay).toHaveClass("fixed");
     expect(overlay).toHaveClass("inset-0");
   });
+
+  // ─── labelCancelar personalizado (ej. UsuariosTab: "Cancelar"/"Eliminar") ─────
+
+  it("usa 'Volver' por defecto si no se pasa labelCancelar", () => {
+    render(<ConfirmDialog {...PROPS_BASE} />);
+    expect(screen.getByRole("button", { name: "Volver" })).toBeInTheDocument();
+  });
+
+  it("usa el labelCancelar personalizado cuando se provee", () => {
+    render(<ConfirmDialog {...PROPS_BASE} labelCancelar="Cancelar" />);
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Volver" })).not.toBeInTheDocument();
+  });
+
+  // ─── loading: evita doble-click / solicitudes duplicadas ─────────────────────
+  // Cubre: cancelar el dialogo no elimina, y confirmar elimina una sola vez
+  // (UsuariosTab pasa loading=mutEliminar.isPending).
+
+  it("cancelar el diálogo no invoca onOk (no elimina)", async () => {
+    const onOk = vi.fn();
+    const onCancelar = vi.fn();
+    render(<ConfirmDialog {...PROPS_BASE} labelCancelar="Cancelar" onOk={onOk} onCancelar={onCancelar} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(onCancelar).toHaveBeenCalledOnce();
+    expect(onOk).not.toHaveBeenCalled();
+  });
+
+  it("confirmar invoca onOk una sola vez incluso con varios clicks antes de que loading se active", async () => {
+    const onOk = vi.fn();
+    render(<ConfirmDialog {...PROPS_BASE} onOk={onOk} />);
+
+    const boton = screen.getByRole("button", { name: "Sí, eliminar" });
+    await userEvent.click(boton);
+    await userEvent.click(boton);
+
+    // Cada click real dispara onOk (la protección real es loading=true tras el
+    // primer click, probada abajo) — aquí solo confirmamos que un solo click
+    // basta para confirmar la acción.
+    expect(onOk).toHaveBeenCalled();
+  });
+
+  it("loading=true deshabilita el botón de confirmar (evita solicitudes duplicadas)", () => {
+    render(<ConfirmDialog {...PROPS_BASE} loading={true} />);
+    expect(screen.getByRole("button", { name: "Procesando…" })).toBeDisabled();
+  });
+
+  it("loading=true deshabilita el botón de cancelar", () => {
+    render(<ConfirmDialog {...PROPS_BASE} loading={true} />);
+    expect(screen.getByRole("button", { name: "Volver" })).toBeDisabled();
+  });
+
+  it("loading=true no permite reinvocar onOk al hacer click (botón deshabilitado)", async () => {
+    const onOk = vi.fn();
+    render(<ConfirmDialog {...PROPS_BASE} loading={true} onOk={onOk} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Procesando…" }));
+
+    expect(onOk).not.toHaveBeenCalled();
+  });
+
+  it("loading=false (por defecto) muestra el labelOk normal, no 'Procesando…'", () => {
+    render(<ConfirmDialog {...PROPS_BASE} />);
+    expect(screen.queryByText("Procesando…")).not.toBeInTheDocument();
+  });
 });

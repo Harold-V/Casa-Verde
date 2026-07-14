@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCOP, formatDecimal, formatFecha, formatHora } from "../format";
+import { formatCOP, formatDecimal, formatFecha, formatFechaLabel, formatHora } from "../format";
 
 // ─── formatCOP ───────────────────────────────────────────────────────────────
 
@@ -79,6 +79,24 @@ describe("formatFecha", () => {
   it("la parte de fecha contiene el día de la semana y el mes", () => {
     const resultado = formatFecha("2024-06-15T10:30:00Z");
     expect(resultado).toMatch(/de \w+/);
+  });
+});
+
+// ─── formatFechaLabel (Resumen del día) ────────────────────────────────────────
+
+describe("formatFechaLabel", () => {
+  it("formatea YYYY-MM-DD como dd/MM/yyyy", () => {
+    expect(formatFechaLabel("2026-07-10")).toBe("10/07/2026");
+  });
+
+  it("conserva ceros a la izquierda en día y mes", () => {
+    expect(formatFechaLabel("2026-01-05")).toBe("05/01/2026");
+  });
+
+  it("retorna cadena vacía para valores falsy", () => {
+    expect(formatFechaLabel(null)).toBe("");
+    expect(formatFechaLabel("")).toBe("");
+    expect(formatFechaLabel(undefined)).toBe("");
   });
 });
 

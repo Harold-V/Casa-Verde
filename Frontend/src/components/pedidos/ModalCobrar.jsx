@@ -94,7 +94,16 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
 
             <div className="px-6 pb-3 border-b border-gray-200">
               <div className="flex justify-between py-1 text-[13px] text-gray-500">
-                <span>Subtotal</span><span className="font-semibold text-gray-800">{formatCOP(pedido.totalCop)}</span>
+                <span>Subtotal</span><span className="font-semibold text-gray-800">{formatCOP(pedido.subtotalCop)}</span>
+              </div>
+              {(pedido.descuentoCop ?? 0) > 0 && (
+                <div className="flex justify-between py-1 text-[13px] text-red-500">
+                  <span>Descuento{pedido.descuentoAplicadoPor && ` (${pedido.descuentoAplicadoPor})`}</span>
+                  <span className="font-semibold">-{formatCOP(pedido.descuentoCop)}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-1 text-[13px] text-gray-700">
+                <span>Total a pagar</span><span className="font-semibold">{formatCOP(pedido.totalCop)}</span>
               </div>
               <div className="flex justify-between py-1 text-[13px] text-verde-claro">
                 <span>Pagado</span><span className="font-semibold">{formatCOP(pedido.totalAbonado)}</span>

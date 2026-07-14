@@ -156,7 +156,10 @@ export default function UsuariosTab() {
             emoji="👤"
             titulo={`Eliminar operador "${u.nombre}"`}
             descripcion="El operador se eliminará permanentemente y no podrá iniciar sesión."
-            labelOk="Sí, eliminar"
+            labelOk="Eliminar"
+            labelCancelar="Cancelar"
+            peligro
+            loading={mutEliminar.isPending}
             onOk={() => mutEliminar.mutate(eliminandoId)}
             onCancelar={() => setEliminandoId(null)}
           />

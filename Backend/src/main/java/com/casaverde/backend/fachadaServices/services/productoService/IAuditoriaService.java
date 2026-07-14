@@ -14,4 +14,7 @@ public interface IAuditoriaService {
     Page<HistorialAuditoriaDTO> listarPaginado(String entidad, Long entidadId, Pageable pageable);
 
     void registrar(String entidad, Long entidadId, String accion, String detalle);
+
+    /** Nombre del usuario autenticado actual (o "sistema-local" sin sesión). */
+    String usuarioActual();
 }

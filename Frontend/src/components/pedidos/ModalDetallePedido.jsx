@@ -48,6 +48,10 @@ export default function ModalDetallePedido({
   const [editSalonId, setEditSalonId]               = useState("");
   const [editParaLlevar, setEditParaLlevar]         = useState(!!pedido.paraLlevar);
   const [editObservacion, setEditObservacion]       = useState(pedido.observacion ?? "");
+  const [editTelefono, setEditTelefono]             = useState(pedido.telefono ?? "");
+  const [editDescuento, setEditDescuento]           = useState(
+    pedido.descuentoCop > 0 ? String(pedido.descuentoCop) : ""
+  );
   // Cobros
   const [editandoPagoId, setEditandoPagoId] = useState(null);
   const [editPagoForm, setEditPagoForm]     = useState({ moneda: "COP", monto: "" });
@@ -68,8 +72,18 @@ export default function ModalDetallePedido({
       setEditSalonId(pedido.salonId    ? String(pedido.salonId)    : "");
       setEditParaLlevar(!!pedido.paraLlevar);
       setEditObservacion(pedido.observacion ?? "");
+      setEditTelefono(pedido.telefono ?? "");
+      setEditDescuento(pedido.descuentoCop > 0 ? String(pedido.descuentoCop) : "");
     }
   }, [showEditReserva, pedido]);
+
+  // El descuento solo se puede modificar antes de que exista cualquier pago —
+  // evita inconsistencias contables (el cobro ya podría haberse calculado
+  // sobre el total anterior).
+  const sinPagos = (pedido.pagos?.length ?? 0) === 0;
+  const descuentoPreview = sinPagos ? (parseFloat(editDescuento) || 0) : (pedido.descuentoCop ?? 0);
+  const totalPreview = Math.max(0, (pedido.subtotalCop ?? 0) - descuentoPreview);
+  const descuentoPreviewInvalido = sinPagos && descuentoPreview >= (pedido.subtotalCop ?? 0) && descuentoPreview > 0;
 
   const togEdit = (k) => setEditOn((o) => {
     const val   = !o[k];
@@ -92,6 +106,7 @@ export default function ModalDetallePedido({
     observacion:  pedido.observacion  ?? null,
     salonId:      pedido.salonId      ?? null,
     paraLlevar:   pedido.paraLlevar   ?? null,
+    telefono:     pedido.telefono     ?? null,
     ...overrides,
   });
 
@@ -182,6 +197,8 @@ export default function ModalDetallePedido({
   });
 
   const handleGuardarReserva = () => run(async () => {
+    if (sinPagos && descuentoPreviewInvalido)
+      throw new Error("El descuento debe ser menor al subtotal");
     await onActualizar(buildUpdateReq({
       horaReserva:  editOn.hora     ? editHora                    : null,
       fechaReserva: editOn.fecha    ? editFecha                   : null,
@@ -189,6 +206,11 @@ export default function ModalDetallePedido({
       salonId:      editOn.salon    ? (Number(editSalonId)  || null) : null,
       paraLlevar:   editParaLlevar,
       observacion:  editObservacion.trim() || null,
+      telefono:     editTelefono.trim() || null,
+      // Sin pagos: se envía el valor editado (0 si el campo quedó vacío). Con
+      // pagos: no se envía nada (undefined se omite en el JSON), el backend
+      // nunca lo tocaría de todas formas si viniera.
+      ...(sinPagos ? { descuentoCop: parseFloat(editDescuento) || 0 } : {}),
     }));
     setShowEditReserva(false);
   });
@@ -303,6 +325,16 @@ export default function ModalDetallePedido({
                     )}
                   </span>
                 )}
+                {pedido.telefono && (
+                  <span className="flex items-center gap-1">
+                    · 📞 {pedido.telefono}
+                    {abierto && (
+                      <button className="btn-icon p-0 text-gray-400 hover:text-verde-oscuro" onClick={() => setShowEditReserva((v) => !v)}>
+                        <Pencil size={10} />
+                      </button>
+                    )}
+                  </span>
+                )}
                 {pedido.observacion && (
                   <span className="flex items-center gap-1 max-w-[240px]">
                     · <span className="italic truncate">📝 {pedido.observacion}</span>
@@ -362,6 +394,14 @@ export default function ModalDetallePedido({
                   )}
                 </div>
               )}
+              <input
+                type="tel"
+                className="form-control text-sm"
+                placeholder="Teléfono del cliente (opcional)"
+                maxLength={30}
+                value={editTelefono}
+                onChange={(e) => setEditTelefono(e.target.value)}
+              />
               <textarea
                 className="form-control text-sm resize-none"
                 rows={2}
@@ -369,8 +409,38 @@ export default function ModalDetallePedido({
                 value={editObservacion}
                 onChange={(e) => setEditObservacion(e.target.value)}
               />
+
+              {/* Descuento — solo editable antes del primer pago */}
+              <div className="border-t border-gray-200 pt-2.5">
+                <div className="text-[11px] font-semibold text-gray-500 mb-1.5">🏷️ Descuento</div>
+                {sinPagos ? (
+                  <>
+                    <MoneyInput
+                      className="form-control text-sm"
+                      moneda="COP"
+                      placeholder="Monto del descuento (opcional)"
+                      value={editDescuento}
+                      onChange={setEditDescuento}
+                    />
+                    {descuentoPreviewInvalido && (
+                      <div className="text-[12px] text-red-500 mt-1">El descuento debe ser menor al subtotal</div>
+                    )}
+                    <div className="flex justify-between text-[12px] text-gray-500 mt-1.5">
+                      <span>Subtotal: {formatCOP(pedido.subtotalCop)}</span>
+                      <span>Descuento: -{formatCOP(descuentoPreview)}</span>
+                      <span className="font-semibold text-gray-700">Total: {formatCOP(totalPreview)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[12px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                    El pedido ya tiene {pedido.pagos.length} cobro{pedido.pagos.length !== 1 ? "s" : ""} registrado{pedido.pagos.length !== 1 ? "s" : ""} — el descuento no se puede modificar para evitar inconsistencias contables.
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
-                <button className="btn btn-primary btn-sm" onClick={handleGuardarReserva} disabled={loading}>Guardar</button>
+                <button className="btn btn-primary btn-sm" onClick={handleGuardarReserva}
+                  disabled={loading || descuentoPreviewInvalido}>Guardar</button>
                 <button className="btn-icon text-gray-400" onClick={() => setShowEditReserva(false)}><X size={14} /></button>
               </div>
             </div>
@@ -490,8 +560,19 @@ export default function ModalDetallePedido({
 
             </div>
 
+            {/* Subtotal / descuento (solo si hay descuento aplicado) */}
+            {(pedido.descuentoCop ?? 0) > 0 && (
+              <div className="px-5 pt-3 border-t border-gray-100 bg-gray-50/70 flex justify-between text-[12px] text-gray-500 shrink-0">
+                <span>Subtotal: {formatCOP(pedido.subtotalCop)}</span>
+                <span className="text-red-500">
+                  Descuento: -{formatCOP(pedido.descuentoCop)}
+                  {pedido.descuentoAplicadoPor && ` (${pedido.descuentoAplicadoPor})`}
+                </span>
+              </div>
+            )}
+
             {/* KPIs: total / pagado / saldo */}
-            <div className="grid grid-cols-3 gap-3 px-5 py-3 border-t border-gray-100 bg-gray-50/70 shrink-0">
+            <div className={`grid grid-cols-3 gap-3 px-5 py-3 bg-gray-50/70 shrink-0 ${(pedido.descuentoCop ?? 0) > 0 ? "" : "border-t border-gray-100"}`}>
               <div className="kpi-card" style={{ padding: "10px 12px" }}>
                 <div className="kpi-label text-[10px]">Total</div>
                 <div className="kpi-value text-[15px]">{formatCOP(pedido.totalCop)}</div>

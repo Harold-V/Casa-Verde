@@ -13,12 +13,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Inventario;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
 import com.casaverde.backend.capaAccesoADatos.models.enums.CajaMovimientoTipo;
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
@@ -26,10 +28,14 @@ import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoReposit
 import com.casaverde.backend.capaAccesoADatos.repositories.FondoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.HistorialAuditoriaRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.InventarioRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoPrecioHistorialRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.TasaCambioRepository;
 import com.casaverde.backend.config.controllerAdvice.ValidacionException;
+import com.casaverde.backend.fachadaServices.dto.ActualizarDetalleRequest;
+import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.AjusteCapitalRequest;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaDTO;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaRequest;
@@ -43,6 +49,8 @@ import com.casaverde.backend.fachadaServices.dto.UsuarioDTO;
 import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.ICierreCajaService;
 import com.casaverde.backend.fachadaServices.services.pedidoService.IPedidoService;
+import com.casaverde.backend.fachadaServices.services.pedidoService.IResumenService;
+import com.casaverde.backend.fachadaServices.dto.ResumenDiaDTO;
 import com.casaverde.backend.fachadaServices.services.cajaService.IGastoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IProductoService;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
@@ -116,6 +124,15 @@ class CasaVerdeBusinessRulesTests {
 
         @Autowired
         private com.casaverde.backend.capaAccesoADatos.repositories.ProveedorRepository proveedorRepository;
+
+        @Autowired
+        private IResumenService resumenService;
+
+        @Autowired
+        private PedidoRepository pedidoRepository;
+
+        @Autowired
+        private MovimientoInventarioRepository movimientoInventarioRepository;
 
         @Test
         void noFinalizaPedidoSiNoHayStockSuficiente() {
@@ -631,6 +648,666 @@ class CasaVerdeBusinessRulesTests {
                 PedidoDTO pedido = pedidoService.crear(req);
                 assertThat(pedido.getId()).isNotNull();
                 assertThat(pedido.getFechaReserva()).isEqualTo(LocalDate.now().plusDays(1).toString());
+        }
+
+        // ── Resumen del día: animales vendidos (fracciones, exclusiones) ──────────
+
+        @Test
+        void resumenCuentaUnCuyCompletoVendido() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente cuy", List.of(detalleProducto("Cuy", 1)), null);
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void resumenCuentaCantidadFraccionadaDeCuy() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente medio cuy", List.of(detalleProducto("1/2 Cuy", 1)), null);
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(new BigDecimal("0.5"));
+        }
+
+        @Test
+        void resumenCuentaUnaGallinaCompletaVendida() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente gallina", List.of(detalleProducto("Gallina", 1)), null);
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getGallinasVendidas()).isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void resumenCuentaCantidadFraccionadaDeGallina() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente media gallina", List.of(detalleProducto("1/2 Gallina", 1)), null);
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getGallinasVendidas()).isEqualByComparingTo(new BigDecimal("0.5"));
+        }
+
+        @Test
+        void resumenCuentaCuyYGallinaEnElMismoPedido() {
+                asegurarStockAlto();
+                crearPagarYFinalizar("Cliente mixto",
+                                List.of(detalleProducto("Cuy", 1), detalleProducto("Gallina", 1)), null);
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
+                assertThat(resumen.getGallinasVendidas()).isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void resumenNoCuentaPedidoAnuladoComoVendido() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente anulado");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.anularPedido(pedido.getId());
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(resumen.getPedidosAnulados()).isEqualTo(1);
+        }
+
+        // Criterio final: una reserva (fechaReserva != null) solo pertenece al
+        // resumen/cierre de "fecha" cuando fechaReserva es EXACTAMENTE esa fecha —
+        // ni antes (vencida de otro día) ni después (futura). Un pedido sin reserva
+        // (fechaReserva == null) conserva el criterio anterior sin cambios: por
+        // creadoEn en el resumen, sin restricción de fecha en el cierre.
+        //
+        // crear() rechaza fechaReserva en el pasado (no se puede reservar "ayer"),
+        // así que para simular una reserva vencida de un día anterior se crea con
+        // fechaReserva=hoy (válido) y se "envejece" directamente vía repositorio —
+        // exactamente el escenario real: una reserva de ayer que nadie resolvió.
+
+        @Test
+        void reservaDeAyerQuedaExcluidaDelResumenDeHoy() {
+                asegurarStockAlto();
+                Long pedidoId = crearReservaHoyYEnvejecerA(hoyBogota().minusDays(1));
+
+                ResumenDiaDTO resumenHoy = resumenService.obtener(hoyBogota());
+                assertThat(resumenHoy.getPedidosTotales()).isEqualTo(0);
+                assertThat(resumenHoy.getPedidosAbiertos()).isEqualTo(0);
+                assertThat(pedidoId).isNotNull();
+        }
+
+        @Test
+        void reservaDeHoyIncluidaEnElResumen() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva hoy");
+                req.setFechaReserva(hoyBogota().toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", pedido.getTotalCop()));
+                pedidoService.finalizarPedido(pedido.getId());
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
+                assertThat(resumen.getPedidosFinalizados()).isEqualTo(1);
+        }
+
+        @Test
+        void reservaDeMananaExcluidaDelResumenDeHoy() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva mañana");
+                req.setFechaReserva(hoyBogota().plusDays(1).toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                pedidoService.crear(req);
+
+                ResumenDiaDTO resumenHoy = resumenService.obtener(hoyBogota());
+                assertThat(resumenHoy.getPedidosTotales()).isEqualTo(0);
+                assertThat(resumenHoy.getPedidosAbiertos()).isEqualTo(0);
+                assertThat(resumenHoy.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        void reservaDeAyerNoBloqueaElCierreDeHoy() {
+                asegurarStockAlto();
+                crearReservaHoyYEnvejecerA(hoyBogota().minusDays(1));
+
+                CierreCajaRequest cierre = new CierreCajaRequest();
+                cierre.setFecha(hoyBogota());
+                assertThat(cierreCajaService.cerrar(cierre)).isNotNull();
+        }
+
+        @Test
+        void reservaDeMananaNoBloqueaElCierreDeHoy() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva mañana cierre");
+                req.setFechaReserva(hoyBogota().plusDays(1).toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                pedidoService.crear(req);
+
+                CierreCajaRequest cierre = new CierreCajaRequest();
+                cierre.setFecha(hoyBogota());
+                assertThat(cierreCajaService.cerrar(cierre)).isNotNull();
+        }
+
+        @Test
+        void reservaDeHoyActivaSiBloqueaElCierre() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reserva hoy sin resolver");
+                req.setFechaReserva(hoyBogota().toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                pedidoService.crear(req); // PENDIENTE — nunca se paga ni finaliza
+
+                CierreCajaRequest cierre = new CierreCajaRequest();
+                cierre.setFecha(hoyBogota());
+                assertThatThrownBy(() -> cierreCajaService.cerrar(cierre))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("pendiente");
+        }
+
+        // ── Pedidos: teléfono opcional ─────────────────────────────────────────────
+
+        @Test
+        void pedidoCreadoSinTelefonoQuedaSinTelefono() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente sin telefono");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(1000), 1)));
+
+                PedidoDTO creado = pedidoService.crear(req);
+                assertThat(creado.getTelefono()).isNull();
+        }
+
+        @Test
+        void pedidoCreadoConTelefonoSePuedeConsultarDespues() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente con telefono");
+                req.setTelefono("+57 300 123 4567");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(1000), 1)));
+
+                PedidoDTO creado = pedidoService.crear(req);
+                PedidoDTO consultado = pedidoService.obtener(creado.getId());
+                assertThat(consultado.getTelefono()).isEqualTo("+57 300 123 4567");
+        }
+
+        // ── Pedidos: descuento opcional ─────────────────────────────────────────────
+
+        @Test
+        void pedidoSinDescuentoConservaComportamientoAnterior() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente sin descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(5000), 1)));
+
+                PedidoDTO creado = pedidoService.crear(req);
+                assertThat(creado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(creado.getDescuentoAplicadoPor()).isNull();
+                assertThat(creado.getTotalCop()).isEqualByComparingTo(creado.getSubtotalCop());
+        }
+
+        @Test
+        void pedidoConDescuentoValidoCalculaSubtotalDescuentoYTotal() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente con descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(5000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(1000));
+
+                PedidoDTO creado = pedidoService.crear(req);
+                assertThat(creado.getSubtotalCop()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+                assertThat(creado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.valueOf(1000));
+                assertThat(creado.getTotalCop()).isEqualByComparingTo(BigDecimal.valueOf(4000));
+                assertThat(creado.getDescuentoAplicadoPor()).isNotNull();
+        }
+
+        // Regla final: 0 <= descuentoCop < subtotalCop (estricta). Mientras el
+        // sistema no soporte un flujo de pedidos gratuitos, descuento == subtotal
+        // se rechaza igual que descuento > subtotal — un pedido de total $0 nunca
+        // llega a PAGADO (EstadoPedido.calcular: total<=0 -> PENDIENTE) y quedaría
+        // atascado sin poder finalizarse.
+        @Test
+        void descuentoIgualAlSubtotalEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente descuento total");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(3000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(3000));
+
+                assertThatThrownBy(() -> pedidoService.crear(req))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("debe ser menor al subtotal");
+        }
+
+        @Test
+        void descuentoMayorAlSubtotalEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente descuento excesivo");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(2000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(2001));
+
+                assertThatThrownBy(() -> pedidoService.crear(req))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("debe ser menor al subtotal");
+        }
+
+        @Test
+        void descuentoNegativoEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente descuento negativo");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(2000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(-500));
+
+                assertThatThrownBy(() -> pedidoService.crear(req))
+                                .isInstanceOf(ValidacionException.class);
+        }
+
+        // Ambos tests confirman persistencia real (no cache de primer nivel):
+        // 1) confirman la pedido con TestTransaction.flagForCommit()+end() (commit real),
+        // 2) intentan la operación inválida en una transacción NUEVA y capturan la excepción,
+        // 3) cierran esa transacción (rollback — nunca se llamó flagForCommit),
+        // 4) abren OTRA transacción nueva (persistence context limpio, sin cache) y
+        //    reconsultan desde la base real para confirmar que nada cambió.
+        @Test
+        void eliminarProductoQueDejariaDescuentoMayorOIgualAlSubtotalEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente elimina item con descuento");
+                req.setDetalles(List.of(
+                                new DetalleItemRequest(null, "Item A", BigDecimal.valueOf(3000), 1),
+                                new DetalleItemRequest(null, "Item B", BigDecimal.valueOf(2000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(4000)); // subtotal 5000, valido (4000 < 5000)
+                PedidoDTO pedido = pedidoService.crear(req);
+                assertThat(pedido.getSubtotalCop()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+                Long pedidoId = pedido.getId();
+                Long detalleAEliminar = pedido.getDetalles().stream()
+                                .filter(d -> d.getPrecioUnitarioCop().compareTo(BigDecimal.valueOf(3000)) == 0)
+                                .findFirst().orElseThrow().getId();
+
+                TestTransaction.flagForCommit();
+                TestTransaction.end(); // commit real del pedido de setup
+
+                long auditoriaAntes = historialAuditoriaRepository.count();
+                long cajaAntes = cajaMovimientoRepository.count();
+                long movInventarioAntes = movimientoInventarioRepository.count();
+
+                TestTransaction.start();
+                // Quitar el item de 3000 dejaría subtotal=2000 < descuento=4000 -> rechazado
+                assertThatThrownBy(() -> pedidoService.quitarDetalle(pedidoId, detalleAEliminar))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("quedaría mayor o igual al nuevo subtotal");
+                TestTransaction.end(); // rollback (nunca se marcó para commit)
+
+                TestTransaction.start();
+                Pedido reconsultado = pedidoRepository.findById(pedidoId).orElseThrow();
+                assertThat(reconsultado.getDetalles()).hasSize(2);
+                BigDecimal subtotalReal = reconsultado.getDetalles().stream()
+                                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                assertThat(subtotalReal).isEqualByComparingTo(BigDecimal.valueOf(5000));
+                assertThat(reconsultado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.valueOf(4000));
+                TestTransaction.end();
+
+                assertThat(historialAuditoriaRepository.count()).isEqualTo(auditoriaAntes);
+                assertThat(cajaMovimientoRepository.count()).isEqualTo(cajaAntes);
+                assertThat(movimientoInventarioRepository.count()).isEqualTo(movInventarioAntes);
+
+                // El pedido de setup se committeó de verdad (flagForCommit arriba) para
+                // poder reconsultarlo en una transacción nueva. anularPedido() no basta:
+                // pedidosTotales cuenta TODO lo creado hoy (incluye ANULADO) — hay que
+                // borrarlo de verdad para no contaminar otros tests que cuentan pedidos
+                // de "hoy" (resumen) o activos (cierre de caja).
+                TestTransaction.start();
+                pedidoRepository.deleteById(pedidoId);
+                TestTransaction.flagForCommit();
+                TestTransaction.end();
+
+                TestTransaction.start(); // deja una transaccion activa para el cierre normal del test
+        }
+
+        @Test
+        void reducirCantidadQueDejariaDescuentoIgualAlSubtotalEsRechazada() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente reduce cantidad con descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(1500), 4))); // subtotal 6000
+                req.setDescuentoCop(BigDecimal.valueOf(3000)); // valido (3000 < 6000)
+                PedidoDTO pedido = pedidoService.crear(req);
+                Long pedidoId = pedido.getId();
+                Long detalleId = pedido.getDetalles().get(0).getId();
+
+                TestTransaction.flagForCommit();
+                TestTransaction.end();
+
+                long auditoriaAntes = historialAuditoriaRepository.count();
+                long cajaAntes = cajaMovimientoRepository.count();
+
+                TestTransaction.start();
+                ActualizarDetalleRequest actualizar = new ActualizarDetalleRequest();
+                actualizar.setCantidad(2); // nuevo subtotal = 1500*2 = 3000 == descuento -> invalido
+                assertThatThrownBy(() -> pedidoService.actualizarDetalle(pedidoId, detalleId, actualizar))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("quedaría mayor o igual al nuevo subtotal");
+                TestTransaction.end();
+
+                TestTransaction.start();
+                Pedido reconsultado = pedidoRepository.findById(pedidoId).orElseThrow();
+                assertThat(reconsultado.getDetalles()).hasSize(1);
+                assertThat(reconsultado.getDetalles().get(0).getCantidad()).isEqualTo(4);
+                BigDecimal subtotalReal = reconsultado.getDetalles().stream()
+                                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                assertThat(subtotalReal).isEqualByComparingTo(BigDecimal.valueOf(6000));
+                assertThat(reconsultado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.valueOf(3000));
+                TestTransaction.end();
+
+                assertThat(historialAuditoriaRepository.count()).isEqualTo(auditoriaAntes);
+                assertThat(cajaMovimientoRepository.count()).isEqualTo(cajaAntes);
+
+                // Mismo motivo que en el test anterior: borrar de verdad, no solo anular.
+                TestTransaction.start();
+                pedidoRepository.deleteById(pedidoId);
+                TestTransaction.flagForCommit();
+                TestTransaction.end();
+
+                TestTransaction.start();
+        }
+
+        @Test
+        void subtotalDescuentoYTotalSeMuestranCorrectamenteEnDtoDetalleYComprobante() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente comprobante con descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(5000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(1000));
+                PedidoDTO pedido = pedidoService.crear(req);
+
+                // DTO
+                assertThat(pedido.getSubtotalCop()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+                assertThat(pedido.getDescuentoCop()).isEqualByComparingTo(BigDecimal.valueOf(1000));
+                assertThat(pedido.getTotalCop()).isEqualByComparingTo(BigDecimal.valueOf(4000));
+
+                // Detalle: el precio unitario histórico NO se toca por el descuento
+                assertThat(pedido.getDetalles().get(0).getPrecioUnitarioCop())
+                                .isEqualByComparingTo(BigDecimal.valueOf(5000));
+                assertThat(pedido.getDetalles().get(0).getSubtotalCop())
+                                .isEqualByComparingTo(BigDecimal.valueOf(5000));
+
+                // Comprobante
+                String comprobante = pedidoService.comprobanteTexto(pedido.getId());
+                assertThat(comprobante).contains("Subtotal COP: 5000");
+                assertThat(comprobante).contains("Descuento COP: -1000");
+                assertThat(comprobante).contains("Total COP: 4000");
+        }
+
+        @Test
+        void cobroYCajaUsanElTotalDespuesDelDescuento() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente cobro con descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(10000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(2000));
+                PedidoDTO pedido = pedidoService.crear(req);
+                assertThat(pedido.getTotalCop()).isEqualByComparingTo(BigDecimal.valueOf(8000));
+
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", BigDecimal.valueOf(8000)));
+                pedidoService.finalizarPedido(pedido.getId());
+
+                assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
+                                .anySatisfy(m -> {
+                                        if (m.getTipo() == CajaMovimientoTipo.COBRO_PEDIDO
+                                                        && ("Cobro pedido #" + pedido.getId()).equals(m.getConcepto())) {
+                                                assertThat(m.getMontoCop()).isEqualByComparingTo(BigDecimal.valueOf(8000));
+                                        }
+                                });
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCobradoTotalCop()).isGreaterThanOrEqualTo(BigDecimal.valueOf(8000));
+        }
+
+        @Test
+        void inventarioDescuentaLasMismasCantidadesConYSinDescuento() {
+                asegurarStockAlto();
+                Inventario cuyAntes1 = inventarioRepository.findByInsumo("cuy").orElseThrow();
+                BigDecimal stockAntesSinDescuento = cuyAntes1.getStockActual();
+                crearPagarYFinalizar("Cliente sin descuento inventario", List.of(detalleProducto("Cuy", 1)), null);
+                BigDecimal consumidoSinDescuento = stockAntesSinDescuento
+                                .subtract(inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual());
+
+                BigDecimal stockAntesConDescuento = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+                crearPagarYFinalizar("Cliente con descuento inventario", List.of(detalleProducto("Cuy", 1)),
+                                BigDecimal.ONE);
+                BigDecimal consumidoConDescuento = stockAntesConDescuento
+                                .subtract(inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual());
+
+                assertThat(consumidoConDescuento).isEqualByComparingTo(consumidoSinDescuento);
+        }
+
+        // ── Pedido vacío (sin ítems) ─────────────────────────────────────────────────
+        // crear() no exige detalles no vacíos (req.getDetalles() puede ser null/[]).
+        // Con subtotal=0, la única forma de cumplir 0<=descuento<subtotal es
+        // descuento=0 — no se usa un caso especial que "deje pasar" un pedido vacío
+        // con descuento distinto de cero, la misma condición general ya lo cubre
+        // (descuento>0 && descuento>=subtotal(0) siempre es true para cualquier
+        // descuento positivo).
+
+        @Test
+        void pedidoVacioConDescuentoCeroEsPermitido() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente pedido vacio");
+
+                PedidoDTO creado = pedidoService.crear(req);
+                assertThat(creado.getSubtotalCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(creado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(creado.getTotalCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(creado.getDetalles()).isEmpty();
+        }
+
+        @Test
+        void pedidoVacioConDescuentoPositivoEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente pedido vacio con descuento");
+                req.setDescuentoCop(BigDecimal.valueOf(100));
+
+                assertThatThrownBy(() -> pedidoService.crear(req))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("debe ser menor al subtotal");
+        }
+
+        @Test
+        void pedidoConProductosYDescuentoCero() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente con productos sin descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(2000), 1)));
+
+                PedidoDTO creado = pedidoService.crear(req);
+                assertThat(creado.getSubtotalCop()).isEqualByComparingTo(BigDecimal.valueOf(2000));
+                assertThat(creado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(creado.getTotalCop()).isEqualByComparingTo(BigDecimal.valueOf(2000));
+        }
+
+        // "pedido con productos y descuento válido" ya cubierto por
+        // pedidoConDescuentoValidoCalculaSubtotalDescuentoYTotal (arriba).
+
+        @Test
+        void pedidoVacioNoPuedeFinalizarseNiCobrarse() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente pedido vacio finalizar");
+                PedidoDTO creado = pedidoService.crear(req);
+
+                assertThatThrownBy(() -> pedidoService.finalizarPedido(creado.getId()))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("no tiene ítems");
+
+                assertThatThrownBy(() -> pedidoService.registrarPago(creado.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000))))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("sin ítems");
+        }
+
+        // ── Edición del descuento (flujo de actualizarPedido, mismo mecanismo que
+        // el resto de "datos generales") ─────────────────────────────────────────────
+
+        @Test
+        void editarDescuentoAntesDePagar() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente edita descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(5000), 1)));
+                PedidoDTO pedido = pedidoService.crear(req); // sin descuento inicial
+
+                ActualizarPedidoRequest edit = new ActualizarPedidoRequest();
+                edit.setNombre(pedido.getNombre());
+                edit.setDescuentoCop(BigDecimal.valueOf(1000));
+                PedidoDTO actualizado = pedidoService.actualizarPedido(pedido.getId(), edit);
+
+                assertThat(actualizado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.valueOf(1000));
+                assertThat(actualizado.getSubtotalCop()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+                assertThat(actualizado.getTotalCop()).isEqualByComparingTo(BigDecimal.valueOf(4000));
+                assertThat(actualizado.getDescuentoAplicadoPor()).isNotNull();
+        }
+
+        @Test
+        void cambiarDescuentoValidoPorCeroLimpiaOperador() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente quita descuento");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(5000), 1)));
+                req.setDescuentoCop(BigDecimal.valueOf(1000));
+                PedidoDTO pedido = pedidoService.crear(req);
+                assertThat(pedido.getDescuentoAplicadoPor()).isNotNull();
+
+                ActualizarPedidoRequest edit = new ActualizarPedidoRequest();
+                edit.setNombre(pedido.getNombre());
+                edit.setDescuentoCop(BigDecimal.ZERO);
+                PedidoDTO actualizado = pedidoService.actualizarPedido(pedido.getId(), edit);
+
+                assertThat(actualizado.getDescuentoCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(actualizado.getDescuentoAplicadoPor()).isNull();
+                assertThat(actualizado.getTotalCop()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+        }
+
+        @Test
+        void editarDescuentoAValorInvalidoEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente descuento invalido edicion");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(3000), 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+
+                ActualizarPedidoRequest edit = new ActualizarPedidoRequest();
+                edit.setNombre(pedido.getNombre());
+                edit.setDescuentoCop(BigDecimal.valueOf(3000)); // igual al subtotal -> invalido
+
+                assertThatThrownBy(() -> pedidoService.actualizarPedido(pedido.getId(), edit))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("debe ser menor al subtotal");
+        }
+
+        @Test
+        void editarDescuentoDespuesDePagoEsRechazado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente descuento tras pago");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(4000), 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
+
+                ActualizarPedidoRequest edit = new ActualizarPedidoRequest();
+                edit.setNombre(pedido.getNombre());
+                edit.setDescuentoCop(BigDecimal.valueOf(500));
+
+                assertThatThrownBy(() -> pedidoService.actualizarPedido(pedido.getId(), edit))
+                                .isInstanceOf(ValidacionException.class)
+                                .hasMessageContaining("después de registrar un pago");
+        }
+
+        @Test
+        void editarDescuentoEnPedidoFinalizadoEsRechazado() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente descuento finalizado");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", pedido.getTotalCop()));
+                pedidoService.finalizarPedido(pedido.getId());
+
+                ActualizarPedidoRequest edit = new ActualizarPedidoRequest();
+                edit.setNombre(pedido.getNombre());
+                edit.setDescuentoCop(BigDecimal.valueOf(500));
+
+                // Rechazado por validarAbierto() — un FINALIZADO no admite ningún PATCH,
+                // no solo el de descuento.
+                assertThatThrownBy(() -> pedidoService.actualizarPedido(pedido.getId(), edit))
+                                .isInstanceOf(ValidacionException.class);
+        }
+
+        @Test
+        void operadorQueModificaDescuentoQuedaRegistrado() {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente registra operador edicion");
+                req.setDetalles(List.of(new DetalleItemRequest(null, "Item", BigDecimal.valueOf(2000), 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+
+                ActualizarPedidoRequest edit = new ActualizarPedidoRequest();
+                edit.setNombre(pedido.getNombre());
+                edit.setDescuentoCop(BigDecimal.valueOf(500));
+                PedidoDTO actualizado = pedidoService.actualizarPedido(pedido.getId(), edit);
+
+                // Sin JWT en este contexto de test, resolverUsuario() cae a "sistema-local"
+                // — lo que se prueba es que el campo se llena (trazabilidad de que ALGUIEN
+                // aplicó el descuento), nunca queda null cuando el descuento es positivo.
+                assertThat(actualizado.getDescuentoAplicadoPor()).isNotNull();
+        }
+
+        // ── Helpers para los casos de arriba ────────────────────────────────────────
+
+        private LocalDate hoyBogota() {
+                return LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+        }
+
+        /**
+         * crear() rechaza fechaReserva en el pasado, así que para simular una
+         * reserva vencida (creada para hoy, nunca resuelta, ahora "de ayer" u
+         * otro día anterior) se crea válida para hoy y se envejece directo vía
+         * repositorio — el mismo estado en que quedaría una reserva real sin
+         * atender.
+         */
+        private Long crearReservaHoyYEnvejecerA(LocalDate fechaEnvejecida) {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Reserva envejecida a " + fechaEnvejecida);
+                req.setFechaReserva(hoyBogota().toString());
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO creado = pedidoService.crear(req);
+
+                Pedido entidad = pedidoRepository.findById(creado.getId()).orElseThrow();
+                entidad.setFechaReserva(fechaEnvejecida);
+                pedidoRepository.save(entidad);
+                return creado.getId();
+        }
+
+        private void asegurarStockAlto() {
+                for (String insumo : new String[] { "cuy", "gallina" }) {
+                        Inventario inv = inventarioRepository.findByInsumo(insumo).orElseThrow();
+                        inv.setStockActual(BigDecimal.valueOf(50));
+                        inventarioRepository.save(inv);
+                }
+                // El seed inicial (DataInitializer) crea Cuy/Gallina y sus fracciones con
+                // precio 0.0 (se configuran luego desde la UI) — sin precio no hay saldo
+                // que cobrar y finalizarPedido() nunca llega a PAGADO.
+                for (String nombre : new String[] { "Cuy", "1/2 Cuy", "1/4 Cuy", "Gallina", "1/2 Gallina" }) {
+                        Producto p = productoPorNombre(nombre);
+                        p.setPrecio(BigDecimal.valueOf(10000));
+                        productoRepository.save(p);
+                }
+        }
+
+        private Producto productoPorNombre(String nombre) {
+                return productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                                .filter(p -> nombre.equals(p.getNombre()))
+                                .findFirst()
+                                .orElseThrow(() -> new AssertionError("Producto no encontrado en seed: " + nombre));
+        }
+
+        private DetalleItemRequest detalleProducto(String nombreProducto, int cantidad) {
+                return new DetalleItemRequest(productoPorNombre(nombreProducto).getId(), null, null, cantidad);
+        }
+
+        private PedidoDTO crearPagarYFinalizar(String cliente, List<DetalleItemRequest> detalles, BigDecimal descuentoCop) {
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre(cliente);
+                req.setDetalles(detalles);
+                if (descuentoCop != null) req.setDescuentoCop(descuentoCop);
+                PedidoDTO pedido = pedidoService.crear(req);
+                if (pedido.getTotalCop().compareTo(BigDecimal.ZERO) > 0) {
+                        pedidoService.registrarPago(pedido.getId(), new RegistrarPagoRequest("COP", pedido.getTotalCop()));
+                }
+                return pedidoService.finalizarPedido(pedido.getId());
         }
 
         private PedidoDTO crearPedidoManual(String cliente, BigDecimal precioCop) {

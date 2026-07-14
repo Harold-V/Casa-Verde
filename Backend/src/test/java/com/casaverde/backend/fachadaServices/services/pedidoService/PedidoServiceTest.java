@@ -79,6 +79,7 @@ class PedidoServiceTest {
         req.setNombre("Juan");
 
         when(pedidoRepo.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(monetaryService.normalizarPrecioCop(any())).thenReturn(BigDecimal.ZERO);
         doNothing().when(auditoriaService).registrar(any(), any(), any(), any());
 
         service.crear(req);
@@ -106,7 +107,9 @@ class PedidoServiceTest {
 
     @Test
     void registrarPago_enPedidoPendiente_noTocaFondo() {
-        Pedido pedido = pedidoBase(EstadoPedido.PENDIENTE);
+        // registrarPago() ahora exige al menos un ítem (un pedido sin ítems no
+        // puede cobrarse) — pedidoConDetalleSinPago() en vez de pedidoBase().
+        Pedido pedido = pedidoConDetalleSinPago();
         when(pedidoRepo.findById(1L)).thenReturn(Optional.of(pedido));
         when(monetaryService.normalizarMoneda(any())).thenReturn(MonedaConstants.COP);
         when(monetaryService.normalizarMontoEntrada(any(), any())).thenReturn(new BigDecimal("10000"));

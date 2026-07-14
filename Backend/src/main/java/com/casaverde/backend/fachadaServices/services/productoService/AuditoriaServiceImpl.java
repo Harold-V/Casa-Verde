@@ -74,6 +74,11 @@ public class AuditoriaServiceImpl implements IAuditoriaService {
                 .build());
     }
 
+    @Override
+    public String usuarioActual() {
+        return resolverUsuario();
+    }
+
     private String resolverUsuario() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {

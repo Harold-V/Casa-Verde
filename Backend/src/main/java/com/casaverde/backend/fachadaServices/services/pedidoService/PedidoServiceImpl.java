@@ -125,6 +125,7 @@ public class PedidoServiceImpl implements IPedidoService {
                 .cantPersonas(req.getCantPersonas())
                 .observacion(req.getObservacion())
                 .paraLlevar(Boolean.TRUE.equals(req.getParaLlevar()))
+                .telefono(normalizarTelefono(req.getTelefono()))
                 .estado(EstadoPedido.PENDIENTE)
                 .build();
 
@@ -138,6 +139,15 @@ public class PedidoServiceImpl implements IPedidoService {
                 pedido.getDetalles().add(buildDetalle(pedido, d));
             }
         }
+
+        BigDecimal subtotal = calcularTotales(pedido).subtotalCop();
+        BigDecimal descuento = monetaryService.normalizarPrecioCop(req.getDescuentoCop());
+        if (descuento.compareTo(BigDecimal.ZERO) > 0 && descuento.compareTo(subtotal) >= 0)
+            throw new ValidacionException(
+                    "El descuento ($" + descuento + ") debe ser menor al subtotal ($" + subtotal + ")");
+        pedido.setDescuentoCop(descuento);
+        if (descuento.compareTo(BigDecimal.ZERO) > 0)
+            pedido.setDescuentoAplicadoPor(auditoriaService.usuarioActual());
 
         pedidoRepo.save(pedido);
 
@@ -178,6 +188,7 @@ public class PedidoServiceImpl implements IPedidoService {
         pedido.setMesa(req.getMesa());
         pedido.setCantPersonas(req.getCantPersonas());
         pedido.setObservacion(req.getObservacion());
+        pedido.setTelefono(normalizarTelefono(req.getTelefono()));
         // Solo actualizar paraLlevar si viene explícito; null = no tocar
         if (req.getParaLlevar() != null) {
             pedido.setParaLlevar(req.getParaLlevar());
@@ -188,6 +199,28 @@ public class PedidoServiceImpl implements IPedidoService {
                     .orElseThrow(() -> new RecursoNoEncontradoException("Salón no encontrado: " + req.getSalonId())));
         } else {
             pedido.setSalon(null);
+        }
+
+        // descuentoCop null = no se intenta modificar el descuento (la mayoría de
+        // los PATCH de "datos generales" no lo tocan). Si viene, y difiere del
+        // actual, se valida y se re-audita — nunca se confía en el total que
+        // pudiera calcular el frontend, siempre se recalcula aquí.
+        if (req.getDescuentoCop() != null) {
+            BigDecimal nuevoDescuento = monetaryService.normalizarPrecioCop(req.getDescuentoCop());
+            if (nuevoDescuento.compareTo(pedido.getDescuentoCop()) != 0) {
+                if (!pedido.getPagos().isEmpty())
+                    throw new ValidacionException(
+                            "No se puede modificar el descuento después de registrar un pago");
+                BigDecimal subtotalActual = calcularTotales(pedido).subtotalCop();
+                if (nuevoDescuento.compareTo(BigDecimal.ZERO) > 0 && nuevoDescuento.compareTo(subtotalActual) >= 0)
+                    throw new ValidacionException("El descuento ($" + nuevoDescuento
+                            + ") debe ser menor al subtotal ($" + subtotalActual + ")");
+                pedido.setDescuentoCop(nuevoDescuento);
+                // Sin razón funcional para conservar trazabilidad al volver a cero — se
+                // limpia el operador registrado previamente.
+                pedido.setDescuentoAplicadoPor(
+                        nuevoDescuento.compareTo(BigDecimal.ZERO) > 0 ? auditoriaService.usuarioActual() : null);
+            }
         }
 
         recalcularEstadoPago(pedido);
@@ -210,6 +243,7 @@ public class PedidoServiceImpl implements IPedidoService {
         }
 
         recalcularEstadoPago(pedido);
+        validarInvarianteDescuento(pedido, calcularTotales(pedido).subtotalCop(), "agregar este ítem");
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "AGREGAR_ITEM",
                 "Item agregado o acumulado en el pedido");
@@ -224,6 +258,7 @@ public class PedidoServiceImpl implements IPedidoService {
         recalcularEstadoPago(pedido);
         if (!removed)
             throw new RecursoNoEncontradoException("Ítem no encontrado: " + detalleId);
+        validarInvarianteDescuento(pedido, calcularTotales(pedido).subtotalCop(), "quitar este ítem");
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "QUITAR_ITEM",
                 "Item eliminado del pedido: " + detalleId);
@@ -246,6 +281,7 @@ public class PedidoServiceImpl implements IPedidoService {
             detalle.setCantidad(req.getCantidad());
         }
         recalcularEstadoPago(pedido);
+        validarInvarianteDescuento(pedido, calcularTotales(pedido).subtotalCop(), "actualizar este ítem");
         Pedido guardado = pedidoRepo.save(pedido);
         auditoriaService.registrar("pedido", guardado.getId(), "ACTUALIZAR_ITEM",
                 "Item actualizado en el pedido: " + detalleId);
@@ -259,6 +295,8 @@ public class PedidoServiceImpl implements IPedidoService {
             throw new ValidacionException("No se puede registrar pago en un pedido ANULADO");
         if (EstadoPedido.FINALIZADO == pedido.getEstado())
             throw new ValidacionException("El pedido ya está FINALIZADO");
+        if (pedido.getDetalles().isEmpty())
+            throw new ValidacionException("No se puede registrar un pago en un pedido sin ítems");
 
         String moneda = monetaryService.normalizarMoneda(resolverMoneda(req.getMoneda()));
         BigDecimal monto = monetaryService.normalizarMontoEntrada(moneda, req.getMonto());
@@ -291,6 +329,11 @@ public class PedidoServiceImpl implements IPedidoService {
         PedidoTotales totalesFinalizacion = calcularTotales(pedido);
         BigDecimal total = totalesFinalizacion.totalCop();
         BigDecimal abonado = totalesFinalizacion.totalAbonado();
+        // El invariante 0 <= descuento < subtotal ya se garantiza en cada punto de
+        // escritura (crear/agregar/actualizar/quitar ítem); se re-verifica aquí
+        // porque este es el punto sin retorno: se descuenta inventario y se
+        // acredita el fondo con "total".
+        validarInvarianteDescuento(pedido, totalesFinalizacion.subtotalCop(), "finalizar el pedido");
         recalcularEstadoPago(pedido);
         if (EstadoPedido.PAGADO != pedido.getEstado()) {
             throw new ValidacionException(String.format(
@@ -470,6 +513,39 @@ public class PedidoServiceImpl implements IPedidoService {
 
     private BigDecimal getTasaVigente() {
         return tasaCambioService.getValorVigente();
+    }
+
+    /**
+     * Recorta espacios externos; cadena en blanco se guarda como null (nunca se
+     * inventa el número). SQLite no impone longitud real sobre varchar(30) — el
+     * límite de 30 caracteres (igual al de la columna, el DTO y el frontend) se
+     * exige aquí porque @Size en el DTO solo se aplica si la llamada pasa por
+     * @Valid en el controller.
+     */
+    private String normalizarTelefono(String telefono) {
+        if (telefono == null) return null;
+        String limpio = telefono.trim();
+        if (limpio.isEmpty()) return null;
+        if (limpio.length() > 30)
+            throw new ValidacionException("El teléfono no puede superar 30 caracteres");
+        return limpio;
+    }
+
+    /**
+     * Garantiza 0 <= descuentoCop < subtotalCop tras cualquier cambio que pueda
+     * alterar el subtotal (agregar/actualizar/quitar detalle, finalizar). Si el
+     * pedido no tiene descuento (0) no hay nada que validar — un subtotal 0 con
+     * descuento 0 es válido (p.ej. al quitar el último ítem). No reduce ni anula
+     * el descuento automáticamente: rechaza la operación completa.
+     */
+    private void validarInvarianteDescuento(Pedido pedido, BigDecimal nuevoSubtotal, String accion) {
+        BigDecimal descuento = pedido.getDescuentoCop();
+        if (descuento == null || descuento.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (descuento.compareTo(nuevoSubtotal) >= 0) {
+            throw new ValidacionException("No se puede " + accion + ": el descuento ($" + descuento
+                    + ") quedaría mayor o igual al nuevo subtotal ($" + nuevoSubtotal
+                    + "). Ajusta el descuento antes de continuar.");
+        }
     }
 
     private void recalcularEstadoPago(Pedido pedido) {
