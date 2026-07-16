@@ -95,7 +95,6 @@ export default function LoginScreen() {
           )}
         </form>
       </div>
-      <div className="text-[11px] text-gray-400 mt-4">Hecho por Harold Velasquez</div>
     </div>
   );
 }
