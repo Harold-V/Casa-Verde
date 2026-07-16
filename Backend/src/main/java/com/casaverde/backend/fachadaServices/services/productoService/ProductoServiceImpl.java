@@ -117,7 +117,6 @@ public class ProductoServiceImpl implements IProductoService {
             producto.setCategoria(null);
         }
 
-        producto.getComposicion().clear();
         aplicarComposicion(producto, req.getComposicion());
 
         Producto guardado = productoRepo.save(producto);
@@ -200,21 +199,39 @@ public class ProductoServiceImpl implements IProductoService {
         }
     }
 
+    /**
+     * Actualiza la composición in-place (por insumo) en vez de limpiar y
+     * reinsertar: limpiar + reinsertar el mismo insumo en la misma transacción
+     * viola el UNIQUE(producto_id, insumo) porque Hibernate emite el INSERT
+     * antes de que el DELETE por orphanRemoval se confirme.
+     */
     private void aplicarComposicion(Producto producto, List<ComposicionDTO> items) {
-        if (items == null || items.isEmpty())
-            return;
-        for (ComposicionDTO item : items) {
+        List<ComposicionDTO> nuevos = items == null ? List.of() : items;
+        List<String> insumosNuevos = new ArrayList<>();
+
+        for (ComposicionDTO item : nuevos) {
             if (item.getInsumo() == null || item.getInsumo().isBlank())
                 throw new ValidacionException("La composición tiene un ítem sin nombre de insumo");
             if (item.getCantidad() == null || item.getCantidad().compareTo(BigDecimal.ZERO) <= 0)
                 throw new ValidacionException("La composición tiene una cantidad inválida para el insumo '" + item.getInsumo() + "'");
-            ProductoComposicionInventario comp = ProductoComposicionInventario.builder()
-                    .producto(producto)
-                    .insumo(item.getInsumo().trim().toLowerCase())
-                    .cantidad(item.getCantidad())
-                    .build();
-            producto.getComposicion().add(comp);
+
+            String insumo = item.getInsumo().trim().toLowerCase();
+            insumosNuevos.add(insumo);
+
+            ProductoComposicionInventario existente = producto.getComposicion().stream()
+                    .filter(c -> c.getInsumo().equals(insumo))
+                    .findFirst().orElse(null);
+            if (existente != null) {
+                existente.setCantidad(item.getCantidad());
+            } else {
+                producto.getComposicion().add(ProductoComposicionInventario.builder()
+                        .producto(producto)
+                        .insumo(insumo)
+                        .cantidad(item.getCantidad())
+                        .build());
+            }
         }
+        producto.getComposicion().removeIf(c -> !insumosNuevos.contains(c.getInsumo()));
     }
 
     private void registrarPrecio(Producto producto, BigDecimal anterior, BigDecimal nuevo, String motivo) {

@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.casaverde.backend.fachadaServices.dto.BackupDTO;
@@ -76,17 +78,44 @@ public class BackupServiceImpl implements IBackupService {
         }
     }
 
+    /**
+     * Respaldo programado diario a medianoche (hora Bogotá). Es el disparador
+     * principal — no depende de que alguien cierre caja o abra la app.
+     */
+    @Scheduled(cron = "0 0 0 * * *", zone = "America/Bogota")
+    public void crearBackupProgramado() {
+        try {
+            Path origen = Paths.get(dbPath).toAbsolutePath().normalize();
+            if (Files.exists(origen)) {
+                crearBackup("medianoche");
+            }
+        } catch (Exception ex) {
+            log.warn("[crearBackupProgramado] No se pudo crear el backup de medianoche: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Respaldo de respaldo (catch-up): si la app estaba cerrada a medianoche
+     * (el restaurante no opera 24/7), el cron nunca se disparó ese día. Al
+     * arrancar, si aún no existe un backup de hoy, se crea uno.
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void crearBackupAlIniciar() {
         try {
             Path origen = Paths.get(dbPath).toAbsolutePath().normalize();
-            if (Files.exists(origen)) {
+            if (Files.exists(origen) && !existeBackupHoy()) {
                 crearBackup("inicio");
             }
         } catch (Exception ex) {
             // El arranque no debe fallar por un backup; el cierre de caja sí lo valida.
             log.warn("[crearBackupAlIniciar] No se pudo crear el backup de inicio: {}", ex.getMessage());
         }
+    }
+
+    private boolean existeBackupHoy() {
+        LocalDate hoy = LocalDate.now(ZONA);
+        return listar().stream()
+                .anyMatch(b -> b.getCreadoEn() != null && b.getCreadoEn().toLocalDate().equals(hoy));
     }
 
     private String limpiarMotivo(String motivo) {
