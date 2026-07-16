@@ -1,6 +1,7 @@
 import { createBrowserRouter, createHashRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
+import UpdateBanner from "./components/shared/UpdateBanner";
 import Dashboard from "./pages/dashboard/Dashboard";
 import ConfiguracionPage from "./pages/configuracion/ConfiguracionPage";
 import InventarioPage from "./pages/inventario/InventarioPage";
@@ -68,6 +69,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <UpdateBanner />
     </QueryClientProvider>
   );
 }
