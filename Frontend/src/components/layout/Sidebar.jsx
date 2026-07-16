@@ -39,7 +39,10 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-footer">Hecho por Harold Velasquez</div>
+      <div className="sidebar-footer">
+        Hecho por Harold Velasquez
+        <div className="sidebar-footer-version">Versión {__APP_VERSION__}</div>
+      </div>
     </aside>
   );
 }
