@@ -22,6 +22,11 @@ public class PedidoDTO {
     private String estado;
     private String observacion;
     private Boolean paraLlevar;
+    private String telefono;
+    private boolean enCurso;
+    private BigDecimal subtotalCop;
+    private BigDecimal descuentoCop;
+    private String descuentoAplicadoPor;
     private BigDecimal totalCop;
     private BigDecimal totalAbonado;
     private BigDecimal saldoPendiente;
@@ -29,6 +34,7 @@ public class PedidoDTO {
     private LocalDateTime creadoEn;
     private LocalDateTime actualizadoEn;
     private LocalDateTime finalizadoEn;
+    private LocalDateTime fiadoEn;
     private List<PedidoDetalleDTO> detalles;
     private List<PagoDTO> pagos;
 }

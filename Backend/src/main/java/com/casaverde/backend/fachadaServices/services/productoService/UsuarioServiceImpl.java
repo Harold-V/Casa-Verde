@@ -2,14 +2,16 @@ package com.casaverde.backend.fachadaServices.services.productoService;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.casaverde.backend.capaAccesoADatos.models.enums.RolUsuario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Usuario;
+import com.casaverde.backend.config.security.AuthTokenService;
 import com.casaverde.backend.fachadaServices.dto.CambiarPasswordRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearOperadorRequest;
 import com.casaverde.backend.fachadaServices.dto.LoginRequest;
@@ -25,11 +27,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UsuarioServiceImpl implements IUsuarioService {
 
+    private static final Logger log = LoggerFactory.getLogger(UsuarioServiceImpl.class);
+
     private final UsuarioRepository usuarioRepo;
     private final IAuditoriaService auditoriaService;
     private final UsuarioMapper usuarioMapper;
-
-    private static final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final AuthTokenService authTokenService;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${app.admin.default-password:admin123}")
     private String defaultAdminPassword;
@@ -66,13 +70,19 @@ public class UsuarioServiceImpl implements IUsuarioService {
             }
         }
 
-        return usuarioMapper.toDTO(usuario);
+        UsuarioDTO dto = usuarioMapper.toDTO(usuario);
+        dto.setToken(authTokenService.generar(usuario));
+        return dto;
     }
 
     @Transactional
     public void ensureUsuariosIniciales() {
         if (usuarioRepo.count() > 0) {
             return;
+        }
+        if ("admin123".equals(defaultAdminPassword)) {
+            log.warn("⚠️  La contraseña del administrador es la predeterminada. " +
+                    "Configure APP_ADMIN_PASSWORD en producción.");
         }
 
         Usuario admin = Usuario.builder()

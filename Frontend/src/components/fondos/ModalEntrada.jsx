@@ -7,7 +7,7 @@ import MoneyInput from "../shared/MoneyInput";
 
 export default function ModalEntrada({ onClose, onGuardar }) {
   const [form, setForm] = useState({
-    concepto: "", moneda: "COP", monto: "", observacion: "",
+    concepto: "", moneda: "COP", monto: "",
   });
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
@@ -59,8 +59,9 @@ export default function ModalEntrada({ onClose, onGuardar }) {
                 <label className="form-label">Moneda</label>
                 <select className="form-control" value={form.moneda}
                   onChange={(e) => set("moneda", e.target.value)}>
-                  <option value="COP">COP — Pesos</option>
+                  <option value="COP">COP — Banco</option>
                   <option value="USD">USD — Dólares</option>
+                  <option value="EFECTIVO">Efectivo — Caja física</option>
                   {nequiCuentas.map((f) => (
                     <option key={f.moneda} value={f.moneda}>
                       {f.moneda}{f.alias ? ` — ${f.alias}` : ""}
@@ -81,14 +82,7 @@ export default function ModalEntrada({ onClose, onGuardar }) {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Observación (opcional)</label>
-              <input
-                className="form-control"
-                value={form.observacion}
-                onChange={(e) => set("observacion", e.target.value)}
-              />
-            </div>
+
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>

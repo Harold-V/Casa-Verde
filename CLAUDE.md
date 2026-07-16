@@ -33,7 +33,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 |---|---|
 | UI | React 19 + Vite 7 |
 | Estilos | Tailwind CSS v4 (clases utilitarias + `@layer components` propias) |
-| Routing | React Router v7 (`createBrowserRouter`) |
+| Routing | React Router v7 (`createBrowserRouter`; `createHashRouter` cuando `VITE_ELECTRON=true`) |
 | Estado global | Zustand v5 (`useSessionStore`) |
 | Fetching / caché | TanStack React Query v5 |
 | HTTP | Axios — base URL `/api/v1` (relativa; nginx la proxea al backend) |
@@ -41,7 +41,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 | Iconos | lucide-react |
 | Fechas | date-fns |
 | Tests | Vitest + Testing Library (jsdom) |
-| Desktop | Electron 37.2.2 + electron-builder 26.0.12 — carpeta `electron/` existe, no integrada con el build Docker aún |
+| Desktop | Electron ^42.x + electron-builder 26.0.12 — carpeta `electron/` existe, no integrada con el build Docker aún |
 | Puerto local | nginx `:80` → proxy `/api/*` → `backend:5020` |
 
 ### Despliegue (Docker Compose)
@@ -67,7 +67,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 Casa-Verde/
 ├── Backend/          ← Spring Boot 3.4 / Java 17
 ├── Frontend/         ← React 19 + Vite + Tailwind v4
-│   └── electron/     ← Electron 37 (no integrado aún)
+│   └── electron/     ← Electron 42 (no integrado aún)
 ├── docker-compose.yml
 └── CLAUDE.md
 ```
@@ -83,7 +83,7 @@ Casa-Verde/
 ├── config/
 │   ├── DataSourceConfig.java      ← DataSource SQLite
 │   ├── CorsConfig.java            ← CORS (localhost:5173, :80, null/Electron)
-│   ├── DataInitializer.java       ← CommandLineRunner — carga datos iniciales
+│   ├── DataInitializer.java       ← CommandLineRunner — siembra datos iniciales + 4 métodos de backfill/migración idempotentes (backfillNequiAlias, backfillFinalizadoEn, backfillEstadosPedido, backfillPreciosDetalles)
 │   ├── controllerAdvice/
 │   │   ├── GlobalExceptionHandler.java
 │   │   ├── ValidacionException.java
@@ -91,16 +91,18 @@ Casa-Verde/
 │   └── dialect/
 │       └── SQLiteDialect.java
 └── fachadaServices/
-    ├── dto/      ← 41 DTOs y Requests
-    ├── mapper/   ← 12 @Mapper MapStruct
+    ├── dto/      ← 44 DTOs y Requests
+    ├── mapper/   ← 15 @Mapper MapStruct
     └── services/
         ├── configuracionService/   ← IConfiguracionGeneralService, ITasaCambioService
         ├── pagoService/            ← IFondoService, ICajaMovimientoService
-        ├── pedidoService/          ← IPedidoService, ICierreCajaService, IResumenService
-        └── productoService/        ← IProductoService, ICategoriaProductoService,
-                                       IInventarioService, ISalonService, IGastoService,
-                                       IUsuarioService, IMonetaryService,
-                                       IBackupService, IExportacionService, IAuditoriaService
+        ├── pedidoService/          ← IPedidoService, ICierreCajaService, IResumenService, IComprobanteService
+        ├── productoService/        ← IProductoService, ICategoriaProductoService,
+        │                              IInventarioService, ISalonService, IGastoService,
+        │                              IUsuarioService, IMonetaryService,
+        │                              IBackupService, IExportacionService, IAuditoriaService
+        ├── compraService/          ← IProveedorService, ICompraService
+        └── empleadoService/        ← IEmpleadoService
 ```
 
 ---
@@ -134,6 +136,7 @@ Casa-Verde/
 | PUT | `/{id}` | Actualizar producto |
 | PUT | `/{id}/precio` | Actualizar precio (registra historial automático) |
 | PUT | `/{id}/toggle` | Activar / desactivar |
+| DELETE | `/{id}` | Soft-delete (marca `eliminado=true`; no aparece en listados) |
 
 ### Categorías — `/api/v1/categorias`
 | Método | Ruta | Descripción |
@@ -195,6 +198,7 @@ Casa-Verde/
 | POST | `/` | Crear |
 | PUT | `/{id}` | Actualizar |
 | PUT | `/{id}/toggle` | Activar / desactivar |
+| DELETE | `/{id}` | Soft-delete (marca `eliminado=true`; no aparece en listados) |
 
 ### Cierre de caja — `/api/v1/cierres-caja`
 | Método | Ruta | Descripción |
@@ -239,6 +243,55 @@ Casa-Verde/
 | GET | `/resumen` | CSV resumen del día. `?fecha=` |
 | GET | `/caja` | CSV libro de caja del día. `?fecha=` |
 
+### Proveedores — `/api/v1/proveedores`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista proveedores. `?soloActivos=true` filtra inactivos |
+| POST | `/` | Crear proveedor (`{nombre, tipo, telefono?}`) |
+| PUT | `/{id}` | Actualizar proveedor |
+| PUT | `/{id}/toggle` | Activar / desactivar |
+| GET | `/{id}/adelantos` | Lista adelantos prepagados del proveedor |
+| POST | `/{id}/adelantos` | Registrar adelanto prepagado (`{monto, moneda, insumo, precioUnitarioAcordado, fecha}`) — debita fondo con ADELANTO_PROVEEDOR |
+
+### Compras — `/api/v1/compras`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista compras. `?fecha=` y `?estado=` (PENDIENTE/ABONADO_PARCIAL/PAGADO) |
+| GET | `/{id}` | Detalle de una compra (incluye abonos y totalAbonado/saldoPendiente) |
+| POST | `/` | Registrar compra (`{proveedorId, insumo, cantidad, precioUnitario, fecha, observacion?}`) — suma inventario automáticamente |
+| DELETE | `/{id}` | Anular compra (solo estado PENDIENTE, sin abonos) — revierte inventario |
+| GET | `/{id}/abonos` | Lista abonos de una compra |
+| POST | `/{id}/abonos` | Registrar abono (`{monto, moneda, fecha, adelantoProveedorId?}`) — si `adelantoProveedorId` presente, descuenta del adelanto prepagado en vez de debitar fondo |
+
+### Cuentas por Cobrar — `/api/v1/cuentas-cobrar`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista cuentas. Filtros: `estado` (PENDIENTE/ABONADO_PARCIAL/CANCELADO), `fecha`, `q` (búsqueda por cliente) |
+| GET | `/{id}` | Detalle de una cuenta con abonos |
+| POST | `/` | Registrar deuda (`{clienteNombre, concepto?, monto, celular?, fecha, observacion?}`) |
+| DELETE | `/{id}` | Anular cuenta (solo PENDIENTE sin abonos) |
+| GET | `/{id}/abonos` | Lista cobros de una cuenta |
+| POST | `/{id}/abonos` | Registrar cobro (`{monto, moneda, fecha, observacion?}`) — **acredita** el fondo con COBRO_CUENTA_COBRAR |
+
+### Empleados — `/api/v1/empleados`
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/` | Lista empleados. `?soloActivos=true` (default) |
+| POST | `/` | Crear empleado (`{nombre, tipo, salario}`) |
+| PUT | `/{id}` | Actualizar nombre y/o salario |
+| PUT | `/{id}/toggle` | Activar / desactivar |
+| GET | `/{id}/adelantos` | Historial de adelantos |
+| POST | `/{id}/adelantos` | Registrar adelanto — debita fondo inmediatamente con ADELANTO_EMPLEADO |
+| GET | `/{id}/dias` | Días trabajados. `?soloNoPagados=true` |
+| POST | `/{id}/dias` | Registrar un día trabajado (solo POR_DIA) |
+| DELETE | `/{id}/dias/{diaId}` | Eliminar día no pagado |
+| GET | `/{id}/pagos` | Historial de liquidaciones |
+| GET | `/{id}/pagos/preview` | Vista previa del pago sin ejecutar (devuelve `EmpleadoResumenDTO`) |
+| POST | `/{id}/pagos` | Liquidar — calcula, debita fondo con PAGO_EMPLEADO, marca adelantos y días como pagados |
+| GET | `/{id}/vacaciones` | Historial de vacaciones |
+| POST | `/{id}/vacaciones` | Registrar periodo de vacaciones (informativo) |
+| DELETE | `/{id}/vacaciones/{vacId}` | Eliminar registro de vacación |
+
 ---
 
 ## Entidades implementadas
@@ -254,13 +307,16 @@ Casa-Verde/
 - `nombreSnapshot`: copia del nombre del producto al momento de agregar
 - `composicionSnapshot`: JSON de la composición inventariable (snapshot, no FK a Producto)
 - `precioUnitarioCop`, `cantidad`
+- `@Version` para bloqueo optimista
 
 ### Pago
 - `moneda` (COP | USD | NEQUI), `monto`, `montoCop`, `tasaUsada`
 - Los pagos **no** afectan el fondo hasta que el pedido se **finaliza**
+- `@Version` para bloqueo optimista
 
 ### Producto
 - `afectaInventario` (boolean): si true, al finalizar el pedido se descuenta inventario
+- `eliminado` (Boolean, default false): soft-delete — los listados filtran `eliminado=false`
 - `composicion`: lista de `ProductoComposicionInventario` (insumo + cantidad)
 - `@Version` para bloqueo optimista
 
@@ -275,7 +331,7 @@ Casa-Verde/
 - El fondo se acredita **al finalizar un pedido**, no al registrar el pago
 
 ### CajaMovimiento
-- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA
+- `tipo`: COBRO_PEDIDO | REVERSO_PAGO | GASTO | REVERSO_GASTO | AJUSTE_FONDO | ENTRADA_MANUAL | TRANSFERENCIA_SALIDA | TRANSFERENCIA_ENTRADA | COMPRA_PAGO | ADELANTO_EMPLEADO | PAGO_EMPLEADO | ADELANTO_PROVEEDOR | APLICACION_ADELANTO_PROVEEDOR | COBRO_CUENTA_COBRAR
 - `referenciaTipo` + `referenciaId`: trazabilidad al origen del movimiento
 - Cada movimiento guarda `saldoResultante` en el momento del registro
 
@@ -308,14 +364,83 @@ Casa-Verde/
 - Usuarios iniciales: un ADMIN (password: `admin123`, hasheado **BCrypt**) y un OPERADOR
 - Contraseñas almacenadas con BCrypt (Spring Security Crypto) — no SHA-256
 
+### Salon
+- `nombre`, `aforo`, `activo`, `eliminado` (Boolean, default false): soft-delete — los listados filtran `eliminado=false`
+
+### CategoriaProducto
+- `nombre`, `orden` (posición en UI), `activo`
+
+### Proveedor
+- `nombre`, `tipo` (TipoProveedor: CUY/GALLINA/AMBOS/OTROS), `telefono` (nullable), `activo` (default true), `creadoEn`
+
+### Compra
+- `proveedor` (@ManyToOne), `proveedorNombre` (snapshot), `insumo`, `cantidad` (scale 4), `precioUnitario` (scale 0), `totalCop` (scale 0)
+- `estado` (EstadoCompra: PENDIENTE → ABONADO_PARCIAL → PAGADO), `observacion`, `fecha` (LocalDate), `creadoEn`
+- `@Version` para bloqueo optimista
+- Al registrar: suma stock de `insumo` en Inventario con `referenciaTipo="compra"`
+- Al anular (solo PENDIENTE sin abonos): revierte stock con `referenciaTipo="compra_anulada"`
+
+### AbonoCompra
+- `compra` (@ManyToOne), `monto`, `moneda`, `montoCop`, `tasaUsada` (nullable), `fondoDebitado`, `fecha` (LocalDate), `creadoEn`
+- `@Version` para bloqueo optimista
+- Debita el fondo vía `CajaMovimientoTipo.COMPRA_PAGO` con monto negativo
+
 ### ConfiguracionGeneral
 - Parámetros clave-valor. Claves iniciales:
   - `nombre_negocio`, `moneda_base`, `capital_inicial_cop`
   - `mostrar_tasa_dolar`, `zona_horaria`, `backup_dir`
+  - `limite_exento_nequi_mensual` (límite mensual exento de 4×1000 NEQUI), `cuenta_nequi_activa`
 
 ### HistorialAuditoria
 - Registra acción, entidad, id de entidad y detalle
 - Usuario por defecto: `"sistema-local"`
+
+### Empleado
+- `tipo`: QUINCENAL (salario fijo por quincena) | POR_DIA (tarifa diaria × días acumulados)
+- `salario`: BigDecimal scale 0 — monto quincenal o tarifa diaria según tipo
+- `@Version` para bloqueo optimista
+- `activo` (default true)
+
+### Adelanto
+- `tipo`: EFECTIVO (debita el fondo inmediatamente) | ESPECIE (bien o servicio descontado del sueldo, no debita fondo — observación obligatoria)
+- Se debita el fondo **inmediatamente** al registrar si tipo=EFECTIVO
+- `pagado = false` hasta incluirse en una liquidación
+- `montoCop` = equivalente en COP (USD se convierte con tasa vigente)
+- `fondoDebitado` = moneda del fondo (tipo EFECTIVO) o "ESPECIE" (tipo ESPECIE)
+
+### TrabajoDia
+- Solo para empleados `POR_DIA`
+- Los días no pagados se pueden eliminar (corrección de errores)
+- Al liquidar, todos los días pendientes se marcan `pagado = true`
+
+### PagoEmpleado
+- Snapshot completo: `salarioBruto`, `totalAdelantos`, `totalNeto`, `montoPagado`, `montoCop`
+- `tipo`: QUINCENA | COBRO_DIAS
+- `fondoDebitado` = moneda elegida al pagar
+
+### Vacacion
+- Registro informativo de periodo sin trabajo
+- Sin efecto en cálculos de pago — se puede eliminar sin restricciones
+
+### AdelantoProveedor
+- Dinero entregado al proveedor antes de recibir los insumos
+- `monto`, `saldoRestante` (decrece por cada compra contra el adelanto), `insumo`, `precioUnitarioAcordado`
+- `activo = false` cuando `saldoRestante = 0`
+- Debita el fondo al registrar con `ADELANTO_PROVEEDOR`
+- Al abonar una compra con `adelantoProveedorId`, descuenta de `saldoRestante` sin tocar el fondo
+
+### AbonoCompra (modificado)
+- Campo nuevo `adelantoProveedorId` (nullable): si presente, el abono se aplica contra el adelanto prepagado
+
+### CuentaCobrar
+- Deuda de un cliente (crédito otorgado en el momento del consumo)
+- `clienteNombre`, `concepto`, `monto` (deuda original), `celular`, `fecha`
+- Estado: PENDIENTE → ABONADO_PARCIAL → CANCELADO
+- Al registrar: **no toca el fondo** (el dinero aún no ha entrado)
+- Al registrar abono: **acredita el fondo** con `COBRO_CUENTA_COBRAR`
+
+### AbonoCuentaCobrar
+- `cuenta` (@ManyToOne), `monto`, `moneda`, `montoCop`, `tasaUsada`, `fondoAcreditado`, `fecha`
 
 ---
 
@@ -327,7 +452,7 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 ### Productos y composición de inventario
 | Producto | afectaInventario | Composición |
 |---|---|---|
-| Cuy | ✅ | 1 gallina + 1 cuy *(ver nota)* |
+| Cuy | ✅ | 1 cuy |
 | 1/2 Cuy | ✅ | 0.5 cuy |
 | 1/4 Cuy | ✅ | 0.25 cuy |
 | Gallina | ✅ | 1 gallina |
@@ -395,7 +520,7 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 
 ```
 src/
-├── App.jsx                         ← Router (createBrowserRouter) + QueryClientProvider
+├── App.jsx                         ← Router (createBrowserRouter / createHashRouter en Electron) + QueryClientProvider
 ├── main.jsx                        ← ReactDOM.createRoot
 ├── index.css                       ← Tailwind v4 + @layer components (design system)
 ├── components/
@@ -408,7 +533,8 @@ src/
 │   ├── pedidos/                    ← OrdenCard, ProductoRow, ModalCrearPedido,
 │   │                                  ModalDetallePedido, ModalCobrar, ModalAgregarItems
 │   ├── configuracion/              ← ModalProducto, ModalSalon, ModalHistorialPrecios,
-│   │                                  ModalCrearOperador, ModalCambiarPassword
+│   │                                  ModalActualizarPrecio, ModalCrearOperador, ModalCambiarPassword,
+│   │                                  ModalCategoria
 │   ├── fondos/                     ← ModalAjuste, ModalEntrada, ModalTransferencia
 │   ├── gastos/                     ← ModalGasto
 │   ├── inventario/                 ← ModalMovimiento, ModalCompraInsumo
@@ -416,19 +542,19 @@ src/
 ├── pages/
 │   ├── dashboard/Dashboard.jsx     ← ✅ Implementado
 │   ├── pedidos/PedidosPage.jsx     ← ✅ Implementado (prioritario)
-│   ├── gastos/GastosPage.jsx       ← ✅ Implementado
-│   ├── fondos/FondosPage.jsx       ← ✅ Implementado
+│   ├── fondos/FondosPage.jsx       ← ✅ Implementado (fondos + salidas de caja/gastos)
 │   ├── inventario/InventarioPage.jsx ← ✅ Implementado
 │   ├── resumen/ResumenPage.jsx     ← ✅ Implementado (incluye CierreCajaPanel)
 │   ├── configuracion/
-│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Categorías, Salones, Usuarios, Tasa USD
-│   │   └── tabs/*.jsx              ← ✅ Los 5 tabs implementados
+│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Salones, Tasa USD, Fondos, Usuarios, Inventario, Categorías, Auditoría, Backups
+│   │   └── tabs/*.jsx              ← ✅ 9 tabs: ProductosTab, SalonesTab, TasaTab, FondosTab, UsuariosTab, InventarioTab, CategoriasTab, AuditoriaTab, BackupsTab
 │   └── Placeholder.jsx             ← Componente vacío para módulos pendientes
-├── services/                       ← 13 archivos (un servicio por dominio)
-│   │  pedidoService, productoService, categoriaService, inventarioService,
-│   │  fondoService, gastoService, salonService, tasaService, cierreCajaService,
-│   │  resumenService, configuracionService, usuarioService,
-│   │  exportacionService, auditoriaService
+├── services/                       ← 15 archivos (14 servicios de dominio + api.js instancia Axios)
+│   │  api.js (instancia Axios base), pedidoService, productoService (incluye categoriaService),
+│   │  inventarioService, fondoService, gastoService, salonService, tasaService,
+│   │  cierreCajaService, resumenService, configuracionService, usuarioService,
+│   │  exportacionService, auditoriaService, backupService,
+│   │  proveedorService, compraService, empleadoService
 ├── store/useSessionStore.js        ← Zustand: { usuario, sidebarColapsado }
 │   │  (la tasa USD viene de React Query, no de Zustand)
 ├── hooks/
@@ -436,15 +562,16 @@ src/
 │   └── useModalKeyboard.js         ← Cierre de modales con tecla Escape
 └── utils/
     ├── format.js                   ← formatCOP, formatUSD, formatDecimal, formatFecha,
-    │                                  formatHora, formatCreadoEn
+    │                                  formatHora, formatCreadoEn, formatFechaLabel
     ├── constants.js                ← ESTADO_BADGE, CAT_BADGE y demás constantes de dominio
-    └── pedidoHelpers.js            ← esActivo, sortByReserva, calcularInsumos, formatInsumo
+    └── pedidoHelpers.js            ← esActivo, sortByReserva, calcularInsumos, formatInsumo,
+                                       calcularInsumosDetallado, normalizarFracciones, REGLAS_FRACCION,
+                                       formatFraccion, formatFechaReserva, formatHoraReserva,
+                                       formatReservaDisplay, esEnCursoPedido, toTitleCase, capFirst,
+                                       ESTADOS_ACTIVOS
 ```
 
-### Módulos pendientes de implementar (no tienen página en el router)
-- **Auditoría** — endpoint `/api/v1/auditoria` existe, sin UI
-- **Backups** — endpoint `/api/v1/backups` existe, sin UI
-- **Exportaciones CSV** — endpoints `/api/v1/exportaciones/*` existen, sin UI
+> **Nota de diseño:** Los gastos (salidas de caja) no tienen página propia — se registran desde `/fondos`. Es una decisión intencional, no deuda técnica.
 
 ### Prioridad de trabajo actual
 **El módulo de Pedidos es el más crítico.** Trabajar primero cualquier mejora, corrección o feature relacionada con pedidos antes de otros módulos.
@@ -523,7 +650,7 @@ Clases utilitarias propias definidas en `@layer components`:
 - `default` methods en mappers con lógica personalizada deben anotarse con `@Named(...)` si retornan tipos comunes (`String`, `BigDecimal`) para evitar que MapStruct los aplique automáticamente en otros mappings
 - Los repositories extienden `JpaRepository<Entity, ID>` sin `@Repository`
 - Las entidades usan `@PrePersist` / `@PreUpdate` para timestamps en zona `America/Bogota`
-- Optimistic locking en entidades con concurrencia: `@Version Long version` (Fondo, Gasto, Inventario, Pedido, Producto)
+- Optimistic locking en entidades con concurrencia: `@Version Long version` (Fondo, Gasto, Inventario, Pedido, PedidoDetalle, Pago, Producto)
 
 ---
 
@@ -578,12 +705,11 @@ Admin panel de escritorio, no landing page.
 | Pedidos | `/pedidos` | ✅ Implementado — **prioridad #1** |
 | Resumen del día | `/resumen` | ✅ Implementado (incluye Cierre de Caja) |
 | Inventario | `/inventario` | ✅ Implementado |
-| Gastos | `/gastos` | ✅ Implementado |
-| Capital y fondos | `/fondos` | ✅ Implementado |
-| Configuración (Productos, Categorías, Salones, Usuarios, Tasa USD) | `/configuracion` | ✅ Implementado |
-| Auditoría | — | ⏳ Pendiente — endpoint backend listo |
-| Backups | — | ⏳ Pendiente — endpoint backend listo |
-| Exportaciones CSV | — | ⏳ Pendiente — endpoints backend listos |
+| Capital, fondos y salidas | `/fondos` | ✅ Implementado (los gastos son "salidas de caja" registradas desde aquí) |
+| Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups, Reportes, Proveedores, Compras) | `/configuracion` | ✅ Implementado (12 tabs) |
+| Exportaciones CSV | ResumenPage | ✅ Implementado — botones "Resumen CSV" y "Caja CSV" en ResumenPage |
+| Empleados | `/empleados` | ✅ Implementado |
+| Cuentas por Cobrar | `/cuentas-cobrar` | ✅ Implementado |
 
 ---
 
@@ -614,6 +740,59 @@ Este archivo es la fuente de verdad del proyecto. Se desactualiza cada vez que s
 - tome una decisión arquitectónica que no estaba documentada.
 
 Si la tarea califica, proponer los cambios concretos al CLAUDE.md antes de cerrar la conversación. No actualizar silenciosamente sin avisar al usuario qué cambió y por qué.
+
+---
+
+## Flujo de trabajo Git (GitFlow)
+
+### Ramas permanentes
+| Rama | Propósito |
+|---|---|
+| `main` | Producción estable. Solo recibe merges de `release/*` y `hotfix/*`. Cada merge a main genera un release con tag `vX.Y.Z`. |
+| `develop` | Integración continua. Base de todo trabajo nuevo. Rama por defecto del repositorio. |
+
+### Ramas temporales
+| Tipo | Naming | Sale de | Vuelve a |
+|---|---|---|---|
+| Feature | `feature/nombre-corto` | `develop` | `develop` |
+| Release | `release/X.Y.Z` | `develop` | `main` + `develop` |
+| Hotfix | `hotfix/descripcion` | `main` | `main` + `develop` |
+
+### Comandos habituales
+
+```bash
+# Empezar una feature
+git checkout develop && git checkout -b feature/nueva-pantalla
+
+# Terminar una feature (merge a develop)
+git checkout develop && git merge --no-ff feature/nueva-pantalla && git branch -d feature/nueva-pantalla
+
+# Preparar un release
+git checkout develop && git checkout -b release/1.2.0
+# (ajustar version en package.json, últimos fixes)
+git checkout main && git merge --no-ff release/1.2.0 && git tag v1.2.0
+git checkout develop && git merge --no-ff release/1.2.0
+git branch -d release/1.2.0
+
+# Fix urgente en producción
+git checkout main && git checkout -b hotfix/fix-critico
+# (aplicar el fix)
+git checkout main && git merge --no-ff hotfix/fix-critico && git tag v1.1.1
+git checkout develop && git merge --no-ff hotfix/fix-critico
+git branch -d hotfix/fix-critico
+
+# Publicar release del instalador (desde main)
+git checkout main
+$env:GH_TOKEN = "ghp_token_write"
+cd Frontend && npm run publish:electron
+```
+
+### Reglas
+- **Nunca** hacer commits directos a `main`.
+- **Nunca** hacer commits directos a `develop` (excepto fixes triviales de una línea).
+- Todo trabajo nuevo va en `feature/*` primero.
+- Los releases del instalador Electron se publican **siempre desde `main`**.
+- El versionado sigue semver: `MAJOR.MINOR.PATCH` → cambios en `Frontend/package.json` antes de hacer el release.
 
 ---
 

@@ -2,10 +2,14 @@ package com.casaverde.backend.config;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.ArrayList;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.ConfiguracionGeneral;
@@ -30,6 +34,8 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoDetalleRepository;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Salon;
 import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
+import com.casaverde.backend.capaAccesoADatos.models.enums.TipoAdelanto;
+import com.casaverde.backend.capaAccesoADatos.repositories.AdelantoRepository;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +43,8 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
     private final CategoriaProductoRepository categoriaRepo;
     private final ProductoRepository productoRepo;
@@ -48,11 +56,14 @@ public class DataInitializer implements CommandLineRunner {
     private final FondoRepository fondoRepo;
     private final PedidoRepository pedidoRepo;
     private final PedidoDetalleRepository pedidoDetalleRepo;
+    private final AdelantoRepository adelantoRepo;
     private final IUsuarioService usuarioService;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
-    @Transactional
     public void run(String... args) {
+        // Seed data: cada método tiene su guard "if count > 0 return" — idempotente por
+        // diseño
         initCategorias();
         initProductos();
         initSalones();
@@ -61,21 +72,39 @@ public class DataInitializer implements CommandLineRunner {
         initInventario();
         initFondos();
         usuarioService.ensureUsuariosIniciales();
-        backfillNequiAlias();
-        backfillFinalizadoEn();
-        backfillEstadosPedido();
-        backfillPreciosDetalles();
+        // Backfills: un fallo no debe impedir el arranque — se registra y se continúa
+        runBackfill("NequiAlias", this::backfillNequiAlias);
+        runBackfill("FinalizadoEn", this::backfillFinalizadoEn);
+        runBackfill("EstadosPedido", this::backfillEstadosPedido);
+        runBackfill("PreciosDetalles", this::backfillPreciosDetalles);
+        runBackfill("AlertasInventario", this::backfillAlertasInventario);
+        runBackfill("TipoAdelanto", this::backfillTipoAdelanto);
+        runBackfill("FondoEfectivo", this::backfillFondoEfectivo);
+    }
+
+    // TransactionTemplate en vez de @Transactional: este método se invoca como
+    // this.runBackfill(...) (self-invocation) desde run(), lo que bypasea el proxy
+    // AOP de Spring y anula la anotación. TransactionTemplate abre la transacción
+    // de forma programática, sin depender del proxy.
+    public void runBackfill(String nombre, Runnable tarea) {
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> tarea.run());
+        } catch (Exception e) {
+            log.warn("Backfill '{}' falló (no crítico, se reintentará en el próximo arranque): {}", nombre,
+                    e.getMessage());
+        }
     }
 
     private void initCategorias() {
         if (categoriaRepo.count() > 0)
             return;
-        categoriaRepo.saveAll(List.of(
-                cat("Cuyes", 1),
-                cat("Gallinas", 2),
-                cat("Almuerzos", 3),
-                cat("Complementos", 4),
-                cat("Bebidas", 5)));
+        List<CategoriaProducto> cats = new ArrayList<>();
+        cats.add(cat("Cuyes", 1));
+        cats.add(cat("Gallinas", 2));
+        cats.add(cat("Almuerzos", 3));
+        cats.add(cat("Complementos", 4));
+        cats.add(cat("Bebidas", 5));
+        categoriaRepo.saveAll(cats);
     }
 
     private void initProductos() {
@@ -131,16 +160,18 @@ public class DataInitializer implements CommandLineRunner {
     private void initSalones() {
         if (salonRepo.count() > 0)
             return;
-        salonRepo.saveAll(List.of(
-                Salon.builder().nombre("Salón principal").aforo(30).activo(true).build(),
-                Salon.builder().nombre("Terraza").aforo(20).activo(true).build(),
-                Salon.builder().nombre("Para llevar").activo(true).build()));
+        List<Salon> salones = new ArrayList<>();
+        salones.add(Salon.builder().nombre("Salón principal").aforo(30).activo(true).build());
+        salones.add(Salon.builder().nombre("Terraza").aforo(20).activo(true).build());
+        salones.add(Salon.builder().nombre("Para llevar").activo(true).build());
+        salonRepo.saveAll(salones);
     }
 
     private void initTasaCambio() {
         if (tasaRepo.count() > 0)
             return;
-        tasaRepo.save(TasaCambio.builder().valorCop(BigDecimal.valueOf(4200)).build());
+        tasaRepo.save(
+                java.util.Objects.requireNonNull(TasaCambio.builder().valorCop(BigDecimal.valueOf(4200)).build()));
     }
 
     private void initConfiguracion() {
@@ -152,6 +183,7 @@ public class DataInitializer implements CommandLineRunner {
         saveConfigIfAbsent("backup_dir", "./Backups", "Carpeta local de backups SQLite");
         saveConfigIfAbsent("limite_exento_nequi_mensual", "3404310", "Límite mensual exento de 4x1000 en NEQUI (COP)");
         saveConfigIfAbsent("cuenta_nequi_activa", "NEQUI", "Cuenta Nequi activa para pagos y movimientos");
+        saveConfigIfAbsent("base_caja_cop", "0", "Base de caja inicial en COP para el conteo de denominaciones");
     }
 
     private void saveConfigIfAbsent(String clave, String valor, String desc) {
@@ -174,7 +206,19 @@ public class DataInitializer implements CommandLineRunner {
         fondoRepo.saveAll(List.of(
                 Fondo.builder().moneda("COP").saldo(BigDecimal.ZERO).build(),
                 Fondo.builder().moneda("USD").saldo(BigDecimal.ZERO).build(),
+                Fondo.builder().moneda("EFECTIVO").alias("Caja física").saldo(BigDecimal.ZERO).build(),
                 Fondo.builder().moneda("NEQUI").alias("Principal").saldo(BigDecimal.ZERO).build()));
+    }
+
+    /**
+     * Crea el fondo EFECTIVO (caja física) en instalaciones existentes que ya
+     * tenían COP/USD/NEQUI antes de que este fondo se introdujera. Idempotente
+     * — solo actúa si el fondo aún no existe.
+     */
+    private void backfillFondoEfectivo() {
+        if (fondoRepo.findById("EFECTIVO").isEmpty()) {
+            fondoRepo.save(Fondo.builder().moneda("EFECTIVO").alias("Caja física").saldo(BigDecimal.ZERO).build());
+        }
     }
 
     /**
@@ -239,6 +283,38 @@ public class DataInitializer implements CommandLineRunner {
         if (!actualizados.isEmpty()) {
             pedidoRepo.saveAll(actualizados);
         }
+    }
+
+    /**
+     * Asigna alertaMinima a los insumos de inventario existentes si aún no tienen
+     * valor.
+     * Idempotente — solo toca registros con alertaMinima null.
+     * gallina = 5, cuy = 10.
+     */
+    private void backfillAlertasInventario() {
+        inventarioRepo.findAll().forEach(inv -> {
+            if (inv.getAlertaMinima() == null) {
+                if ("gallina".equalsIgnoreCase(inv.getInsumo())) {
+                    inv.setAlertaMinima(new BigDecimal("5"));
+                } else if ("cuy".equalsIgnoreCase(inv.getInsumo())) {
+                    inv.setAlertaMinima(new BigDecimal("10"));
+                }
+                inventarioRepo.save(inv);
+            }
+        });
+    }
+
+    /**
+     * Asigna tipo=EFECTIVO a todos los adelantos existentes que no tengan tipo.
+     * Idempotente.
+     */
+    private void backfillTipoAdelanto() {
+        List<com.casaverde.backend.capaAccesoADatos.models.entitys.Adelanto> sin = adelantoRepo.findAll().stream()
+                .filter(a -> a.getTipo() == null)
+                .peek(a -> a.setTipo(TipoAdelanto.EFECTIVO))
+                .toList();
+        if (!sin.isEmpty())
+            adelantoRepo.saveAll(sin);
     }
 
     // ---- helpers ----

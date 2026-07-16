@@ -4,11 +4,13 @@ import { Plus, Power, Trash2 } from "lucide-react";
 import { usuarioService } from "../../../services/usuarioService";
 import ModalCrearOperador from "../../../components/configuracion/ModalCrearOperador";
 import ModalCambiarPassword from "../../../components/configuracion/ModalCambiarPassword";
+import ConfirmDialog from "../../../components/shared/ConfirmDialog";
 
 export default function UsuariosTab() {
   const qc = useQueryClient();
   const [creando, setCreando]                     = useState(false);
   const [cambiandoPassword, setCambiandoPassword] = useState(null);
+  const [eliminandoId, setEliminandoId]           = useState(null);
   const [msg, setMsg]                             = useState(null);
 
   const { data: usuarios = [], isLoading } = useQuery({
@@ -43,8 +45,8 @@ export default function UsuariosTab() {
 
   const mutEliminar = useMutation({
     mutationFn: (id) => usuarioService.eliminar(id),
-    onSuccess: () => { invalidar(); flash("success", "Operador eliminado"); },
-    onError:   (err) => flash("error", err.response?.data?.mensaje ?? err.message),
+    onSuccess: () => { invalidar(); setEliminandoId(null); flash("success", "Operador eliminado"); },
+    onError:   (err) => { setEliminandoId(null); flash("error", err.response?.data?.mensaje ?? err.message); },
   });
 
   if (isLoading) return <div className="loading-center"><div className="spinner" /></div>;
@@ -114,11 +116,7 @@ export default function UsuariosTab() {
                               className="btn-icon text-red-400 hover:text-red-600"
                               title="Eliminar operador"
                               disabled={mutEliminar.isPending}
-                              onClick={() => {
-                                if (window.confirm(`¿Eliminar al operador "${u.nombre}"?`)) {
-                                  mutEliminar.mutate(u.id);
-                                }
-                              }}
+                              onClick={() => setEliminandoId(u.id)}
                             >
                               <Trash2 size={15} />
                             </button>
@@ -150,6 +148,23 @@ export default function UsuariosTab() {
           }
         />
       )}
+
+      {eliminandoId !== null && (() => {
+        const u = usuarios.find((x) => x.id === eliminandoId);
+        return u ? (
+          <ConfirmDialog
+            emoji="👤"
+            titulo={`Eliminar operador "${u.nombre}"`}
+            descripcion="El operador se eliminará permanentemente y no podrá iniciar sesión."
+            labelOk="Eliminar"
+            labelCancelar="Cancelar"
+            peligro
+            loading={mutEliminar.isPending}
+            onOk={() => mutEliminar.mutate(eliminandoId)}
+            onCancelar={() => setEliminandoId(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

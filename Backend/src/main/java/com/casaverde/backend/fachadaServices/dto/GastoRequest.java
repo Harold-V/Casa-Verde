@@ -13,7 +13,6 @@ import lombok.*;
 public class GastoRequest {
     @NotBlank(message = "El concepto del gasto es obligatorio")
     private String concepto;
-    @NotBlank(message = "La categoría del gasto es obligatoria")
     private String categoria;
     @NotBlank(message = "La moneda es obligatoria")
     private String moneda;

@@ -23,8 +23,8 @@ public interface FondoMapper {
     MovimientoFondoDTO toMovimientoDTO(CajaMovimiento c);
 
     @Named("resolveTipo")
-    default String resolveTipo(String tipoStr) {
-        return switch (CajaMovimientoTipo.valueOf(tipoStr)) {
+    default String resolveTipo(CajaMovimientoTipo tipo) {
+        return switch (tipo) {
             case COBRO_PEDIDO -> "cobro";
             case GASTO -> "salida";
             case REVERSO_PAGO, REVERSO_GASTO -> "reverso";
@@ -32,6 +32,12 @@ public interface FondoMapper {
             case ENTRADA_MANUAL -> "entrada";
             case TRANSFERENCIA_SALIDA -> "salida";
             case TRANSFERENCIA_ENTRADA -> "entrada";
+            case COMPRA_PAGO -> "salida";
+            case ADELANTO_EMPLEADO -> "salida";
+            case PAGO_EMPLEADO -> "salida";
+            case ADELANTO_PROVEEDOR -> "salida";
+            case APLICACION_ADELANTO_PROVEEDOR -> "salida";
+            case COBRO_CUENTA_COBRAR -> "entrada";
         };
     }
 

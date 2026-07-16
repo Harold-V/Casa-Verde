@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, AlertTriangle, Calendar } from "lucide-react";
@@ -16,16 +16,15 @@ function StockCard({ s, estimado = 0 }) {
   const texto   = formatInsumo(s.insumo, s.stockActual) ?? "0";
   const deficit = Math.max(0, estimado - s.stockActual);
 
-  const borderCls = deficit > 0 || s.stockActual < 2
-    ? "border-l-red-600"
-    : s.stockActual < 5
-      ? "border-l-amber-500"
-      : "border-l-verde-claro";
-  const textCls = deficit > 0 || s.stockActual < 2
-    ? "text-red-600"
-    : s.stockActual < 5
-      ? "text-amber-600"
-      : "text-verde-claro";
+  const umbral = s.alertaMinima ?? 5;
+  const color =
+    deficit > 0 || s.stockActual < umbral * 0.4
+      ? "red-600"
+      : s.stockActual < umbral
+      ? "amber-500"
+      : "verde-claro";
+  const borderCls = `border-l-${color}`;
+  const textCls = color === "amber-500" ? "text-amber-600" : `text-${color}`;
   const label = s.insumo.charAt(0).toUpperCase() + s.insumo.slice(1);
 
   return (
@@ -83,25 +82,17 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [hoy]);
 
-  // Re-render exactamente cuando la próxima reserva alcanza su hora
-  const [, setReservasTick] = useState(0);
-  useEffect(() => {
-    const now   = Date.now();
-    const today = new Date().toLocaleDateString("en-CA");
-    const proximoFlip = pedidosActivos
-      .filter((p) => p.horaReserva)
-      .map((p) => new Date(`${p.fechaReserva ?? today}T${p.horaReserva}`).getTime())
-      .filter((t) => t > now)
-      .sort((a, b) => a - b)[0];
-    if (!proximoFlip) return;
-    const timer = setTimeout(() => setReservasTick((n) => n + 1), proximoFlip - now + 500);
-    return () => clearTimeout(timer);
-  }, [pedidosActivos]);
 
   const r = resumen;
   const porCobrar      = pedidosActivos.reduce((s, p) => s + (p.saldoPendiente ?? 0), 0);
   const insumosActivos = calcularInsumos(pedidosActivos.flatMap((p) => p.detalles ?? []));
   const reservasCount = pedidosActivos.filter((p) => !!(p.fechaReserva || p.horaReserva)).length;
+
+  const insumosMap = useMemo(() => {
+    const map = new Map();
+    pedidosActivos.forEach((p) => map.set(p.id, calcularInsumos(p.detalles ?? [])));
+    return map;
+  }, [pedidosActivos]);
 
   const listaFiltrada = sortByReserva(
     soloReservas
@@ -216,7 +207,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {listaPagina.map((p) => {
-                    const insumos = calcularInsumos(p.detalles ?? []);
+                    const insumos = insumosMap.get(p.id) ?? {};
                     const gallina = insumos["gallina"];
                     const cuy = insumos["cuy"];
                     const tieneReserva = !!(p.fechaReserva || p.horaReserva);
@@ -267,12 +258,12 @@ export default function Dashboard() {
       </div>
 
       {/* Alerta de stock bajo */}
-      {stock.some((s) => s.stockActual < 2) && (
+      {stock.some((s) => s.stockActual < (s.alertaMinima ?? 5) * 0.4) && (
         <div className="mt-3.5 px-[14px] py-[10px] rounded-lg bg-red-600/[0.08] border border-red-600 flex items-center gap-2.5 text-[13px] text-red-600">
           <AlertTriangle size={16} />
           <span>
             <strong>Stock crítico:</strong>{" "}
-            {stock.filter((s) => s.stockActual < 2).map((s) => `${s.insumo} (${formatDecimal(s.stockActual)})`).join(", ")}
+            {stock.filter((s) => s.stockActual < (s.alertaMinima ?? 5) * 0.4).map((s) => `${s.insumo} (${formatDecimal(s.stockActual)})`).join(", ")}
           </span>
         </div>
       )}

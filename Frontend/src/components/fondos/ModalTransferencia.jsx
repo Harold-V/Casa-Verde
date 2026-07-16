@@ -20,16 +20,23 @@ function montoGravable(monto, disponible) {
 
 function getMonedaLabel(moneda, fondos) {
   const fondo = fondos.find((f) => f.moneda === moneda);
-  if (moneda === "COP") return "COP — Pesos";
+  if (moneda === "COP") return "COP — Banco";
   if (moneda === "USD") return "USD — Dólares";
   if (fondo?.alias) return `${moneda} — ${fondo.alias}`;
   return moneda;
 }
 
-export default function ModalTransferencia({ fondos = [], onClose, onGuardar, monedaOrigenInicial, titulo, conceptoFijo }) {
+export default function ModalTransferencia({ fondos = [], onClose, onGuardar, monedaOrigenInicial, monedaDestinoDefault, titulo, conceptoFijo }) {
+  // Toda billetera puede transferir a cualquier otra. Cuando se abre desde
+  // una tarjeta puntual, el origen queda fijo (así se pidió la operación);
+  // el destino siempre es editable, solo se pre-selecciona un valor por
+  // defecto sensato (Efectivo, salvo que el origen ya sea Efectivo → Banco).
+  const origenBloqueado = !!monedaOrigenInicial;
+
   const todasMonedas = [
     ...fondos.filter((f) => f.moneda === "COP").map((f) => f.moneda),
     ...fondos.filter((f) => f.moneda === "USD").map((f) => f.moneda),
+    ...fondos.filter((f) => f.moneda === "EFECTIVO").map((f) => f.moneda),
     ...fondos.filter((f) => f.moneda.startsWith("NEQUI")).map((f) => f.moneda),
   ];
 
@@ -41,7 +48,7 @@ export default function ModalTransferencia({ fondos = [], onClose, onGuardar, mo
   const [form, setForm] = useState({
     monedaOrigen:  origenInicial,
     montoOrigen:   "",
-    monedaDestino: todasMonedas.find((m) => m !== origenInicial) ?? "",
+    monedaDestino: monedaDestinoDefault ?? (todasMonedas.find((m) => m !== origenInicial) ?? ""),
     montoDestino:  "",
     concepto:      "",
     observacion:   "",
@@ -199,7 +206,7 @@ export default function ModalTransferencia({ fondos = [], onClose, onGuardar, mo
             <div className="flex items-end gap-3">
               <div className="form-group flex-1 mb-0">
                 <label className="form-label">Fondo origen</label>
-                {conceptoFijo ? (
+                {origenBloqueado ? (
                   <div className="form-control bg-gray-50 text-gray-700 cursor-default">
                     {getMonedaLabel(form.monedaOrigen, fondos)}
                   </div>
@@ -264,11 +271,11 @@ export default function ModalTransferencia({ fondos = [], onClose, onGuardar, mo
                   Monto a acreditar {form.monedaDestino === "USD" ? "(USD)" : "(pesos)"}
                 </label>
                 <MoneyInput
-                  className={`form-control ${esNequiOrigen && conceptoFijo ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
+                  className={`form-control ${esNequiOrigen ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
                   moneda={form.monedaDestino}
                   value={form.montoDestino}
-                  onChange={esNequiOrigen && conceptoFijo ? undefined : (v) => set("montoDestino", v)}
-                  readOnly={esNequiOrigen && !!conceptoFijo}
+                  onChange={esNequiOrigen ? undefined : (v) => set("montoDestino", v)}
+                  readOnly={esNequiOrigen}
                 />
               </div>
             </div>

@@ -49,11 +49,17 @@ public class ProductoController {
 
     @PutMapping("/{id}/precio")
     public ProductoDTO actualizarPrecio(@PathVariable Long id, @Valid @RequestBody ActualizarPrecioRequest req) {
-        return service.actualizarPrecio(id, req.getPrecio());
+        return service.actualizarPrecio(id, req.getPrecio(), req.getMotivo());
     }
 
     @PutMapping("/{id}/toggle")
     public ProductoDTO toggleActivo(@PathVariable Long id) {
         return service.toggleActivo(id);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        service.eliminar(id);
+        return ResponseEntity.noContent().build();
     }
 }

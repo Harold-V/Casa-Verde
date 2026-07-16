@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Ban, CheckCircle, Pencil, Plus, Trash2, Utensils, X } from "lucide-react";
+import { Ban, CheckCircle, HandCoins, Pencil, Plus, Trash2, Utensils, X } from "lucide-react";
 import { formatCOP, formatFecha } from "../../utils/format";
 import { ESTADO_BADGE } from "../../utils/constants";
 import {
-  calcularInsumosDetallado, formatInsumo, esActivo, esEnCursoPedido,
+  calcularInsumosDetallado, formatInsumo, esActivo, permiteCobro,
   normalizarFracciones, toTitleCase, formatReservaDisplay,
 } from "../../utils/pedidoHelpers";
 import MoneyInput from "../shared/MoneyInput";
@@ -13,6 +13,9 @@ import ModalAgregarItems from "./ModalAgregarItems";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 
+// Debe ser > duración de --animate-fade-out-card (180ms) definida en index.css
+const FADE_OUT_DELAY_MS = 190;
+
 /**
  * Modal de detalle y edición de un pedido activo.
  * Gestiona ítems, datos generales, finalización y anulación.
@@ -21,7 +24,7 @@ export default function ModalDetallePedido({
   pedido, productos, salones = [], onClose,
   onActualizar,
   onAgregarDetalle, onActualizarDetalle, onQuitarDetalle,
-  onFinalizar, onAnular,
+  onFinalizar, onAnular, onFiar,
   onActualizarPago, onQuitarPago,
 }) {
   useModalKeyboard({ onEscape: onClose });
@@ -45,11 +48,16 @@ export default function ModalDetallePedido({
   const [editSalonId, setEditSalonId]               = useState("");
   const [editParaLlevar, setEditParaLlevar]         = useState(!!pedido.paraLlevar);
   const [editObservacion, setEditObservacion]       = useState(pedido.observacion ?? "");
+  const [editTelefono, setEditTelefono]             = useState(pedido.telefono ?? "");
+  const [editDescuento, setEditDescuento]           = useState(
+    pedido.descuentoCop > 0 ? String(pedido.descuentoCop) : ""
+  );
   // Cobros
   const [editandoPagoId, setEditandoPagoId] = useState(null);
   const [editPagoForm, setEditPagoForm]     = useState({ moneda: "COP", monto: "" });
 
   // Sincroniza con los valores actuales del pedido al abrir el panel
+  // o cuando el pedido cambia mientras el panel está abierto (refetch)
   useEffect(() => {
     if (showEditReserva) {
       setEditOn({
@@ -64,8 +72,18 @@ export default function ModalDetallePedido({
       setEditSalonId(pedido.salonId    ? String(pedido.salonId)    : "");
       setEditParaLlevar(!!pedido.paraLlevar);
       setEditObservacion(pedido.observacion ?? "");
+      setEditTelefono(pedido.telefono ?? "");
+      setEditDescuento(pedido.descuentoCop > 0 ? String(pedido.descuentoCop) : "");
     }
-  }, [showEditReserva]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showEditReserva, pedido]);
+
+  // El descuento solo se puede modificar antes de que exista cualquier pago —
+  // evita inconsistencias contables (el cobro ya podría haberse calculado
+  // sobre el total anterior).
+  const sinPagos = (pedido.pagos?.length ?? 0) === 0;
+  const descuentoPreview = sinPagos ? (parseFloat(editDescuento) || 0) : (pedido.descuentoCop ?? 0);
+  const totalPreview = Math.max(0, (pedido.subtotalCop ?? 0) - descuentoPreview);
+  const descuentoPreviewInvalido = sinPagos && descuentoPreview >= (pedido.subtotalCop ?? 0) && descuentoPreview > 0;
 
   const togEdit = (k) => setEditOn((o) => {
     const val   = !o[k];
@@ -75,8 +93,20 @@ export default function ModalDetallePedido({
     return nuevo;
   });
 
+  // abierto: ítems y datos generales editables — excluye FIADO a propósito
+  // (queda congelado). puedeCobrar: más amplio, incluye FIADO — gobierna lo
+  // que sí sigue disponible en un pedido fiado (editar/quitar cobros,
+  // finalizar/saldar la cuenta una vez el saldo llega a $0).
   const abierto       = esActivo(pedido.estado);
-  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !esEnCursoPedido(pedido);
+  const puedeCobrar    = permiteCobro(pedido.estado);
+  // Un pedido FIADO nunca es "enCurso" (el backend excluye los no-activos de
+  // ese cálculo), pero puede conservar la fechaReserva/horaReserva original
+  // de antes de fiarlo — sin la exclusión explícita, quedaría bloqueado para
+  // finalizar/saldar para siempre. El backend ya se salta esta validación
+  // para pedidos que vienen de fiado (finalizarPedido) — el frontend debe
+  // reflejar lo mismo.
+  const reservaFutura = pedido.estado !== "FIADO"
+    && !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
   const { totales: itotales, almuerzo: ialmuerzo } = calcularInsumosDetallado(pedido.detalles);
 
   const buildUpdateReq = (overrides) => ({
@@ -88,6 +118,7 @@ export default function ModalDetallePedido({
     observacion:  pedido.observacion  ?? null,
     salonId:      pedido.salonId      ?? null,
     paraLlevar:   pedido.paraLlevar   ?? null,
+    telefono:     pedido.telefono     ?? null,
     ...overrides,
   });
 
@@ -162,7 +193,7 @@ export default function ModalDetallePedido({
           .filter(Boolean);
         if (idsQuitar.length > 0) {
           setRemovingIds(new Set(idsQuitar));
-          await new Promise((r) => setTimeout(r, 190));
+          await new Promise((r) => setTimeout(r, FADE_OUT_DELAY_MS));
         }
         for (const { pid } of allDiffs.filter(({ d }) => d === 0)) {
           const det = conProducto.find((x) => x.productoId === pid);
@@ -178,6 +209,8 @@ export default function ModalDetallePedido({
   });
 
   const handleGuardarReserva = () => run(async () => {
+    if (sinPagos && descuentoPreviewInvalido)
+      throw new Error("El descuento debe ser menor al subtotal");
     await onActualizar(buildUpdateReq({
       horaReserva:  editOn.hora     ? editHora                    : null,
       fechaReserva: editOn.fecha    ? editFecha                   : null,
@@ -185,6 +218,11 @@ export default function ModalDetallePedido({
       salonId:      editOn.salon    ? (Number(editSalonId)  || null) : null,
       paraLlevar:   editParaLlevar,
       observacion:  editObservacion.trim() || null,
+      telefono:     editTelefono.trim() || null,
+      // Sin pagos: se envía el valor editado (0 si el campo quedó vacío). Con
+      // pagos: no se envía nada (undefined se omite en el JSON), el backend
+      // nunca lo tocaría de todas formas si viniera.
+      ...(sinPagos ? { descuentoCop: parseFloat(editDescuento) || 0 } : {}),
     }));
     setShowEditReserva(false);
   });
@@ -210,29 +248,31 @@ export default function ModalDetallePedido({
     try {
       if (diffs.length > 0) {
         normalizandoRef.current = true;
-        for (const diff of diffs.filter((d) => d.cantidadAntes === 0))
-          await onAgregarDetalle({ productoId: diff.productoId, cantidad: diff.cantidadDespues });
-        for (const diff of diffs.filter((d) => d.cantidadAntes > 0 && d.cantidadDespues > 0)) {
-          const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
-          if (det) await onActualizarDetalle(det.id, { cantidad: diff.cantidadDespues });
+        try {
+          for (const diff of diffs.filter((d) => d.cantidadAntes === 0))
+            await onAgregarDetalle({ productoId: diff.productoId, cantidad: diff.cantidadDespues });
+          for (const diff of diffs.filter((d) => d.cantidadAntes > 0 && d.cantidadDespues > 0)) {
+            const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
+            if (det) await onActualizarDetalle(det.id, { cantidad: diff.cantidadDespues });
+          }
+          const idsQuitar = diffs
+            .filter((d) => d.cantidadDespues === 0)
+            .map((d) => pedido.detalles.find((det) => det.productoId === d.productoId)?.id)
+            .filter(Boolean);
+          if (idsQuitar.length > 0) {
+            setRemovingIds(new Set(idsQuitar));
+            await new Promise((r) => setTimeout(r, FADE_OUT_DELAY_MS));
+          }
+          for (const diff of diffs.filter((d) => d.cantidadDespues === 0)) {
+            const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
+            if (det) await onQuitarDetalle(det.id);
+          }
+        } finally {
+          normalizandoRef.current = false;
         }
-        const idsQuitar = diffs
-          .filter((d) => d.cantidadDespues === 0)
-          .map((d) => pedido.detalles.find((det) => det.productoId === d.productoId)?.id)
-          .filter(Boolean);
-        if (idsQuitar.length > 0) {
-          setRemovingIds(new Set(idsQuitar));
-          await new Promise((r) => setTimeout(r, 190));
-        }
-        for (const diff of diffs.filter((d) => d.cantidadDespues === 0)) {
-          const det = pedido.detalles.find((d) => d.productoId === diff.productoId);
-          if (det) await onQuitarDetalle(det.id);
-        }
-        normalizandoRef.current = false;
       }
       for (const m of manuales) await onAgregarDetalle(m);
     } catch (err) {
-      normalizandoRef.current = false;
       setRemovingIds(new Set());
       setError(err.message);
     } finally {
@@ -290,6 +330,16 @@ export default function ModalDetallePedido({
                 {(pedido.fechaReserva || pedido.horaReserva) && (
                   <span className="flex items-center gap-1">
                     · 📅 {formatReservaDisplay(pedido.fechaReserva, pedido.horaReserva)}
+                    {abierto && (
+                      <button className="btn-icon p-0 text-gray-400 hover:text-verde-oscuro" onClick={() => setShowEditReserva((v) => !v)}>
+                        <Pencil size={10} />
+                      </button>
+                    )}
+                  </span>
+                )}
+                {pedido.telefono && (
+                  <span className="flex items-center gap-1">
+                    · 📞 {pedido.telefono}
                     {abierto && (
                       <button className="btn-icon p-0 text-gray-400 hover:text-verde-oscuro" onClick={() => setShowEditReserva((v) => !v)}>
                         <Pencil size={10} />
@@ -356,6 +406,14 @@ export default function ModalDetallePedido({
                   )}
                 </div>
               )}
+              <input
+                type="tel"
+                className="form-control text-sm"
+                placeholder="Teléfono del cliente (opcional)"
+                maxLength={30}
+                value={editTelefono}
+                onChange={(e) => setEditTelefono(e.target.value)}
+              />
               <textarea
                 className="form-control text-sm resize-none"
                 rows={2}
@@ -363,8 +421,38 @@ export default function ModalDetallePedido({
                 value={editObservacion}
                 onChange={(e) => setEditObservacion(e.target.value)}
               />
+
+              {/* Descuento — solo editable antes del primer pago */}
+              <div className="border-t border-gray-200 pt-2.5">
+                <div className="text-[11px] font-semibold text-gray-500 mb-1.5">🏷️ Descuento</div>
+                {sinPagos ? (
+                  <>
+                    <MoneyInput
+                      className="form-control text-sm"
+                      moneda="COP"
+                      placeholder="Monto del descuento (opcional)"
+                      value={editDescuento}
+                      onChange={setEditDescuento}
+                    />
+                    {descuentoPreviewInvalido && (
+                      <div className="text-[12px] text-red-500 mt-1">El descuento debe ser menor al subtotal</div>
+                    )}
+                    <div className="flex justify-between text-[12px] text-gray-500 mt-1.5">
+                      <span>Subtotal: {formatCOP(pedido.subtotalCop)}</span>
+                      <span>Descuento: -{formatCOP(descuentoPreview)}</span>
+                      <span className="font-semibold text-gray-700">Total: {formatCOP(totalPreview)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[12px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                    El pedido ya tiene {pedido.pagos.length} cobro{pedido.pagos.length !== 1 ? "s" : ""} registrado{pedido.pagos.length !== 1 ? "s" : ""} — el descuento no se puede modificar para evitar inconsistencias contables.
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
-                <button className="btn btn-primary btn-sm" onClick={handleGuardarReserva} disabled={loading}>Guardar</button>
+                <button className="btn btn-primary btn-sm" onClick={handleGuardarReserva}
+                  disabled={loading || descuentoPreviewInvalido}>Guardar</button>
                 <button className="btn-icon text-gray-400" onClick={() => setShowEditReserva(false)}><X size={14} /></button>
               </div>
             </div>
@@ -442,7 +530,7 @@ export default function ModalDetallePedido({
                           onClick={() => handleGuardarDetalle(d.id)} disabled={loading}>Guardar</button>
                         <button type="button" className="btn-icon text-red-500 shrink-0" title="Eliminar ítem"
                           disabled={loading}
-                          onClick={() => run(async () => { await onQuitarDetalle(d.id); setEditandoDetalleId(null); })}>
+                          onClick={() => setConfirm({ tipo: "quitar-detalle", id: d.id, nombre: d.nombreSnapshot })}>
                           <Trash2 size={14} />
                         </button>
                         <button type="button" className="btn-icon text-gray-400 shrink-0"
@@ -484,8 +572,19 @@ export default function ModalDetallePedido({
 
             </div>
 
+            {/* Subtotal / descuento (solo si hay descuento aplicado) */}
+            {(pedido.descuentoCop ?? 0) > 0 && (
+              <div className="px-5 pt-3 border-t border-gray-100 bg-gray-50/70 flex justify-between text-[12px] text-gray-500 shrink-0">
+                <span>Subtotal: {formatCOP(pedido.subtotalCop)}</span>
+                <span className="text-red-500">
+                  Descuento: -{formatCOP(pedido.descuentoCop)}
+                  {pedido.descuentoAplicadoPor && ` (${pedido.descuentoAplicadoPor})`}
+                </span>
+              </div>
+            )}
+
             {/* KPIs: total / pagado / saldo */}
-            <div className="grid grid-cols-3 gap-3 px-5 py-3 border-t border-gray-100 bg-gray-50/70 shrink-0">
+            <div className={`grid grid-cols-3 gap-3 px-5 py-3 bg-gray-50/70 shrink-0 ${(pedido.descuentoCop ?? 0) > 0 ? "" : "border-t border-gray-100"}`}>
               <div className="kpi-card" style={{ padding: "10px 12px" }}>
                 <div className="kpi-label text-[10px]">Total</div>
                 <div className="kpi-value text-[15px]">{formatCOP(pedido.totalCop)}</div>
@@ -536,7 +635,7 @@ export default function ModalDetallePedido({
                             onClick={() => handleGuardarPago(p.id)} disabled={loading}>Guardar</button>
                           <button type="button" className="btn-icon text-red-500 shrink-0"
                             title="Eliminar cobro" disabled={loading}
-                            onClick={() => run(async () => { await onQuitarPago(p.id); setEditandoPagoId(null); })}>
+                            onClick={() => setConfirm({ tipo: "quitar-pago", id: p.id, moneda: p.moneda, monto: p.montoCop })}>
                             <Trash2 size={14} />
                           </button>
                           <button type="button" className="btn-icon text-gray-400"
@@ -550,7 +649,7 @@ export default function ModalDetallePedido({
                         </span>
                         <span className="flex-1 font-semibold">{formatCOP(p.montoCop)}</span>
                         <span className="text-[11px] text-gray-400">{formatFecha(p.registradoEn)}</span>
-                        {abierto && (
+                        {puedeCobrar && (
                           <button className="btn-icon text-gray-400 hover:text-verde-oscuro"
                             onClick={() => { setEditandoPagoId(p.id); setEditPagoForm({ moneda: p.moneda, monto: String(p.monto) }); }}>
                             <Pencil size={12} />
@@ -565,16 +664,22 @@ export default function ModalDetallePedido({
 
             {/* Acciones */}
             <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-200 bg-white shrink-0">
-              <div>
+              <div className="flex gap-2">
                 {pedido.estado !== "ANULADO" && pedido.estado !== "FINALIZADO" && (
                   <button type="button" className="btn btn-danger"
                     onClick={() => setConfirm({ tipo: "anular" })} disabled={loading}>
                     <Ban size={15} /> Anular
                   </button>
                 )}
+                {abierto && pedido.detalles.length > 0 && (
+                  <button type="button" className="btn btn-secondary"
+                    onClick={() => setConfirm({ tipo: "fiar" })} disabled={loading}>
+                    <HandCoins size={15} /> Fiar
+                  </button>
+                )}
               </div>
               <div className="flex gap-2">
-                {abierto && pedido.saldoPendiente <= 0 && pedido.detalles.length > 0 && (
+                {puedeCobrar && pedido.saldoPendiente <= 0 && pedido.detalles.length > 0 && (
                   <button
                     type="button"
                     className="btn btn-primary bg-verde-oscuro hover:bg-[#0f2b1e] disabled:opacity-40 disabled:cursor-not-allowed"
@@ -603,10 +708,18 @@ export default function ModalDetallePedido({
 
       {confirm && (
         <ConfirmDialog
-          emoji={confirm.tipo === "anular" ? "🚫" : confirm.tipo === "anular-sin-items" ? "⚠️" : "✅"}
+          emoji={
+            confirm.tipo === "anular" || confirm.tipo === "quitar-detalle" || confirm.tipo === "quitar-pago" ? "🗑️"
+            : confirm.tipo === "anular-sin-items" ? "⚠️"
+            : confirm.tipo === "fiar" ? "🤝"
+            : "✅"
+          }
           titulo={
             confirm.tipo === "anular"           ? "¿Anular el pedido?"
             : confirm.tipo === "anular-sin-items" ? "Pedido sin ítems"
+            : confirm.tipo === "quitar-detalle"  ? `¿Quitar "${confirm.nombre}"?`
+            : confirm.tipo === "quitar-pago"     ? "¿Eliminar este cobro?"
+            : confirm.tipo === "fiar"            ? "¿Marcar como fiado?"
             : "¿Finalizar el pedido?"
           }
           descripcion={
@@ -614,12 +727,33 @@ export default function ModalDetallePedido({
               ? "Esta acción no se puede deshacer."
               : confirm.tipo === "anular-sin-items"
               ? "Quitaste el último ítem. ¿Deseas anular el pedido? Puedes cancelar y agregar ítems primero."
+              : confirm.tipo === "quitar-detalle"
+              ? "El ítem se eliminará del pedido."
+              : confirm.tipo === "quitar-pago"
+              ? `El cobro de ${formatCOP(confirm.monto)} (${confirm.moneda}) se eliminará del pedido.`
+              : confirm.tipo === "fiar"
+              ? "Se descuenta el inventario ahora (la comida ya se sirve) y el saldo pendiente queda como deuda en Cuentas por Cobrar. Los ítems quedan congelados — solo se le podrán registrar abonos."
               : "Se descontará el inventario correspondiente al cerrar el pedido."
           }
-          labelOk={confirm.tipo !== "finalizar" ? "Sí, anular" : "Sí, finalizar"}
-          peligro={confirm.tipo !== "finalizar"}
+          labelOk={
+            confirm.tipo === "finalizar" ? "Sí, finalizar"
+            : confirm.tipo === "quitar-detalle" || confirm.tipo === "quitar-pago" ? "Sí, eliminar"
+            : confirm.tipo === "fiar" ? "Sí, fiar"
+            : "Sí, anular"
+          }
+          peligro={confirm.tipo !== "finalizar" && confirm.tipo !== "fiar"}
           onOk={() => {
-            run(confirm.tipo === "finalizar" ? onFinalizar : onAnular);
+            if (confirm.tipo === "finalizar") {
+              run(onFinalizar);
+            } else if (confirm.tipo === "anular" || confirm.tipo === "anular-sin-items") {
+              run(onAnular);
+            } else if (confirm.tipo === "fiar") {
+              run(onFiar);
+            } else if (confirm.tipo === "quitar-detalle") {
+              run(async () => { await onQuitarDetalle(confirm.id); setEditandoDetalleId(null); });
+            } else if (confirm.tipo === "quitar-pago") {
+              run(async () => { await onQuitarPago(confirm.id); setEditandoPagoId(null); });
+            }
             setConfirm(null);
           }}
           onCancelar={() => setConfirm(null)}

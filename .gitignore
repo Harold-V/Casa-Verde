@@ -1,3 +1,6 @@
+# Secretos — nunca subir a git
+.env
+
 # Base de datos local
 /DataBase
 Backend/DataBase/

@@ -12,7 +12,6 @@ import lombok.*;
 public class GastoDTO {
     private Long id;
     private String concepto;
-    private String categoria;
     private String moneda;
     private BigDecimal monto;
     private BigDecimal montoCop;

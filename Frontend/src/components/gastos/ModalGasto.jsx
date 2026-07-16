@@ -5,12 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { fondoService } from "../../services/fondoService";
 import MoneyInput from "../shared/MoneyInput";
 
-const CATEGORIAS = ["insumos", "servicios", "equipos", "otros"];
 
 /** Modal para registrar un gasto. Extraído de GastosPage. */
 export default function ModalGasto({ onClose, onGuardar }) {
   const [form, setForm] = useState({
-    concepto: "", categoria: "insumos", moneda: "COP", monto: "", observacion: "",
+    concepto: "", moneda: "COP", monto: "",
   });
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
@@ -36,9 +35,9 @@ export default function ModalGasto({ onClose, onGuardar }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal max-w-[480px]">
+      <div className="modal max-w-[440px]">
         <div className="modal-header">
-          <span className="modal-title">Registrar gasto</span>
+          <span className="modal-title">Nueva salida</span>
           <button className="btn-icon" onClick={onClose}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -51,26 +50,18 @@ export default function ModalGasto({ onClose, onGuardar }) {
                 className="form-control" autoFocus
                 value={form.concepto}
                 onChange={(e) => set("concepto", e.target.value)}
-                placeholder="ej. Compra 10 gallinas"
+                placeholder="ej. Pago servicios, Compra carbón…"
               />
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Categoría</label>
-                <select className="form-control" value={form.categoria}
-                  onChange={(e) => set("categoria", e.target.value)}>
-                  {CATEGORIAS.map((c) => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
                 <label className="form-label">Moneda</label>
                 <select className="form-control" value={form.moneda}
                   onChange={(e) => set("moneda", e.target.value)}>
-                  <option value="COP">COP — Pesos</option>
+                  <option value="COP">COP — Banco</option>
                   <option value="USD">USD — Dólares</option>
+                  <option value="EFECTIVO">Efectivo — Caja física</option>
                   {nequiCuentas.map((f) => (
                     <option key={f.moneda} value={f.moneda}>
                       {f.moneda}{f.alias ? ` — ${f.alias}` : ""}
@@ -78,33 +69,23 @@ export default function ModalGasto({ onClose, onGuardar }) {
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Monto {form.moneda === "USD" ? "(en dólares)" : "(en pesos)"}
-              </label>
-              <MoneyInput
-                className="form-control"
-                moneda={form.moneda}
-                value={form.monto}
-                onChange={(v) => set("monto", v)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Observación (opcional)</label>
-              <input
-                className="form-control"
-                value={form.observacion}
-                onChange={(e) => set("observacion", e.target.value)}
-              />
+              <div className="form-group">
+                <label className="form-label">
+                  Monto {form.moneda === "USD" ? "(en dólares)" : "(en pesos)"}
+                </label>
+                <MoneyInput
+                  className="form-control"
+                  moneda={form.moneda}
+                  value={form.monto}
+                  onChange={(v) => set("monto", v)}
+                />
+              </div>
             </div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Guardando…" : "Registrar gasto"}
+              {saving ? "Guardando…" : "Registrar salida"}
             </button>
           </div>
         </form>

@@ -13,6 +13,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -23,6 +25,8 @@ import com.casaverde.backend.config.controllerAdvice.ValidacionException;
 
 @Service
 public class BackupServiceImpl implements IBackupService {
+
+    private static final Logger log = LoggerFactory.getLogger(BackupServiceImpl.class);
 
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
     private static final DateTimeFormatter FORMATO = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
@@ -79,8 +83,9 @@ public class BackupServiceImpl implements IBackupService {
             if (Files.exists(origen)) {
                 crearBackup("inicio");
             }
-        } catch (Exception ignored) {
-            // El arranque no debe fallar por un backup; el cierre de caja si lo valida.
+        } catch (Exception ex) {
+            // El arranque no debe fallar por un backup; el cierre de caja sí lo valida.
+            log.warn("[crearBackupAlIniciar] No se pudo crear el backup de inicio: {}", ex.getMessage());
         }
     }
 

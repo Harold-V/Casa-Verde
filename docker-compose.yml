@@ -6,13 +6,21 @@ services:
       context: ./Backend
       dockerfile: Dockerfile
     container_name: casaverde-backend
+    # Puerto 5020 expuesto al host solo para debug directo.
+    # Comentar si no se necesita acceso externo al API.
     ports:
       - "5020:5020"
     volumes:
       - casaverde_db:/app/DataBase
+      - casaverde_backups:/app/Backups
     environment:
       - TZ=America/Bogota
+      - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-Xmx512m -XX:+UseG1GC
+      - APP_ADMIN_PASSWORD=${APP_ADMIN_PASSWORD}
+      - APP_SECURITY_TOKEN_SECRET=${APP_SECURITY_TOKEN_SECRET}
+    networks:
+      - casaverde_net
     deploy:
       resources:
         limits:
@@ -37,6 +45,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - casaverde_net
     deploy:
       resources:
         limits:
@@ -49,6 +59,12 @@ services:
       timeout: 5s
       retries: 3
 
+networks:
+  casaverde_net:
+    driver: bridge
+
 volumes:
   casaverde_db:
+    driver: local
+  casaverde_backups:
     driver: local

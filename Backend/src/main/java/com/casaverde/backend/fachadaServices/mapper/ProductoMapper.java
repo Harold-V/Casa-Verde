@@ -19,5 +19,6 @@ public interface ProductoMapper {
 
     ComposicionDTO toComposicionDTO(ProductoComposicionInventario c);
 
+    @Mapping(target = "productoId", source = "producto.id")
     ProductoPrecioHistorialDTO toPrecioHistorialDTO(ProductoPrecioHistorial h);
 }

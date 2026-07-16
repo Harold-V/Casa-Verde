@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { History, Plus, Pencil, Power, Search } from "lucide-react";
+import { History, Plus, Pencil, Power, Search, Trash2 } from "lucide-react";
 import { productoService, categoriaService } from "../../../services/productoService";
 import { formatCOP } from "../../../utils/format";
+import { formatFraccion } from "../../../utils/pedidoHelpers";
 import ModalProducto from "../../../components/configuracion/ModalProducto";
 import ModalHistorialPrecios from "../../../components/configuracion/ModalHistorialPrecios";
+import ModalActualizarPrecio from "../../../components/configuracion/ModalActualizarPrecio";
+import ConfirmDialog from "../../../components/shared/ConfirmDialog";
 
 export default function ProductosTab() {
   const qc = useQueryClient();
@@ -13,6 +16,8 @@ export default function ProductosTab() {
   const [editando, setEditando] = useState(null);
   const [creando, setCreando] = useState(false);
   const [historialDe, setHistorialDe] = useState(null);
+  const [precioModal, setPrecioModal] = useState(null);
+  const [eliminandoId, setEliminandoId] = useState(null);
 
   const { data: productos = [], isLoading } = useQuery({
     queryKey: ["productos", soloActivos],
@@ -48,8 +53,16 @@ export default function ProductosTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["productos"] }),
   });
 
+  const mutEliminar = useMutation({
+    mutationFn: productoService.eliminar,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["productos"] });
+      setEliminandoId(null);
+    },
+  });
+
   const mutPrecio = useMutation({
-    mutationFn: ({ id, precio }) => productoService.actualizarPrecio(id, precio),
+    mutationFn: ({ id, precio, motivo }) => productoService.actualizarPrecio(id, precio, motivo),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["productos"] });
       qc.invalidateQueries({ queryKey: ["pedidos"] });
@@ -61,19 +74,8 @@ export default function ProductosTab() {
   );
 
   const handleSave = async (data) => {
-    if (editando) {
-      await mutUpdate.mutateAsync({ id: editando.id, data });
-    } else {
-      await mutCreate.mutateAsync(data);
-    }
-  };
-
-  const handlePrecio = async (p) => {
-    const nuevo = window.prompt(`Nuevo precio para "${p.nombre}":`, p.precio);
-    if (nuevo === null) return;
-    const val = parseFloat(nuevo);
-    if (isNaN(val) || val < 0) return;
-    mutPrecio.mutate({ id: p.id, precio: val });
+    if (editando) await mutUpdate.mutateAsync({ id: editando.id, data });
+    else await mutCreate.mutateAsync(data);
   };
 
   return (
@@ -81,7 +83,12 @@ export default function ProductosTab() {
       <div className="toolbar">
         <div className="search-wrap">
           <Search size={16} />
-          <input className="form-control" placeholder="Buscar producto…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          <input
+            className="form-control"
+            placeholder="Buscar producto…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
         </div>
         <label className="flex items-center gap-1.5 text-[13px] cursor-pointer">
           <input type="checkbox" checked={soloActivos} onChange={(e) => setSoloActivos(e.target.checked)} />
@@ -119,7 +126,7 @@ export default function ProductosTab() {
                     <td>
                       <span
                         className="cursor-pointer underline decoration-dotted"
-                        onClick={() => handlePrecio(p)}
+                        onClick={() => setPrecioModal(p)}
                         title="Clic para cambiar precio"
                       >
                         {formatCOP(p.precio)}
@@ -128,9 +135,13 @@ export default function ProductosTab() {
                     <td>
                       {p.afectaInventario ? (
                         <span className="badge badge-info">
-                          {p.composicion?.map((c) => `${c.cantidad} ${c.insumo}`).join(" + ") || "Sí"}
+                          {p.composicion?.length > 0
+                            ? p.composicion.map((c) => `${formatFraccion(c.cantidad)} ${c.insumo}`).join(" + ")
+                            : "Sí"}
                         </span>
-                      ) : <span className="badge badge-gray">No</span>}
+                      ) : (
+                        <span className="badge badge-gray">No</span>
+                      )}
                     </td>
                     <td>
                       <span className={`badge ${p.activo ? "badge-success" : "badge-danger"}`}>
@@ -139,10 +150,25 @@ export default function ProductosTab() {
                     </td>
                     <td>
                       <div className="flex gap-1">
-                        <button className="btn-icon" title="Editar" onClick={() => setEditando(p)}><Pencil size={15} /></button>
-                        <button className="btn-icon" title="Historial de precios" onClick={() => setHistorialDe(p)}><History size={15} /></button>
-                        <button className="btn-icon" title={p.activo ? "Desactivar" : "Activar"} onClick={() => mutToggle.mutate(p.id)}>
+                        <button className="btn-icon" title="Editar" onClick={() => setEditando(p)}>
+                          <Pencil size={15} />
+                        </button>
+                        <button className="btn-icon" title="Historial de precios" onClick={() => setHistorialDe(p)}>
+                          <History size={15} />
+                        </button>
+                        <button
+                          className="btn-icon"
+                          title={p.activo ? "Desactivar" : "Activar"}
+                          onClick={() => mutToggle.mutate(p.id)}
+                        >
                           <Power size={15} className={p.activo ? "text-green-600" : "text-red-600"} />
+                        </button>
+                        <button
+                          className="btn-icon text-red-500"
+                          title="Eliminar producto"
+                          onClick={() => setEliminandoId(p.id)}
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
@@ -171,6 +197,28 @@ export default function ProductosTab() {
           onClose={() => setHistorialDe(null)}
         />
       )}
+
+      {precioModal && (
+        <ModalActualizarPrecio
+          producto={precioModal}
+          onClose={() => setPrecioModal(null)}
+          onSave={(data) => mutPrecio.mutateAsync(data)}
+        />
+      )}
+
+      {eliminandoId !== null && (() => {
+        const p = productos.find((x) => x.id === eliminandoId);
+        return p ? (
+          <ConfirmDialog
+            emoji="🗑️"
+            titulo={`Eliminar ${p.nombre}`}
+            descripcion="El producto se eliminará permanentemente. Los pedidos históricos conservan el nombre y precio registrados al momento de la venta."
+            labelOk="Sí, eliminar"
+            onOk={() => mutEliminar.mutate(eliminandoId)}
+            onCancelar={() => setEliminandoId(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

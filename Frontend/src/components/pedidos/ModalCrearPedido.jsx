@@ -11,11 +11,12 @@ import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 /** Modal de creación de pedido: datos del cliente + catálogo + abono inicial. */
 export default function ModalCrearPedido({ salones, productos, onClose, onCrear }) {
   const [nombre, setNombre]         = useState("");
-  const [on, setOn]                 = useState({ fecha: false, hora: false, personas: false, salon: false });
+  const [on, setOn]                 = useState({ fecha: false, hora: false, personas: false, salon: false, telefono: false });
   const [fecha, setFecha]           = useState(new Date().toLocaleDateString("en-CA"));
   const [hora, setHora]             = useState(new Date().toTimeString().slice(0, 5));
   const [personas, setPersonas]     = useState(1);
   const [salonId, setSalonId]       = useState("");
+  const [telefono, setTelefono]     = useState("");
   const [paraLlevar, setParaLlevar] = useState(false);
   const [observacion, setObservacion] = useState("");
   const [cantidades, setCantidades] = useState({});
@@ -25,6 +26,8 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
   const [showAbono, setShowAbono]   = useState(false);
   const [abonoMoneda, setAbonoMoneda] = useState("COP");
   const [abonoMonto, setAbonoMonto] = useState("");
+  const [showDescuento, setShowDescuento] = useState(false);
+  const [descuentoCop, setDescuentoCop]   = useState("");
   const [confirmCancelar, setConfirmCancelar] = useState(false);
   const [error, setError]           = useState("");
   const [saving, setSaving]         = useState(false);
@@ -63,26 +66,13 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
 
   const totalEstimado = seleccionados.reduce((s, p) => s + p.precio * p.cantidad, 0)
     + manualItems.reduce((s, m) => s + (parseFloat(m.precio) || 0) * m.cantidad, 0);
+  const descuentoNum   = showDescuento && descuentoCop ? parseFloat(descuentoCop) || 0 : 0;
+  const totalConDescuento = Math.max(0, totalEstimado - descuentoNum);
 
   const handleCrear = async () => {
     if (!nombre.trim()) { setError("El nombre del cliente es obligatorio"); return; }
     if (totalItems === 0) { setError("Agrega al menos un ítem al pedido"); return; }
-    if (on.fecha || on.hora) {
-      const now   = new Date();
-      const today = now.toLocaleDateString("en-CA");
-      const rFecha = on.fecha ? fecha : today;
-      if (rFecha < today) {
-        setError("La fecha de reserva ya pasó. Elige una fecha futura.");
-        return;
-      }
-      if (rFecha === today && on.hora) {
-        const [hh, mm] = hora.split(":").map(Number);
-        if (hh * 60 + mm <= now.getHours() * 60 + now.getMinutes()) {
-          setError("La hora de reserva ya pasó. Elige una hora posterior a la actual.");
-          return;
-        }
-      }
-    }
+    if (descuentoNum > totalEstimado) { setError("El descuento no puede ser mayor al subtotal"); return; }
     setSaving(true); setError("");
     try {
       const detalles = [
@@ -99,10 +89,12 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
         fechaReserva: on.fecha ? fecha : (on.hora ? new Date().toLocaleDateString("en-CA") : null),
         horaReserva:  on.hora    ? hora    : null,
         cantPersonas: on.personas ? Number(personas) : null,
+        telefono:     on.telefono && telefono.trim() ? telefono.trim() : null,
         paraLlevar:   paraLlevar || null,
         observacion:  observacion.trim() || null,
         abono:        showAbono && abonoMonto ? parseFloat(abonoMonto) : null,
         monedaAbono:  showAbono && abonoMonto ? abonoMoneda : null,
+        descuentoCop: descuentoNum > 0 ? descuentoNum : null,
         detalles,
       });
     } catch (err) {
@@ -144,6 +136,7 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
                   <ToggleChip label="👥 Personas"   active={on.personas} onToggle={() => tog("personas")} />
                   <ToggleChip label="🪑 Salón"      active={on.salon}    onToggle={() => tog("salon")} />
                   <ToggleChip label="🛵 Para llevar" active={paraLlevar}  onToggle={() => setParaLlevar((v) => !v)} />
+                  <ToggleChip label="📞 Teléfono"   active={on.telefono} onToggle={() => tog("telefono")} />
                 </div>
                 <textarea
                   className="form-control text-sm resize-none"
@@ -152,7 +145,7 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
                   value={observacion}
                   onChange={(e) => setObservacion(e.target.value)}
                 />
-                {(on.hora || on.personas || on.salon) && (
+                {(on.hora || on.personas || on.salon || on.telefono) && (
                   <div className="flex flex-wrap gap-2 pt-1 items-center">
                     {on.hora && (
                       <>
@@ -167,6 +160,16 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
                         <option value="">Salón…</option>
                         {salones.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                       </select>
+                    )}
+                    {on.telefono && (
+                      <input
+                        type="tel"
+                        placeholder="Teléfono del cliente"
+                        className="form-control flex-1 min-w-[160px]"
+                        maxLength={30}
+                        value={telefono}
+                        onChange={(e) => setTelefono(e.target.value)}
+                      />
                     )}
                   </div>
                 )}
@@ -259,17 +262,29 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
 
               {totalItems > 0 && (
                 <div className="border-t border-gray-200 bg-white shrink-0">
-                  <div className="flex justify-between items-end px-5 pt-3 pb-2">
-                    <div>
-                      <div className="text-xs text-gray-400 mb-0.5">Total estimado</div>
-                      <div className="text-[24px] font-black text-verde-oscuro leading-none">{formatCOP(totalEstimado)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-gray-400">Ítems</div>
-                      <div className="text-lg font-bold text-gray-700">{totalItems}</div>
+                  <div className="px-5 pt-3 pb-1">
+                    {descuentoNum > 0 && (
+                      <>
+                        <div className="flex justify-between text-[13px] text-gray-500">
+                          <span>Subtotal</span><span>{formatCOP(totalEstimado)}</span>
+                        </div>
+                        <div className="flex justify-between text-[13px] text-red-500">
+                          <span>Descuento</span><span>-{formatCOP(descuentoNum)}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex justify-between items-end pt-1 pb-2">
+                      <div>
+                        <div className="text-xs text-gray-400 mb-0.5">{descuentoNum > 0 ? "Total a pagar" : "Total estimado"}</div>
+                        <div className="text-[24px] font-black text-verde-oscuro leading-none">{formatCOP(totalConDescuento)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-400">Ítems</div>
+                        <div className="text-lg font-bold text-gray-700">{totalItems}</div>
+                      </div>
                     </div>
                   </div>
-                  <div className="px-5 pb-3">
+                  <div className="px-5 pb-3 flex flex-col gap-2">
                     {!showAbono ? (
                       <button className="btn btn-secondary btn-sm w-full justify-center text-gray-500" onClick={() => setShowAbono(true)}>
                         <Wallet size={13} /> Registrar abono inicial
@@ -298,6 +313,30 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
                         </div>
                       </div>
                     )}
+                    {!showDescuento ? (
+                      <button className="btn btn-secondary btn-sm w-full justify-center text-gray-500" onClick={() => setShowDescuento(true)}>
+                        🏷️ Aplicar descuento
+                      </button>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[12px] font-semibold text-verde-oscuro">Descuento (COP)</span>
+                          <button className="btn-icon text-gray-400" onClick={() => { setShowDescuento(false); setDescuentoCop(""); }}>
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <MoneyInput
+                          className="form-control text-sm"
+                          moneda="COP"
+                          placeholder="Monto del descuento"
+                          value={descuentoCop}
+                          onChange={setDescuentoCop}
+                        />
+                        {descuentoNum > totalEstimado && (
+                          <div className="text-[12px] text-red-500 mt-1">El descuento no puede ser mayor al subtotal</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -310,7 +349,7 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
             <button
               className="btn btn-primary px-6 py-2.5 text-[15px] font-bold"
               onClick={handleCrear}
-              disabled={saving || !nombre.trim()}
+              disabled={saving || !nombre.trim() || descuentoNum > totalEstimado}
             >
               {saving ? "Creando…" : `🍽️ Crear pedido${totalItems > 0 ? ` · ${totalItems} ítem${totalItems !== 1 ? "s" : ""}` : ""}`}
             </button>

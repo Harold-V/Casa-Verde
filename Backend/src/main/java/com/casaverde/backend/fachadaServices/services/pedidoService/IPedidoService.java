@@ -2,6 +2,9 @@ package com.casaverde.backend.fachadaServices.services.pedidoService;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.casaverde.backend.fachadaServices.dto.ActualizarDetalleRequest;
 import com.casaverde.backend.fachadaServices.dto.ActualizarPagoRequest;
 import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
@@ -15,6 +18,8 @@ public interface IPedidoService {
     List<PedidoDTO> listarActivos();
 
     List<PedidoDTO> listarTodos();
+
+    Page<PedidoDTO> listarTodosPaginado(Pageable pageable);
 
     PedidoDTO obtener(Long id);
 
@@ -33,6 +38,13 @@ public interface IPedidoService {
     PedidoDTO registrarPago(Long pedidoId, RegistrarPagoRequest req);
 
     PedidoDTO finalizarPedido(Long pedidoId);
+
+    /**
+     * Marca el pedido como FIADO: congela ítems, descuenta inventario (la
+     * comida ya se sirve) y deja el saldo pendiente como deuda visible desde
+     * Cuentas por Cobrar — sin acreditar fondo todavía.
+     */
+    PedidoDTO marcarFiado(Long pedidoId);
 
     PedidoDTO anularPedido(Long pedidoId);
 

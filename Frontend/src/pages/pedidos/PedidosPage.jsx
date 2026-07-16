@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search, X, CheckCircle, ChevronDown, ChevronUp, Calendar } from "lucide-react";
@@ -8,7 +8,7 @@ import { productoService } from "../../services/productoService";
 import { salonService } from "../../services/salonService";
 import { inventarioService } from "../../services/inventarioService";
 import { formatCOP } from "../../utils/format";
-import { esActivo, esEnCursoPedido, sortByReserva, calcularInsumos, formatInsumo } from "../../utils/pedidoHelpers";
+import { esActivo, sortByReserva, calcularInsumos, formatInsumo } from "../../utils/pedidoHelpers";
 import { usePedidoMutations } from "../../hooks/usePedidoMutations";
 import OrdenCard from "../../components/pedidos/OrdenCard";
 import ModalCrearPedido from "../../components/pedidos/ModalCrearPedido";
@@ -19,7 +19,7 @@ import Pagination from "../../components/shared/Pagination";
 const CARD_MIN = 280; // minmax(280px, ...) del grid
 const CARD_GAP = 14;  // gap-[14px]
 const ROWS     = 2;   // filas por página
-const HOY = new Date().toLocaleDateString("en-CA");
+const getHoy = () => new Date().toLocaleDateString("en-CA");
 
 // ── Overlay de éxito después de crear pedido ─────────────────────────────────
 function PedidoCreado({ pedido, onVerPedido, onCerrar }) {
@@ -153,37 +153,21 @@ export default function PedidosPage() {
     window.history.replaceState({}, "");
   }, [pendienteAbrirId, pedidos, pageSize]);
 
-  // Fuerza un re-render exactamente cuando la próxima reserva alcanza su hora.
-  // "YYYY-MM-DDTHH:mm" sin Z → Date lo parsea en hora local (Colombia).
-  const [, setReservasTick] = useState(0);
-  useEffect(() => {
-    const now   = Date.now();
-    const today = new Date().toLocaleDateString("en-CA");
-    const proximoFlip = pedidos
-      .filter((p) => esActivo(p.estado) && p.horaReserva)
-      .map((p) => new Date(`${p.fechaReserva ?? today}T${p.horaReserva}`).getTime())
-      .filter((t) => t > now)
-      .sort((a, b) => a - b)[0];
-
-    if (!proximoFlip) return;
-    const timer = setTimeout(() => setReservasTick((n) => n + 1), proximoFlip - now + 500);
-    return () => clearTimeout(timer);
-  }, [pedidos]);
 
   const {
     crearMut, agregarMut, actualizarDetalleMut, quitarDetalleMut,
     actualizarMut, pagoMut, actualizarPagoMut, quitarPagoMut,
-    finalizarMut, anularMut,
+    finalizarMut, anularMut, fiarMut,
   } = usePedidoMutations();
 
   // ── Listas derivadas ──────────────────────────────────────────────────────
-  const abiertos       = pedidos.filter((p) => esActivo(p.estado));
-  const enCursoList    = abiertos.filter((p) => esEnCursoPedido(p));
-  const reservasList   = abiertos.filter((p) => !!(p.fechaReserva || p.horaReserva));
-  const paraLlevarList = abiertos.filter((p) => !!p.paraLlevar);
+  const abiertos       = useMemo(() => pedidos.filter((p) => esActivo(p.estado)), [pedidos]);
+  const enCursoList    = useMemo(() => abiertos.filter((p) => p.enCurso), [abiertos]);
+  const reservasList   = useMemo(() => abiertos.filter((p) => !!(p.fechaReserva || p.horaReserva)), [abiertos]);
+  const paraLlevarList = useMemo(() => abiertos.filter((p) => !!p.paraLlevar), [abiertos]);
 
   // Insumos totales necesarios para todos los pedidos activos
-  const insumosTotal  = calcularInsumos(abiertos.flatMap((p) => p.detalles ?? []));
+  const insumosTotal  = useMemo(() => calcularInsumos(abiertos.flatMap((p) => p.detalles ?? [])), [abiertos]);
   const totalGallina  = insumosTotal["gallina"] ?? 0;
   const totalCuy      = insumosTotal["cuy"]     ?? 0;
 
@@ -194,42 +178,44 @@ export default function PedidosPage() {
   const defGallina   = Math.max(0, totalGallina - stockGallina);
   const defCuy       = Math.max(0, totalCuy     - stockCuy);
 
-  const historial = pedidos.filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO");
-  const historialFiltrado = fechaHistorial
+  const historial = useMemo(() => pedidos.filter((p) => p.estado === "FINALIZADO" || p.estado === "ANULADO"), [pedidos]);
+  const historialFiltrado = useMemo(() => fechaHistorial
     ? historial.filter((p) => (p.creadoEn ?? "").slice(0, 10) === fechaHistorial)
-    : historial;
+    : historial,
+  [historial, fechaHistorial]);
 
-  const toggleKpi = (filtro) => {
+  const handleEditar = useCallback((p) => setPedidoActivo(p), []);
+  const handleCobrar = useCallback((p) => setPedidoCobrar(p), []);
+
+  const toggleKpi = useCallback((filtro) => {
     setKpiFiltro((prev) => (prev === filtro ? null : filtro));
     setPagina(0);
-  };
+  }, []);
 
-  // Auto-reset del filtro si la lista filtrada queda vacía (p.ej. se finalizó el último pedido en curso)
-  useEffect(() => {
-    if (kpiFiltro === "en-curso"    && enCursoList.length    === 0) { setKpiFiltro(null); setPagina(0); }
-    if (kpiFiltro === "reservas"    && reservasList.length   === 0) { setKpiFiltro(null); setPagina(0); }
-    if (kpiFiltro === "para-llevar" && paraLlevarList.length === 0) { setKpiFiltro(null); setPagina(0); }
-  }, [kpiFiltro, enCursoList.length, reservasList.length, paraLlevarList.length]);
+  const kpiFiltroEfectivo =
+    (kpiFiltro === "en-curso"    && enCursoList.length    > 0) ? "en-curso"    :
+    (kpiFiltro === "reservas"    && reservasList.length   > 0) ? "reservas"    :
+    (kpiFiltro === "para-llevar" && paraLlevarList.length > 0) ? "para-llevar" :
+    null;
 
   const kpiLabel = {
-    null:          "Pendientes",
     "en-curso":    "En curso",
     "reservas":    "Reservas",
     "para-llevar": "Para llevar",
-  }[kpiFiltro] ?? "Pendientes";
+  }[kpiFiltroEfectivo] ?? "Pendientes";
 
-  const listaActivos = (() => {
-    if (kpiFiltro === "en-curso")    return enCursoList;
-    if (kpiFiltro === "reservas")    return reservasList;
-    if (kpiFiltro === "para-llevar") return paraLlevarList;
-    return abiertos;
-  })();
+  const listaActivos =
+    kpiFiltroEfectivo === "en-curso"    ? enCursoList    :
+    kpiFiltroEfectivo === "reservas"    ? reservasList   :
+    kpiFiltroEfectivo === "para-llevar" ? paraLlevarList :
+    abiertos;
 
   const listaBase     = tab === "historial" ? historialFiltrado : listaActivos;
-  const listaFiltrada = busqueda
+  const listaFiltrada = useMemo(() => busqueda
     ? listaBase.filter((p) => (p.nombre ?? "").toLowerCase().includes(busqueda.toLowerCase()))
-    : listaBase;
-  const pedidosMostrados = tab === "activos" ? sortByReserva(listaFiltrada) : listaFiltrada;
+    : listaBase,
+  [listaBase, busqueda]);
+  const pedidosMostrados = useMemo(() => tab === "activos" ? sortByReserva(listaFiltrada) : listaFiltrada, [tab, listaFiltrada]);
 
   // ── Paginación ────────────────────────────────────────────────────────────
   const totalPaginas = Math.max(1, Math.ceil(pedidosMostrados.length / pageSize));
@@ -412,8 +398,8 @@ export default function PedidosPage() {
                   />
                 </div>
                 <button
-                  className={`btn btn-sm ${fechaHistorial === HOY ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => { setFechaHistorial(HOY); setPagina(0); }}
+                  className={`btn btn-sm ${fechaHistorial === getHoy() ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => { setFechaHistorial(getHoy()); setPagina(0); }}
                 >
                   Hoy
                 </button>
@@ -491,8 +477,8 @@ export default function PedidosPage() {
             {pedidosPagina.map((p, idx) => (
               <OrdenCard key={p.id} pedido={p} idx={idx}
                 expandidoInicial={p.id === pedidoExpandidoId}
-                onEditar={(p) => setPedidoActivo(p)}
-                onCobrar={(p) => setPedidoCobrar(p)}
+                onEditar={handleEditar}
+                onCobrar={handleCobrar}
               />
             ))}
           </div>
@@ -523,6 +509,7 @@ export default function PedidosPage() {
           onQuitarDetalle={(detalleId) => quitarDetalleMut.mutateAsync({ id: pedidoActivo.id, detalleId }).then(setPedidoActivo)}
           onFinalizar={() => finalizarMut.mutateAsync(pedidoActivo.id).then(setPedidoActivo)}
           onAnular={() => anularMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
+          onFiar={() => fiarMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
           onActualizarPago={(pagoId, req) => actualizarPagoMut.mutateAsync({ id: pedidoActivo.id, pagoId, req }).then(setPedidoActivo)}
           onQuitarPago={(pagoId) => quitarPagoMut.mutateAsync({ id: pedidoActivo.id, pagoId }).then(setPedidoActivo)}
         />
@@ -534,6 +521,7 @@ export default function PedidosPage() {
           onClose={() => setPedidoCobrar(null)}
           onPago={(req) => pagoMut.mutateAsync({ id: pedidoCobrar.id, req }).then(setPedidoCobrar)}
           onFinalizar={() => finalizarMut.mutateAsync(pedidoCobrar.id).then(setPedidoCobrar)}
+          onFiar={() => fiarMut.mutateAsync(pedidoCobrar.id).then(() => setPedidoCobrar(null))}
         />
       )}
 

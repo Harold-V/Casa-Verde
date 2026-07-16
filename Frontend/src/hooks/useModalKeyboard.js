@@ -19,9 +19,13 @@ const _stack = [];
 export function useModalKeyboard({ onEscape, onEnter } = {}) {
   // Refs para no tener que re-registrar el listener cuando cambian los callbacks.
   const escapeRef = useRef(onEscape);
-  const enterRef  = useRef(onEnter);
-  useEffect(() => { escapeRef.current = onEscape; }, [onEscape]);
-  useEffect(() => { enterRef.current  = onEnter;  }, [onEnter]);
+  const enterRef = useRef(onEnter);
+  useEffect(() => {
+    escapeRef.current = onEscape;
+  }, [onEscape]);
+  useEffect(() => {
+    enterRef.current = onEnter;
+  }, [onEnter]);
 
   useEffect(() => {
     const id = Symbol();
@@ -41,7 +45,7 @@ export function useModalKeyboard({ onEscape, onEnter } = {}) {
       }
 
       if (e.key === "Enter") {
-        const tag  = document.activeElement?.tagName ?? "";
+        const tag = document.activeElement?.tagName ?? "";
         const type = document.activeElement?.type ?? "";
         // Dejar que textarea, select, enlaces y botones manejen Enter solos
         if (["TEXTAREA", "SELECT", "A"].includes(tag)) return;

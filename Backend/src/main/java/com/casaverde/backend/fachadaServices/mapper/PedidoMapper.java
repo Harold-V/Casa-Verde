@@ -1,6 +1,9 @@
 package com.casaverde.backend.fachadaServices.mapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
@@ -11,43 +14,60 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.fachadaServices.dto.PagoDTO;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
 import com.casaverde.backend.fachadaServices.dto.PedidoDetalleDTO;
+import com.casaverde.backend.fachadaServices.dto.PedidoTotales;
 
 /**
- * Convierte entidades de Pedido a DTOs de respuesta.
- * Los cálculos de total y abonado son responsabilidad de este mapper
- * ya que son operaciones de lectura puras sobre las colecciones del pedido.
+ * Convierte entidades de Pedido a DTOs. Los cálculos financieros (totales, abonado)
+ * son responsabilidad de PedidoServiceImpl.calcularTotales() y se pasan como PedidoTotales.
+ * Este mapper permanece como @Component (no MapStruct) porque recibe ese parámetro extra.
  */
 @Component
 public class PedidoMapper {
 
-    public PedidoDTO toDTO(Pedido p) {
-        BigDecimal total = calcularTotal(p);
-        BigDecimal abonado = calcularAbonado(p);
-        BigDecimal saldoPendiente = total.subtract(abonado).max(BigDecimal.ZERO);
-        BigDecimal valorCambio = abonado.subtract(total).max(BigDecimal.ZERO);
-
+    public PedidoDTO toDTO(Pedido p, PedidoTotales totales) {
         return PedidoDTO.builder()
                 .id(p.getId())
                 .nombre(p.getNombre())
                 .salonId(p.getSalon() != null ? p.getSalon().getId() : null)
                 .salonNombre(p.getSalon() != null ? p.getSalon().getNombre() : null)
                 .mesa(p.getMesa())
-                .fechaReserva(p.getFechaReserva())
-                .horaReserva(p.getHoraReserva())
+                .fechaReserva(p.getFechaReserva() != null ? p.getFechaReserva().toString() : null)
+                .horaReserva(p.getHoraReserva() != null ? p.getHoraReserva().toString() : null)
                 .cantPersonas(p.getCantPersonas())
                 .estado(p.getEstado() != null ? p.getEstado().name() : null)
                 .observacion(p.getObservacion())
                 .paraLlevar(Boolean.TRUE.equals(p.getParaLlevar()))
-                .totalCop(total)
-                .totalAbonado(abonado)
-                .saldoPendiente(saldoPendiente)
-                .valorCambio(valorCambio)
+                .telefono(p.getTelefono())
+                .enCurso(calcularEnCurso(p))
+                .subtotalCop(totales.subtotalCop())
+                .descuentoCop(p.getDescuentoCop())
+                .descuentoAplicadoPor(p.getDescuentoAplicadoPor())
+                .totalCop(totales.totalCop())
+                .totalAbonado(totales.totalAbonado())
+                .saldoPendiente(totales.saldoPendiente())
+                .valorCambio(totales.valorCambio())
                 .creadoEn(p.getCreadoEn())
                 .actualizadoEn(p.getActualizadoEn())
                 .finalizadoEn(p.getFinalizadoEn())
+                .fiadoEn(p.getFiadoEn())
                 .detalles(p.getDetalles().stream().map(this::toDetalleDTO).collect(Collectors.toList()))
                 .pagos(p.getPagos().stream().map(this::toPagoDTO).collect(Collectors.toList()))
                 .build();
+    }
+
+    private boolean calcularEnCurso(Pedido p) {
+        if (p.getEstado() == null || !p.getEstado().esActivo()) return false;
+        if (p.getFechaReserva() == null && p.getHoraReserva() == null) return true;
+
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/Bogota"));
+        LocalDate today = now.toLocalDate();
+        LocalDate rFecha = p.getFechaReserva() != null ? p.getFechaReserva() : today;
+
+        if (rFecha.isBefore(today)) return true;
+        if (rFecha.isAfter(today))  return false;
+        // Es hoy
+        if (p.getHoraReserva() == null) return true;
+        return !p.getHoraReserva().isAfter(now.toLocalTime());
     }
 
     public PedidoDetalleDTO toDetalleDTO(PedidoDetalle d) {
@@ -71,19 +91,5 @@ public class PedidoMapper {
                 .tasaUsada(p.getTasaUsada())
                 .registradoEn(p.getRegistradoEn())
                 .build();
-    }
-
-    /** Suma el subtotal de todos los ítems del pedido. */
-    public BigDecimal calcularTotal(Pedido pedido) {
-        return pedido.getDetalles().stream()
-                .map(d -> d.getPrecioUnitarioCop().multiply(BigDecimal.valueOf(d.getCantidad())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /** Suma el montoCop de todos los pagos del pedido. */
-    public BigDecimal calcularAbonado(Pedido pedido) {
-        return pedido.getPagos().stream()
-                .map(Pago::getMontoCop)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

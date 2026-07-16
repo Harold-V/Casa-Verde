@@ -103,6 +103,15 @@ export const ESTADOS_ACTIVOS = new Set([
 ]);
 export const esActivo = (estado) => ESTADOS_ACTIVOS.has(estado);
 
+// FIADO se excluye a propósito de esActivo(): un pedido fiado ya no cuenta
+// como "pedido activo" en el módulo de Pedidos (ítems congelados, no
+// aparece en la pestaña Activos). Pero SÍ puede seguir recibiendo abonos y
+// saldarse — permiteCobro() es lo que usan OrdenCard/ModalCobrar/
+// ModalDetallePedido para mostrar esas acciones también quedan disponibles
+// cuando ese pedido se reutiliza dentro de Cuentas por Cobrar.
+export const ESTADOS_CON_COBRO = new Set([...ESTADOS_ACTIVOS, "FIADO"]);
+export const permiteCobro = (estado) => ESTADOS_CON_COBRO.has(estado);
+
 // ── Normalización de fracciones ───────────────────────────────────────────────
 /** Reglas de cascada: 2×½Cuy → 1×Cuy, 4×⅛Gallina → 1×½Gallina, etc. */
 export const REGLAS_FRACCION = [
@@ -192,26 +201,18 @@ export function formatReservaDisplay(fechaStr, horaStr) {
   return [fecha, hora].filter(Boolean).join(" · ");
 }
 
-// ── Estado "en curso" de un pedido ────────────────────────────────────────────
-/**
- * Un pedido está "en curso" si está activo Y su momento ya llegó:
- * - Sin reserva → siempre en curso
- * - Reserva futura → NO en curso
- * - Reserva de hoy → en curso si la hora ya pasó (o no tiene hora)
- * - Reserva de día anterior → en curso (ya debería haberse atendido)
- */
-export function esEnCursoPedido(pedido) {
-  if (!esActivo(pedido.estado)) return false;
-  if (!pedido.fechaReserva && !pedido.horaReserva) return true;
-  const hoy = new Date().toLocaleDateString("en-CA");
-  const fechaRes = pedido.fechaReserva ?? hoy;
-  if (fechaRes > hoy) return false;
-  if (fechaRes < hoy) return true;
-  if (!pedido.horaReserva) return true;
-  const [hh, mm] = pedido.horaReserva.split(":").map(Number);
-  const now = new Date();
-  return hh * 60 + mm <= now.getHours() * 60 + now.getMinutes();
-}
+
+export const formatFraccion = (cantidad) => {
+  if (cantidad === 1)      return "1";
+  if (cantidad === 0.5)    return "½";
+  if (cantidad === 0.25)   return "¼";
+  if (cantidad === 0.125)  return "⅛";
+  if (cantidad === 0.75)   return "¾";
+  if (cantidad === 0.375)  return "⅜";
+  if (cantidad === 0.625)  return "⅝";
+  if (cantidad === 0.875)  return "⅞";
+  return String(cantidad);
+};
 
 // ── Ordenación de pedidos por reserva ────────────────────────────────────────
 /**

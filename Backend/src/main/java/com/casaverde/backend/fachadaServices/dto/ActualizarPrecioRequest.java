@@ -15,4 +15,6 @@ public class ActualizarPrecioRequest {
     @NotNull(message = "El precio es obligatorio")
     @PositiveOrZero(message = "El precio no puede ser negativo")
     private BigDecimal precio;
+
+    private String motivo;
 }

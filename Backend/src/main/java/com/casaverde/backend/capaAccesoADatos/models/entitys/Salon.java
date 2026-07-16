@@ -14,9 +14,10 @@ public class Salon {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, length = 100)
     private String nombre;
 
     private Integer aforo;
@@ -24,4 +25,8 @@ public class Salon {
     @Column(nullable = false)
     @Builder.Default
     private Boolean activo = true;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean eliminado = false;
 }

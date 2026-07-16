@@ -15,6 +15,7 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.Usuario;
 import com.casaverde.backend.fachadaServices.services.productoService.IAuditoriaService;
 import com.casaverde.backend.fachadaServices.dto.BackupDTO;
 import com.casaverde.backend.fachadaServices.services.productoService.IBackupService;
+import com.casaverde.backend.config.MonedaConstants;
 import com.casaverde.backend.fachadaServices.services.productoService.IMonetaryService;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaDTO;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaRequest;
@@ -66,7 +67,10 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
             throw new ValidacionException("La caja ya fue cerrada para la fecha: " + fecha);
         }
 
-        long pedidosAbiertos = pedidoRepo.countByEstadoIn(EstadoPedido.activos());
+        // Una reserva solo bloquea el cierre del día exacto al que corresponde
+        // (fechaReserva == fecha). Reservas de otro día (antes o después) no
+        // cuentan; pedidos sin reserva cuentan siempre que estén activos.
+        long pedidosAbiertos = pedidoRepo.countActivosParaFecha(EstadoPedido.activos(), fecha);
         if (pedidosAbiertos > 0) {
             throw new ValidacionException("No se puede cerrar caja con " + pedidosAbiertos + " pedido(s) pendiente(s)");
         }
@@ -78,13 +82,19 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                     .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado o inactivo"));
         }
 
-        BigDecimal esperadoCop = saldoFondo("COP");
-        BigDecimal esperadoUsd = saldoFondo("USD");
-        BigDecimal esperadoNequi = saldoFondo("NEQUI");
+        // El arqueo físico (billetes) valida EFECTIVO, no COP — COP ya no se
+        // cuenta a mano en el cierre: solo crece por consignaciones desde
+        // Efectivo y se confía en el saldo que lleva el sistema.
+        BigDecimal esperadoEfectivo = saldoFondo(MonedaConstants.EFECTIVO);
+        BigDecimal esperadoUsd = saldoFondo(MonedaConstants.USD);
+        BigDecimal esperadoNequi = saldoTotalNequi();
 
-        BigDecimal contadoCop = normalizarOCero("COP", request.getContadoCop(), esperadoCop);
-        BigDecimal contadoUsd = normalizarOCero("USD", request.getContadoUsd(), esperadoUsd);
-        BigDecimal contadoNequi = normalizarOCero("NEQUI", request.getContadoNequi(), esperadoNequi);
+        if (tieneDenominaciones(request)) {
+            request.setContadoEfectivo(calcularContadoEfectivoDesdeDenominaciones(request));
+        }
+        BigDecimal contadoEfectivo = normalizarOCero(MonedaConstants.EFECTIVO, request.getContadoEfectivo(), esperadoEfectivo);
+        BigDecimal contadoUsd = normalizarOCero(MonedaConstants.USD, request.getContadoUsd(), esperadoUsd);
+        BigDecimal contadoNequi = normalizarOCero(MonedaConstants.NEQUI, request.getContadoNequi(), esperadoNequi);
 
         ResumenDiaDTO resumen = resumenService.obtener(fecha);
         BackupDTO backup = backupService.crearBackup("cierre-" + fecha);
@@ -93,13 +103,13 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                 .fecha(fecha)
                 .usuarioId(usuario != null ? usuario.getId() : null)
                 .usuarioNombre(usuario != null ? usuario.getNombre() : null)
-                .esperadoCop(esperadoCop)
+                .esperadoEfectivo(esperadoEfectivo)
                 .esperadoUsd(esperadoUsd)
                 .esperadoNequi(esperadoNequi)
-                .contadoCop(contadoCop)
+                .contadoEfectivo(contadoEfectivo)
                 .contadoUsd(contadoUsd)
                 .contadoNequi(contadoNequi)
-                .diferenciaCop(contadoCop.subtract(esperadoCop))
+                .diferenciaEfectivo(contadoEfectivo.subtract(esperadoEfectivo))
                 .diferenciaUsd(contadoUsd.subtract(esperadoUsd))
                 .diferenciaNequi(contadoNequi.subtract(esperadoNequi))
                 .cobradoTotalCop(resumen.getCobradoTotalCop())
@@ -107,6 +117,14 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                 .balanceNeto(resumen.getBalanceNeto())
                 .observacion(request.getObservacion())
                 .backupPath(backup.getPath())
+                .baseEfectivo(request.getBaseEfectivo())
+                .billetes100k(request.getBilletes100k())
+                .billetes50k(request.getBilletes50k())
+                .billetes20k(request.getBilletes20k())
+                .billetes10k(request.getBilletes10k())
+                .billetes5k(request.getBilletes5k())
+                .billetes2k(request.getBilletes2k())
+                .monedasEfectivo(request.getMonedasEfectivo())
                 .build();
 
         CierreCaja guardado = cierreRepo.save(cierre);
@@ -119,6 +137,45 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
         return fondoRepo.findById(moneda)
                 .map(Fondo::getSaldo)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    // Suma COP equivalente de NEQUI principal + todas las cuentas NEQUI adicionales
+    private BigDecimal saldoTotalNequi() {
+        return fondoRepo.findAll().stream()
+                .filter(f -> f.getMoneda().startsWith(MonedaConstants.NEQUI))
+                .map(Fondo::getSaldo)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal denom(Integer cantidad, long valorUnitario) {
+        if (cantidad == null || cantidad == 0) return BigDecimal.ZERO;
+        return BigDecimal.valueOf(cantidad).multiply(BigDecimal.valueOf(valorUnitario));
+    }
+
+    private BigDecimal safe(BigDecimal v) {
+        return v != null ? v : BigDecimal.ZERO;
+    }
+
+    private boolean tieneDenominaciones(CierreCajaRequest req) {
+        return req.getBaseEfectivo() != null
+            || req.getBilletes100k() != null
+            || req.getBilletes50k() != null
+            || req.getBilletes20k() != null
+            || req.getBilletes10k() != null
+            || req.getBilletes5k() != null
+            || req.getBilletes2k() != null
+            || req.getMonedasEfectivo() != null;
+    }
+
+    private BigDecimal calcularContadoEfectivoDesdeDenominaciones(CierreCajaRequest req) {
+        return safe(req.getBaseEfectivo())
+            .add(denom(req.getBilletes100k(), 100_000L))
+            .add(denom(req.getBilletes50k(),   50_000L))
+            .add(denom(req.getBilletes20k(),   20_000L))
+            .add(denom(req.getBilletes10k(),   10_000L))
+            .add(denom(req.getBilletes5k(),     5_000L))
+            .add(denom(req.getBilletes2k(),     2_000L))
+            .add(safe(req.getMonedasEfectivo()));
     }
 
     private BigDecimal normalizarOCero(String moneda, BigDecimal valor, BigDecimal fallback) {

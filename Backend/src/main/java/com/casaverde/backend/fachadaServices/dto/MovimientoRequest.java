@@ -2,7 +2,7 @@ package com.casaverde.backend.fachadaServices.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 
 import lombok.*;
@@ -18,7 +18,7 @@ public class MovimientoRequest {
     @NotBlank(message = "El tipo de movimiento es obligatorio")
     private String tipo;
     @NotNull(message = "La cantidad es obligatoria")
-    @Positive(message = "La cantidad debe ser mayor a 0")
+    @PositiveOrZero(message = "La cantidad debe ser mayor o igual a 0")
     private BigDecimal cantidad;
     private String observacion;
 }

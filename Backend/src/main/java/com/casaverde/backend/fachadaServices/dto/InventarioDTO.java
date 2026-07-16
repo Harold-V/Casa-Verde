@@ -14,6 +14,7 @@ public class InventarioDTO {
     private Long id;
     private String insumo;
     private BigDecimal stockActual;
+    private BigDecimal alertaMinima;
     private String unidad;
     private LocalDateTime actualizadoEn;
 }

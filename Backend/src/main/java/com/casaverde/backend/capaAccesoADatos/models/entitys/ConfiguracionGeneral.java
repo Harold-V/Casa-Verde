@@ -16,11 +16,13 @@ import lombok.*;
 public class ConfiguracionGeneral {
 
     @Id
+    @Column(length = 100)
     private String clave;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String valor;
 
+    @Column(length = 300)
     private String descripcion;
 
     @Column(name = "actualizado_en")

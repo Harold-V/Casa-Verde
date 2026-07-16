@@ -6,7 +6,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "pedido_detalle")
+@Table(name = "pedido_detalle", indexes = {
+        @Index(name = "idx_pd_pedido_id", columnList = "pedido_id"),
+        @Index(name = "idx_pd_producto_id", columnList = "producto_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,6 +19,7 @@ public class PedidoDetalle {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "integer")
     private Long id;
 
     @Version
@@ -32,7 +36,7 @@ public class PedidoDetalle {
     @Column(name = "nombre_snapshot", nullable = false)
     private String nombreSnapshot;
 
-    @Column(name = "precio_unitario_cop", nullable = false)
+    @Column(name = "precio_unitario_cop", nullable = false, precision = 19, scale = 0)
     private BigDecimal precioUnitarioCop;
 
     @Column(nullable = false)

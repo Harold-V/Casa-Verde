@@ -7,6 +7,7 @@ public enum EstadoPedido {
     PENDIENTE,
     ABONADO_PARCIAL,
     PAGADO,
+    FIADO,
     FINALIZADO,
     ANULADO;
 
@@ -17,10 +18,30 @@ public enum EstadoPedido {
         return EstadoPedido.valueOf(value.trim().toUpperCase());
     }
 
+    /**
+     * Permite editar ítems y datos generales del pedido. FIADO queda excluido
+     * a propósito: una vez fiado el pedido se congela (no se agregan/quitan
+     * ítems) — solo admite abonos hasta saldarse.
+     */
     public boolean permiteEdicion() {
-        return this != FINALIZADO && this != ANULADO;
+        return this != FIADO && this != FINALIZADO && this != ANULADO;
     }
 
+    /**
+     * Permite registrar/editar/quitar pagos. A diferencia de permiteEdicion(),
+     * SÍ incluye FIADO — un pedido fiado sigue recibiendo abonos hasta
+     * saldarse, aunque sus ítems ya no se puedan tocar.
+     */
+    public boolean permiteRegistrarPago() {
+        return this == PENDIENTE || this == ABONADO_PARCIAL || this == PAGADO || this == FIADO;
+    }
+
+    /**
+     * Pedidos del flujo activo normal de Pedidos (tab Activos, Dashboard,
+     * bloqueo de cierre de caja). FIADO se excluye deliberadamente: una vez
+     * fiado, el pedido se gestiona desde Cuentas por Cobrar y no debe
+     * bloquear el cierre de caja del día.
+     */
     public boolean esActivo() {
         return this == PENDIENTE || this == ABONADO_PARCIAL || this == PAGADO;
     }
