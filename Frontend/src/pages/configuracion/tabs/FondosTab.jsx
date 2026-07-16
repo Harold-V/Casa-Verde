@@ -96,6 +96,8 @@ export default function FondosTab() {
                   ? "Banco"
                   : f.moneda === "USD"
                   ? "Dólares"
+                  : f.moneda === "EFECTIVO"
+                  ? "Efectivo - Caja física"
                   : `Nequi${f.alias ? ` — ${f.alias}` : ""}`;
                 return (
                   <tr key={f.moneda}>

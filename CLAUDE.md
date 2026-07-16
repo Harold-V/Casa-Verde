@@ -73,7 +73,7 @@ Casa-Verde/
 ```
 
 ### Backend (`Backend/src/main/java/com/casaverde/backend/`)
-├── casaVerdeApplication.java                          ← @SpringBootApplication raíz
+├── CasaVerdeApplication.java                          ← @SpringBootApplication raíz
 ├── capaAccesoADatos/
 │   ├── models/
 │   │   ├── entitys/   ← 18 @Entity JPA
@@ -361,7 +361,7 @@ Casa-Verde/
 ### Usuario
 - `rol`: ADMIN | OPERADOR
 - `requierePassword`: solo ADMIN requiere clave por defecto
-- Usuarios iniciales: un ADMIN (password: `admin123`, hasheado **BCrypt**) y un OPERADOR
+- Usuarios iniciales: solo un ADMIN (password: `admin123`, hasheado **BCrypt**) — sin OPERADOR seed; se crea manualmente desde Configuración cuando se necesite
 - Contraseñas almacenadas con BCrypt (Spring Security Crypto) — no SHA-256
 
 ### Salon
@@ -471,9 +471,7 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 | Pokeron | ❌ | — |
 
 ### Salones iniciales
-- Salón principal (aforo 30)
-- Terraza (aforo 20)
-- Para llevar (sin aforo)
+- Ninguno — sin seed. El negocio crea sus propios salones desde Configuración según su layout real.
 
 ---
 
@@ -511,6 +509,11 @@ Cuyes (1) · Gallinas (2) · Almuerzos (3) · Complementos (4) · Bebidas (5)
 - Bloquea si hay pedidos activos (PENDIENTE, ABONADO_PARCIAL, PAGADO)
 - Crea backup automático al cerrar
 - Solo uno por fecha (unique constraint)
+
+### Backups automáticos
+- Cron diario a las `00:00 America/Bogota` (`BackupServiceImpl.crearBackupProgramado`, requiere `@EnableScheduling` en `CasaVerdeApplication`)
+- Catch-up al iniciar la app: si no existe backup de hoy (la app no corre 24/7), crea uno al arrancar — no crea uno en cada arranque incondicionalmente
+- Independiente del backup que genera el cierre de caja
 
 ---
 
