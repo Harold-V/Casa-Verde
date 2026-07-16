@@ -39,6 +39,13 @@ public interface IPedidoService {
 
     PedidoDTO finalizarPedido(Long pedidoId);
 
+    /**
+     * Marca el pedido como FIADO: congela ítems, descuenta inventario (la
+     * comida ya se sirve) y deja el saldo pendiente como deuda visible desde
+     * Cuentas por Cobrar — sin acreditar fondo todavía.
+     */
+    PedidoDTO marcarFiado(Long pedidoId);
+
     PedidoDTO anularPedido(Long pedidoId);
 
     PedidoDTO quitarPago(Long pedidoId, Long pagoId);

@@ -4,6 +4,7 @@ export const ESTADO_BADGE = {
   PENDIENTE:       "badge-gray",
   ABONADO_PARCIAL: "badge-warning",
   PAGADO:          "badge-success",
+  FIADO:           "badge-warning",
   FINALIZADO:      "badge-info",
   ANULADO:         "badge-danger",
 };

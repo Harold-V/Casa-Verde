@@ -29,6 +29,13 @@ public interface IInventarioService {
 
     void descontarPorPedido(Pedido pedido);
 
+    /**
+     * Revierte (suma de vuelta) el consumo de inventario de un pedido —
+     * usado al anular un pedido en estado FIADO, cuyo inventario ya se
+     * había descontado al marcarlo fiado.
+     */
+    void revertirPorPedido(Pedido pedido);
+
     /** Insumo -> cantidad requerida por el pedido, leída del composicionSnapshot de cada detalle. */
     Map<String, BigDecimal> calcularConsumos(Pedido pedido);
 

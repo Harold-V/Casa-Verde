@@ -20,4 +20,5 @@ export const pedidoService = {
     api.patch(`/pedidos/${id}/pagos/${pagoId}`, req).then((r) => r.data),
   finalizar: (id) => api.put(`/pedidos/${id}/finalizar`).then((r) => r.data),
   anular: (id) => api.put(`/pedidos/${id}/anular`).then((r) => r.data),
+  fiar: (id) => api.put(`/pedidos/${id}/fiar`).then((r) => r.data),
 };

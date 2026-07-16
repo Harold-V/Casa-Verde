@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Download, RotateCcw, TrendingUp, TrendingDown,
-  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, RefreshCw, Minus, ChevronDown,
+  DollarSign, SlidersHorizontal, Plus, ArrowUpRight, Minus, ChevronDown,
 } from "lucide-react";
 import { fondoService } from "../../services/fondoService";
 import { gastoService } from "../../services/gastoService";
@@ -39,16 +39,18 @@ const formatSaldoCompacto = (saldo, moneda) => {
 
 /* ── helpers visuales ─────────────────────────────────────────────── */
 function getFondoLabel(fondo) {
-  if (fondo.moneda === "COP")  return "Pesos colombianos";
-  if (fondo.moneda === "USD")  return "Dólares estadounidenses";
+  if (fondo.moneda === "COP")      return "Banco";
+  if (fondo.moneda === "USD")      return "Dólares estadounidenses";
+  if (fondo.moneda === "EFECTIVO") return "Efectivo (caja física)";
   if (fondo.moneda.startsWith("NEQUI"))
-    return `Nequi${fondo.alias ? ` — ${fondo.alias}` : ""}`;
+    return `Nequi${fondo.alias ? ` ${fondo.alias}` : ""}`;
   return fondo.moneda;
 }
 
 function getColorCls(moneda) {
   if (moneda === "COP") return "text-verde-claro";
   if (moneda === "USD") return "text-[#1a6b3c]";
+  if (moneda === "EFECTIVO") return "text-amber-600";
   if (moneda.startsWith("NEQUI")) return "text-[#8c00ff]";
   return "text-verde-oscuro";
 }
@@ -56,6 +58,7 @@ function getColorCls(moneda) {
 function getBorderCls(moneda) {
   if (moneda === "COP") return "border-l-verde-claro";
   if (moneda === "USD") return "border-l-[#1a6b3c]";
+  if (moneda === "EFECTIVO") return "border-l-amber-500";
   if (moneda.startsWith("NEQUI")) return "border-l-[#8c00ff]";
   return "border-l-verde-claro";
 }
@@ -63,6 +66,7 @@ function getBorderCls(moneda) {
 function getMonedaBadge(moneda) {
   if (moneda === "COP") return { cls: "badge", style: { background: "#e8f4ec", color: "#2d6a4f" } };
   if (moneda === "USD") return { cls: "badge", style: { background: "#dbeafe", color: "#1e40af" } };
+  if (moneda === "EFECTIVO") return { cls: "badge", style: { background: "#fef3c7", color: "#b45309" } };
   if (moneda.startsWith("NEQUI")) return { cls: "badge", style: { background: "#f0e6ff", color: "#8c00ff" } };
   return { cls: "badge badge-gray", style: {} };
 }
@@ -159,15 +163,21 @@ export default function FondosPage() {
   });
 
   /* ── cálculos ─────────────────────────────────────────────────── */
-  const saldoCop        = fondos.find((f) => f.moneda === "COP")?.saldo ?? 0;
-  const saldoUsd        = fondos.find((f) => f.moneda === "USD")?.saldo ?? 0;
-  const nequiFondos     = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
-  const saldoNequiTotal = nequiFondos.reduce((acc, f) => acc + Number(f.saldo ?? 0), 0);
-  const tasaValor       = tasa?.valorCop ?? null;
-  const usdEnCop        = tasaValor != null ? saldoUsd * tasaValor : null;
-  const capitalTotal    = tasaValor != null
-    ? saldoCop + saldoNequiTotal + usdEnCop
-    : saldoCop + saldoNequiTotal;
+  const nequiFondos = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
+  const tasaValor   = tasa?.valorCop ?? null;
+
+  // Capital neto acumulado = suma de TODAS las billeteras del sistema
+  // (Banco, Efectivo, Nequi, USD convertido a COP y cualquier fondo nuevo
+  // que se agregue a futuro) — genérico sobre el array de fondos, no una
+  // lista fija de monedas. USD se excluye del total mientras no haya tasa
+  // vigente cargada (no se puede convertir con certeza).
+  const capitalTotal = fondos.reduce((total, f) => {
+    const saldo = Number(f.saldo ?? 0);
+    if (f.moneda === "USD") {
+      return tasaValor != null ? total + saldo * tasaValor : total;
+    }
+    return total + saldo;
+  }, 0);
 
   const historialProcesado = useMemo(() => procesarHistorial(historial), [historial]);
   const totalPaginas  = Math.max(1, Math.ceil(historialProcesado.length / PAGE_SIZE));
@@ -227,8 +237,6 @@ export default function FondosPage() {
             <div className="p-4 bg-white">
               <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
                 {fondos.map((f) => {
-                  const esNequi = f.moneda.startsWith("NEQUI");
-                  const esUsd   = f.moneda === "USD";
                   return (
                     <div key={f.moneda} className={`border-l-4 ${getBorderCls(f.moneda)} pl-4 py-3 flex flex-col`}>
                       <div className="text-[12px] text-gray-500 mb-1">{getFondoLabel(f)}</div>
@@ -246,22 +254,14 @@ export default function FondosPage() {
                           {f.actualizadoEn && <span>act. {formatHora(f.actualizadoEn)}</span>}
                         </div>
                         <div className="h-[28px] flex items-center">
-                          {esNequi && (
-                            <button
-                              className="btn btn-secondary btn-sm flex items-center gap-1"
-                              onClick={(e) => { e.stopPropagation(); setModalTransferenciaMoneda(f.moneda); }}
-                            >
-                              <ArrowUpRight size={13} /> Retiro
-                            </button>
-                          )}
-                          {esUsd && (
-                            <button
-                              className="btn btn-secondary btn-sm flex items-center gap-1"
-                              onClick={(e) => { e.stopPropagation(); setModalTransferenciaMoneda("USD"); }}
-                            >
-                              <RefreshCw size={13} /> Cambio
-                            </button>
-                          )}
+                          {/* Toda billetera puede transferir a cualquier otra — destino
+                              por defecto Efectivo (Banco si el origen ya es Efectivo). */}
+                          <button
+                            className="btn btn-secondary btn-sm flex items-center gap-1"
+                            onClick={(e) => { e.stopPropagation(); setModalTransferenciaMoneda(f.moneda); }}
+                          >
+                            <ArrowUpRight size={13} /> Transferir
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -305,6 +305,7 @@ export default function FondosPage() {
             <option value="">Todas</option>
             <option value="COP">COP</option>
             <option value="USD">USD</option>
+            <option value="EFECTIVO">Efectivo</option>
             {nequiFondos.map((f) => (
               <option key={f.moneda} value={f.moneda}>
                 {f.alias ? `Nequi ${f.alias}` : f.moneda}
@@ -438,27 +439,15 @@ export default function FondosPage() {
         />
       )}
 
-      {modalTransferenciaMoneda && (() => {
-        const esUsdModal   = modalTransferenciaMoneda === "USD";
-        const fondoNequi   = fondos.find((f) => f.moneda === modalTransferenciaMoneda);
-        const aliasNequi   = fondoNequi?.alias;
-        const tituloModal  = esUsdModal
-          ? "Cambio de dólares"
-          : `Retiro Nequi${aliasNequi ? ` — ${aliasNequi}` : ""}`;
-        const conceptoAuto = esUsdModal
-          ? "Cambio USD → COP"
-          : `Retiro Nequi${aliasNequi ? ` ${aliasNequi}` : ""}`;
-        return (
-          <ModalTransferencia
-            fondos={fondos}
-            monedaOrigenInicial={modalTransferenciaMoneda}
-            titulo={tituloModal}
-            conceptoFijo={conceptoAuto}
-            onClose={() => setModalTransferenciaMoneda(null)}
-            onGuardar={(data) => transferenciaMut.mutateAsync(data)}
-          />
-        );
-      })()}
+      {modalTransferenciaMoneda && (
+        <ModalTransferencia
+          fondos={fondos}
+          monedaOrigenInicial={modalTransferenciaMoneda}
+          monedaDestinoDefault={modalTransferenciaMoneda === "EFECTIVO" ? "COP" : "EFECTIVO"}
+          onClose={() => setModalTransferenciaMoneda(null)}
+          onGuardar={(data) => transferenciaMut.mutateAsync(data)}
+        />
+      )}
     </div>
   );
 }

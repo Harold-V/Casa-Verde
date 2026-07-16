@@ -16,14 +16,14 @@ const BILL_ROWS = [
 ];
 
 const DENOM_INITIAL = {
-  baseCop:      "",
-  billetes100k: "",
-  billetes50k:  "",
-  billetes20k:  "",
-  billetes10k:  "",
-  billetes5k:   "",
-  billetes2k:   "",
-  monedasCop:   "",
+  baseEfectivo:    "",
+  billetes100k:    "",
+  billetes50k:     "",
+  billetes20k:     "",
+  billetes10k:     "",
+  billetes5k:      "",
+  billetes2k:      "",
+  monedasEfectivo: "",
 };
 
 /** Panel de cierre de caja diario. Extraído de ResumenPage. */
@@ -52,10 +52,10 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
     setDenoms(DENOM_INITIAL);
   }, [fecha, resumen.fondos]);
 
-  // Pre-fill baseCop once config loads (only if the field is still empty)
+  // Pre-fill baseEfectivo once config loads (only if the field is still empty)
   useEffect(() => {
-    if (configBase?.valor && denoms.baseCop === "") {
-      setDenoms((prev) => ({ ...prev, baseCop: String(configBase.valor) }));
+    if (configBase?.valor && denoms.baseEfectivo === "") {
+      setDenoms((prev) => ({ ...prev, baseEfectivo: String(configBase.valor) }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configBase]);
@@ -63,22 +63,22 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
   const setDenom = (key) => (e) => setDenoms((prev) => ({ ...prev, [key]: e.target.value }));
 
   // Real-time total of all denominations
-  const totalContadoCop = useMemo(() => {
-    const base     = parseFloat(denoms.baseCop)      || 0;
+  const totalContadoEfectivo = useMemo(() => {
+    const base     = parseFloat(denoms.baseEfectivo) || 0;
     const b100k    = (parseInt(denoms.billetes100k)  || 0) * 100_000;
     const b50k     = (parseInt(denoms.billetes50k)   || 0) * 50_000;
     const b20k     = (parseInt(denoms.billetes20k)   || 0) * 20_000;
     const b10k     = (parseInt(denoms.billetes10k)   || 0) * 10_000;
     const b5k      = (parseInt(denoms.billetes5k)    || 0) * 5_000;
     const b2k      = (parseInt(denoms.billetes2k)    || 0) * 2_000;
-    const monedas  = parseFloat(denoms.monedasCop)   || 0;
+    const monedas  = parseFloat(denoms.monedasEfectivo) || 0;
     return base + b100k + b50k + b20k + b10k + b5k + b2k + monedas;
   }, [denoms]);
 
   // Amount to hand over to owner = total minus the base kept for tomorrow
   const paraEntregar = useMemo(() => {
-    return totalContadoCop - (parseFloat(denoms.baseCop) || 0);
-  }, [totalContadoCop, denoms.baseCop]);
+    return totalContadoEfectivo - (parseFloat(denoms.baseEfectivo) || 0);
+  }, [totalContadoEfectivo, denoms.baseEfectivo]);
 
   const numeroONull = (valor) => (valor === "" || valor == null ? null : Number(valor));
   const bloqueado = resumen.pedidosAbiertos > 0;
@@ -89,17 +89,17 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
       fecha,
       usuarioId:    usuario?.id,
       // Denomination breakdown
-      baseCop:      numeroONull(denoms.baseCop),
-      billetes100k: numeroONull(denoms.billetes100k),
-      billetes50k:  numeroONull(denoms.billetes50k),
-      billetes20k:  numeroONull(denoms.billetes20k),
-      billetes10k:  numeroONull(denoms.billetes10k),
-      billetes5k:   numeroONull(denoms.billetes5k),
-      billetes2k:   numeroONull(denoms.billetes2k),
-      monedasCop:   numeroONull(denoms.monedasCop),
+      baseEfectivo:    numeroONull(denoms.baseEfectivo),
+      billetes100k:    numeroONull(denoms.billetes100k),
+      billetes50k:     numeroONull(denoms.billetes50k),
+      billetes20k:     numeroONull(denoms.billetes20k),
+      billetes10k:     numeroONull(denoms.billetes10k),
+      billetes5k:      numeroONull(denoms.billetes5k),
+      billetes2k:      numeroONull(denoms.billetes2k),
+      monedasEfectivo: numeroONull(denoms.monedasEfectivo),
       paraEntregar,
-      // Fallback total that backend uses as contadoCop
-      contadoCop:   totalContadoCop,
+      // Fallback total that backend uses as contadoEfectivo
+      contadoEfectivo: totalContadoEfectivo,
       contadoUsd:   numeroONull(contadoUsd),
       contadoNequi: numeroONull(contadoNequi),
       observacion,
@@ -140,11 +140,11 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
                   </tr>
                 </thead>
                 <tbody>
-                  {cierre.baseCop != null && (
+                  {cierre.baseEfectivo != null && (
                     <tr className="border-b border-gray-100">
                       <td className="py-1 text-gray-600">Base para mañana</td>
                       <td className="py-1 text-right">—</td>
-                      <td className="py-1 text-right font-medium">{formatCOP(cierre.baseCop)}</td>
+                      <td className="py-1 text-right font-medium">{formatCOP(cierre.baseEfectivo)}</td>
                     </tr>
                   )}
                   {BILL_ROWS.map(({ key, label, value }) =>
@@ -156,17 +156,17 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
                       </tr>
                     ) : null
                   )}
-                  {cierre.monedasCop > 0 && (
+                  {cierre.monedasEfectivo > 0 && (
                     <tr className="border-b border-gray-100">
                       <td className="py-1 text-gray-600">Monedas</td>
                       <td className="py-1 text-right">—</td>
-                      <td className="py-1 text-right">{formatCOP(cierre.monedasCop)}</td>
+                      <td className="py-1 text-right">{formatCOP(cierre.monedasEfectivo)}</td>
                     </tr>
                   )}
                   <tr className="font-semibold border-t">
-                    <td className="pt-2">Total contado COP</td>
+                    <td className="pt-2">Total contado Efectivo</td>
                     <td></td>
-                    <td className="pt-2 text-right">{formatCOP(cierre.contadoCop)}</td>
+                    <td className="pt-2 text-right">{formatCOP(cierre.contadoEfectivo)}</td>
                   </tr>
                   {cierre.paraEntregar != null && (
                     <tr className="text-verde-claro font-semibold">
@@ -180,8 +180,8 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
             ) : (
               // Historical record without denomination breakdown
               <p className="text-sm text-gray-600">
-                Contado COP:{" "}
-                <span className="font-semibold">{formatCOP(cierre.contadoCop)}</span>
+                Contado Efectivo:{" "}
+                <span className="font-semibold">{formatCOP(cierre.contadoEfectivo)}</span>
               </p>
             )}
           </div>
@@ -195,7 +195,7 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
 
             {/* ── Denomination grid ─────────────────────────────── */}
             <div className="form-group mb-4">
-              <label className="form-label">Contado COP — desglose de billetes</label>
+              <label className="form-label">Contado Efectivo — desglose de billetes</label>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b">
@@ -216,12 +216,12 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
                         step="1000"
                         min="0"
                         placeholder="0"
-                        value={denoms.baseCop}
-                        onChange={setDenom("baseCop")}
+                        value={denoms.baseEfectivo}
+                        onChange={setDenom("baseEfectivo")}
                       />
                     </td>
                     <td className="py-1 text-right font-medium">
-                      {formatCOP(parseFloat(denoms.baseCop) || 0)}
+                      {formatCOP(parseFloat(denoms.baseEfectivo) || 0)}
                     </td>
                   </tr>
 
@@ -258,19 +258,19 @@ export default function CierreCajaPanel({ resumen, fecha, cierre, onCerrar, savi
                         step="100"
                         min="0"
                         placeholder="0"
-                        value={denoms.monedasCop}
-                        onChange={setDenom("monedasCop")}
+                        value={denoms.monedasEfectivo}
+                        onChange={setDenom("monedasEfectivo")}
                       />
                     </td>
                     <td className="py-1 text-right">
-                      {formatCOP(parseFloat(denoms.monedasCop) || 0)}
+                      {formatCOP(parseFloat(denoms.monedasEfectivo) || 0)}
                     </td>
                   </tr>
 
                   {/* Totals footer */}
                   <tr className="font-semibold border-t">
-                    <td className="pt-2" colSpan={2}>Total contado COP</td>
-                    <td className="pt-2 text-right">{formatCOP(totalContadoCop)}</td>
+                    <td className="pt-2" colSpan={2}>Total contado Efectivo</td>
+                    <td className="pt-2 text-right">{formatCOP(totalContadoEfectivo)}</td>
                   </tr>
                   <tr className="text-verde-claro font-semibold">
                     <td className="py-1" colSpan={2}>Para entregar al dueño</td>

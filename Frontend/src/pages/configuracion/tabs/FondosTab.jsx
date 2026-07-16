@@ -93,7 +93,7 @@ export default function FondosTab() {
             <tbody>
               {fondos.map((f) => {
                 const label = f.moneda === "COP"
-                  ? "Pesos colombianos"
+                  ? "Banco"
                   : f.moneda === "USD"
                   ? "Dólares"
                   : `Nequi${f.alias ? ` — ${f.alias}` : ""}`;

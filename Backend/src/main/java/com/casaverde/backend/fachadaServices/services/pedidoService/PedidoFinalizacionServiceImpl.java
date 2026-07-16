@@ -32,6 +32,24 @@ public class PedidoFinalizacionServiceImpl implements IPedidoFinalizacionService
         registrarCobroFinal(pedido, totalCop);
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void ejecutarSoloCobro(Pedido pedido, BigDecimal totalCop) {
+        registrarCobroFinal(pedido, totalCop);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void ejecutarSoloInventario(Pedido pedido) {
+        inventarioService.descontarPorPedido(pedido);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void revertirInventario(Pedido pedido) {
+        inventarioService.revertirPorPedido(pedido);
+    }
+
     /**
      * Registra un único movimiento al fondo por cada moneda usada en el pedido.
      * Solo ingresa el valor del pedido (totalCop); el cambio nunca toca el fondo.
@@ -64,9 +82,14 @@ public class PedidoFinalizacionServiceImpl implements IPedidoFinalizacionService
             }
 
             if (montoFondo.compareTo(BigDecimal.ZERO) > 0) {
+                // Los cobros en efectivo (COP) se acumulan en la caja física
+                // "EFECTIVO", no en el capital neto acumulado — ese solo crece
+                // cuando se consigna. USD y NEQUI siguen acreditando su propio
+                // fondo directamente (no son billetes en caja).
+                String fondoDestino = MonedaConstants.COP.equals(moneda) ? MonedaConstants.EFECTIVO : moneda;
                 cajaMovimientoService.registrar(
                         CajaMovimientoTipo.COBRO_PEDIDO,
-                        moneda,
+                        fondoDestino,
                         montoFondo,
                         montoCopFondo,
                         "pedido",

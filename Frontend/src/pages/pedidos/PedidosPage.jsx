@@ -157,7 +157,7 @@ export default function PedidosPage() {
   const {
     crearMut, agregarMut, actualizarDetalleMut, quitarDetalleMut,
     actualizarMut, pagoMut, actualizarPagoMut, quitarPagoMut,
-    finalizarMut, anularMut,
+    finalizarMut, anularMut, fiarMut,
   } = usePedidoMutations();
 
   // ── Listas derivadas ──────────────────────────────────────────────────────
@@ -509,6 +509,7 @@ export default function PedidosPage() {
           onQuitarDetalle={(detalleId) => quitarDetalleMut.mutateAsync({ id: pedidoActivo.id, detalleId }).then(setPedidoActivo)}
           onFinalizar={() => finalizarMut.mutateAsync(pedidoActivo.id).then(setPedidoActivo)}
           onAnular={() => anularMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
+          onFiar={() => fiarMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
           onActualizarPago={(pagoId, req) => actualizarPagoMut.mutateAsync({ id: pedidoActivo.id, pagoId, req }).then(setPedidoActivo)}
           onQuitarPago={(pagoId) => quitarPagoMut.mutateAsync({ id: pedidoActivo.id, pagoId }).then(setPedidoActivo)}
         />
@@ -520,6 +521,7 @@ export default function PedidosPage() {
           onClose={() => setPedidoCobrar(null)}
           onPago={(req) => pagoMut.mutateAsync({ id: pedidoCobrar.id, req }).then(setPedidoCobrar)}
           onFinalizar={() => finalizarMut.mutateAsync(pedidoCobrar.id).then(setPedidoCobrar)}
+          onFiar={() => fiarMut.mutateAsync(pedidoCobrar.id).then(() => setPedidoCobrar(null))}
         />
       )}
 

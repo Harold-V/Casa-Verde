@@ -129,4 +129,10 @@ public class PedidoController {
     public PedidoDTO anular(@PathVariable Long id) {
         return service.anularPedido(id);
     }
+
+    @PutMapping("/{id}/fiar")
+    @Operation(summary = "Marcar como fiado", description = "Congela ítems, descuenta inventario y deja el saldo pendiente como deuda en Cuentas por Cobrar, sin acreditar fondo")
+    public PedidoDTO marcarFiado(@PathVariable Long id) {
+        return service.marcarFiado(id);
+    }
 }

@@ -49,6 +49,7 @@ public class PedidoMapper {
                 .creadoEn(p.getCreadoEn())
                 .actualizadoEn(p.getActualizadoEn())
                 .finalizadoEn(p.getFinalizadoEn())
+                .fiadoEn(p.getFiadoEn())
                 .detalles(p.getDetalles().stream().map(this::toDetalleDTO).collect(Collectors.toList()))
                 .pagos(p.getPagos().stream().map(this::toPagoDTO).collect(Collectors.toList()))
                 .build();

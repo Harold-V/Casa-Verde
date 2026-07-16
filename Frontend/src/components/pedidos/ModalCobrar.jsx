@@ -1,29 +1,31 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Calendar, CheckCircle, CreditCard, X } from "lucide-react";
+import { Calendar, CheckCircle, CreditCard, HandCoins, X } from "lucide-react";
 import { formatCOP, formatFecha } from "../../utils/format";
-import { esActivo, formatReservaDisplay } from "../../utils/pedidoHelpers";
+import { esActivo, permiteCobro, formatReservaDisplay } from "../../utils/pedidoHelpers";
 import MoneyInput from "../shared/MoneyInput";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
-import { fondoService } from "../../services/fondoService";
 
 /** Modal de cobro rápido: factura + registro de pagos (solo lectura) + finalizar. */
-export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
-  const { data: fondos = [] } = useQuery({
-    queryKey: ["fondos"],
-    queryFn: fondoService.listar,
-    staleTime: 60_000,
-  });
-  const cuentasNequi = fondos.filter((f) => f.moneda.startsWith("NEQUI"));
-
+export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar, onFiar }) {
   const [pagoForm, setPagoForm]         = useState({ moneda: "COP", monto: "" });
   const [showPagoForm, setShowPagoForm] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [confirm, setConfirm]           = useState(false);
-  const abierto       = esActivo(pedido.estado);
-  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
+  const [confirmFiar, setConfirmFiar]   = useState(false);
+  // abierto: puede recibir cobros/finalizarse — incluye FIADO (se abona
+  // hasta saldar la deuda). puedeFiar: más angosto, solo antes de estar ya
+  // fiado (fiar algo que ya está fiado no tiene sentido y el backend lo
+  // rechaza).
+  const abierto       = permiteCobro(pedido.estado);
+  const puedeFiar      = esActivo(pedido.estado);
+  // Ver comentario equivalente en ModalDetallePedido.jsx: un pedido FIADO
+  // nunca es "enCurso" (backend excluye no-activos de ese cálculo), pero
+  // puede conservar reserva de antes de fiarlo — se excluye explícitamente
+  // para no bloquear "Finalizar" para siempre, igual que hace el backend.
+  const reservaFutura = pedido.estado !== "FIADO"
+    && !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
 
   const run = async (fn) => {
     setLoading(true); setError("");
@@ -158,9 +160,17 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
                       </button>
                     </div>
                   ) : (
-                    <button className="btn btn-secondary w-full justify-center" onClick={() => { setShowPagoForm(true); setError(""); }}>
-                      <CreditCard size={14} /> Registrar cobro
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button className="btn btn-secondary w-full justify-center" onClick={() => { setShowPagoForm(true); setError(""); }}>
+                        <CreditCard size={14} /> Registrar cobro
+                      </button>
+                      {puedeFiar && (
+                        <button className="btn btn-secondary w-full justify-center text-amber-700"
+                          onClick={() => setConfirmFiar(true)} disabled={loading}>
+                          <HandCoins size={14} /> Fiar
+                        </button>
+                      )}
+                    </div>
                   )
                 ) : (
                   <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 animate-slide-down">
@@ -172,11 +182,7 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
                       <select className="form-control text-sm w-28" value={pagoForm.moneda} onChange={(e) => setPagoForm((f) => ({ ...f, moneda: e.target.value }))}>
                         <option value="COP">COP</option>
                         <option value="USD">USD</option>
-                        {cuentasNequi.map((f) => (
-                          <option key={f.moneda} value={f.moneda}>
-                            {f.alias ? `Nequi — ${f.alias}` : "Nequi"}
-                          </option>
-                        ))}
+                        <option value="NEQUI">Nequi</option>
                       </select>
                       <MoneyInput className="form-control flex-1 text-sm" moneda={pagoForm.moneda}
                         placeholder={pagoForm.moneda === "USD" ? "Dólares" : "Pesos COP"}
@@ -201,6 +207,14 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar }) {
           labelOk="Sí, finalizar"
           onOk={() => { run(onFinalizar); setConfirm(false); }}
           onCancelar={() => setConfirm(false)} />
+      )}
+
+      {confirmFiar && (
+        <ConfirmDialog emoji="🤝" titulo="¿Marcar como fiado?"
+          descripcion="Se descuenta el inventario ahora (la comida ya se sirve) y el saldo pendiente queda como deuda en Cuentas por Cobrar. Los ítems quedan congelados — solo se le podrán registrar abonos."
+          labelOk="Sí, fiar"
+          onOk={() => { run(onFiar); setConfirmFiar(false); }}
+          onCancelar={() => setConfirmFiar(false)} />
       )}
     </>
   );

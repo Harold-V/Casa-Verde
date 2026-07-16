@@ -31,6 +31,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     List<Pedido> findByFinalizadoEnBetweenOrderByFinalizadoEnDesc(LocalDateTime inicio, LocalDateTime fin);
 
+    List<Pedido> findByFiadoEnBetweenOrderByFiadoEnDesc(LocalDateTime inicio, LocalDateTime fin);
+
     long countByEstadoIn(List<EstadoPedido> estados);
 
     /**

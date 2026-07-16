@@ -39,6 +39,7 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="sidebar-footer">Hecho por Harold Velasquez</div>
     </aside>
   );
 }

@@ -8,7 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.casaverde.backend.config.controllerAdvice.RecursoNoEncontradoException;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.ConfiguracionGeneral;
@@ -57,6 +58,7 @@ public class DataInitializer implements CommandLineRunner {
     private final PedidoDetalleRepository pedidoDetalleRepo;
     private final AdelantoRepository adelantoRepo;
     private final IUsuarioService usuarioService;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     public void run(String... args) {
@@ -77,12 +79,16 @@ public class DataInitializer implements CommandLineRunner {
         runBackfill("PreciosDetalles", this::backfillPreciosDetalles);
         runBackfill("AlertasInventario", this::backfillAlertasInventario);
         runBackfill("TipoAdelanto", this::backfillTipoAdelanto);
+        runBackfill("FondoEfectivo", this::backfillFondoEfectivo);
     }
 
-    @Transactional
+    // TransactionTemplate en vez de @Transactional: este método se invoca como
+    // this.runBackfill(...) (self-invocation) desde run(), lo que bypasea el proxy
+    // AOP de Spring y anula la anotación. TransactionTemplate abre la transacción
+    // de forma programática, sin depender del proxy.
     public void runBackfill(String nombre, Runnable tarea) {
         try {
-            tarea.run();
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> tarea.run());
         } catch (Exception e) {
             log.warn("Backfill '{}' falló (no crítico, se reintentará en el próximo arranque): {}", nombre,
                     e.getMessage());
@@ -200,7 +206,19 @@ public class DataInitializer implements CommandLineRunner {
         fondoRepo.saveAll(List.of(
                 Fondo.builder().moneda("COP").saldo(BigDecimal.ZERO).build(),
                 Fondo.builder().moneda("USD").saldo(BigDecimal.ZERO).build(),
+                Fondo.builder().moneda("EFECTIVO").alias("Caja física").saldo(BigDecimal.ZERO).build(),
                 Fondo.builder().moneda("NEQUI").alias("Principal").saldo(BigDecimal.ZERO).build()));
+    }
+
+    /**
+     * Crea el fondo EFECTIVO (caja física) en instalaciones existentes que ya
+     * tenían COP/USD/NEQUI antes de que este fondo se introdujera. Idempotente
+     * — solo actúa si el fondo aún no existe.
+     */
+    private void backfillFondoEfectivo() {
+        if (fondoRepo.findById("EFECTIVO").isEmpty()) {
+            fondoRepo.save(Fondo.builder().moneda("EFECTIVO").alias("Caja física").saldo(BigDecimal.ZERO).build());
+        }
     }
 
     /**

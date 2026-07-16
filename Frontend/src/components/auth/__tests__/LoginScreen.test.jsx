@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Mock del servicio ANTES de importar el componente
 vi.mock("../../../services/usuarioService", () => ({
@@ -21,6 +22,19 @@ const USUARIOS = [
   { id: 2, nombre: "Admin",    rol: "ADMIN",    requierePassword: true  },
 ];
 
+// LoginScreen usa useQuery (["usuarios"]) — necesita un QueryClientProvider
+// propio en el test. retry:false para que los tests de error no esperen
+// el reintento automático de React Query.
+function wrapper({ children }) {
+  return (
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      {children}
+    </QueryClientProvider>
+  );
+}
+
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe("LoginScreen", () => {
@@ -36,24 +50,24 @@ describe("LoginScreen", () => {
   it("muestra el spinner mientras carga", () => {
     // listar nunca resuelve durante esta prueba
     usuarioService.listar.mockReturnValue(new Promise(() => {}));
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     expect(document.querySelector(".spinner")).toBeInTheDocument();
   });
 
   it("oculta el spinner tras cargar", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await waitFor(() =>
       expect(document.querySelector(".spinner")).not.toBeInTheDocument()
     );
   });
 
   it("muestra el título 'Casa Verde'", () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     expect(screen.getByText("Casa Verde")).toBeInTheDocument();
   });
 
   it("muestra el select de usuarios con las opciones cargadas", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     const select = await screen.findByRole("combobox");
     expect(select).toBeInTheDocument();
 
@@ -64,7 +78,7 @@ describe("LoginScreen", () => {
   });
 
   it("pre-selecciona el primer usuario", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     const select = await screen.findByRole("combobox");
     expect(select).toHaveValue(String(USUARIOS[0].id));
   });
@@ -72,13 +86,13 @@ describe("LoginScreen", () => {
   // ─── Campo de contraseña ───────────────────────────────────────────────────
 
   it("NO muestra campo de contraseña para usuario sin requierePassword", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await screen.findByRole("combobox");
     expect(screen.queryByLabelText(/Clave/i)).not.toBeInTheDocument();
   });
 
   it("muestra campo de contraseña al seleccionar usuario con requierePassword=true", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     const select = await screen.findByRole("combobox");
 
     await userEvent.selectOptions(select, String(USUARIOS[1].id));
@@ -87,7 +101,7 @@ describe("LoginScreen", () => {
   });
 
   it("oculta el campo de contraseña al volver a seleccionar usuario sin password", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     const select = await screen.findByRole("combobox");
 
     // Seleccionar admin (con password) y luego volver al operador
@@ -100,7 +114,7 @@ describe("LoginScreen", () => {
   // ─── Botón Entrar ──────────────────────────────────────────────────────────
 
   it("el botón 'Entrar' está habilitado cuando hay usuarioId", async () => {
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await screen.findByRole("combobox");
     expect(screen.getByRole("button", { name: /Entrar/i })).toBeEnabled();
   });
@@ -111,7 +125,7 @@ describe("LoginScreen", () => {
     const sesionMock = { id: 1, nombre: "Operador", rol: "OPERADOR" };
     usuarioService.login.mockResolvedValue(sesionMock);
 
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await screen.findByRole("combobox");
 
     await userEvent.click(screen.getByRole("button", { name: /Entrar/i }));
@@ -125,7 +139,7 @@ describe("LoginScreen", () => {
     const sesionMock = { id: 1, nombre: "Operador", rol: "OPERADOR" };
     usuarioService.login.mockResolvedValue(sesionMock);
 
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await screen.findByRole("combobox");
 
     await userEvent.click(screen.getByRole("button", { name: /Entrar/i }));
@@ -139,7 +153,7 @@ describe("LoginScreen", () => {
     const sesionMock = { id: 2, nombre: "Admin", rol: "ADMIN" };
     usuarioService.login.mockResolvedValue(sesionMock);
 
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     const select = await screen.findByRole("combobox");
 
     await userEvent.selectOptions(select, String(USUARIOS[1].id));
@@ -158,15 +172,17 @@ describe("LoginScreen", () => {
   it("muestra error si listar falla", async () => {
     usuarioService.listar.mockRejectedValue(new Error("Sin conexión al servidor"));
 
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
 
-    await screen.findByText("Sin conexión al servidor");
+    // LoginScreen fija retry:1 en su useQuery — el primer reintento espera
+    // ~1s de backoff antes de que el error quede disponible.
+    await screen.findByText("Sin conexión al servidor", {}, { timeout: 3000 });
   });
 
   it("muestra el error del backend si login falla", async () => {
     usuarioService.login.mockRejectedValue(new Error("Contraseña incorrecta"));
 
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await screen.findByRole("combobox");
 
     await userEvent.click(screen.getByRole("button", { name: /Entrar/i }));
@@ -177,7 +193,7 @@ describe("LoginScreen", () => {
   it("re-habilita el botón tras error de login", async () => {
     usuarioService.login.mockRejectedValue(new Error("Error"));
 
-    render(<LoginScreen />);
+    render(<LoginScreen />, { wrapper });
     await screen.findByRole("combobox");
 
     await userEvent.click(screen.getByRole("button", { name: /Entrar/i }));

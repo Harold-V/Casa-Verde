@@ -58,6 +58,9 @@ public class ResumenServiceImpl implements IResumenService {
                 .filter(p -> p.getFechaReserva() == null || p.getFechaReserva().isEqual(fecha))
                 .collect(Collectors.toList());
         List<Pedido> pedidosFinalizados = pedidoRepo.findByFinalizadoEnBetweenOrderByFinalizadoEnDesc(ini, fin);
+        // Pedidos marcados FIADO hoy: la comida se sirvió hoy aunque el pago
+        // quede pendiente — su consumo de cocina cuenta en el resumen de hoy.
+        List<Pedido> pedidosFiadosHoy = pedidoRepo.findByFiadoEnBetweenOrderByFiadoEnDesc(ini, fin);
         // Excluir pagos de pedidos ANULADOS — esos fondos ya fueron revertidos al
         // anular
         // JOIN FETCH evita N+1 al acceder a pago.getPedido().getEstado()
@@ -90,11 +93,18 @@ public class ResumenServiceImpl implements IResumenService {
         // vienen normalizadas (trim+lowercase) por calcularConsumos(), la misma
         // normalización que usa el resto del inventario — no es una comparación
         // frágil de texto libre.
+        //
+        // Un pedido que vino de FIADO y hoy se termina de pagar (pasa a
+        // FINALIZADO) NO se vuelve a contar acá — su consumo de cocina ya se
+        // contó el día que se marcó fiado (fiadoEn != null lo excluye del
+        // bucket de finalizados; pedidosFiadosHoy lo cuenta aparte, solo si
+        // fiadoEn cae en el rango de hoy).
         Map<String, BigDecimal> consumosTotales = new HashMap<>();
-        for (Pedido p : pedidosFinalizados) {
-            inventarioService.calcularConsumos(p)
-                    .forEach((insumo, cantidad) -> consumosTotales.merge(insumo, cantidad, BigDecimal::add));
-        }
+        Stream.concat(
+                pedidosFinalizados.stream().filter(p -> p.getFiadoEn() == null),
+                pedidosFiadosHoy.stream())
+                .forEach(p -> inventarioService.calcularConsumos(p)
+                        .forEach((insumo, cantidad) -> consumosTotales.merge(insumo, cantidad, BigDecimal::add)));
         BigDecimal cuyesVendidos = consumosTotales.getOrDefault("cuy", BigDecimal.ZERO);
         BigDecimal gallinasVendidas = consumosTotales.getOrDefault("gallina", BigDecimal.ZERO);
 

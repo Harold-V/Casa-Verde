@@ -116,8 +116,9 @@ export default function ModalCompraInsumo({ insumos, onClose }) {
                   value={form.moneda}
                   onChange={(e) => set("moneda", e.target.value)}
                 >
-                  <option value="COP">COP — Pesos</option>
+                  <option value="COP">COP — Banco</option>
                   <option value="USD">USD — Dólares</option>
+                  <option value="EFECTIVO">Efectivo — Caja física</option>
                   {nequiCuentas.map((f) => (
                     <option key={f.moneda} value={f.moneda}>
                       {f.moneda}{f.alias ? ` — ${f.alias}` : ""}

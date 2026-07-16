@@ -34,6 +34,7 @@ public class PedidoDTO {
     private LocalDateTime creadoEn;
     private LocalDateTime actualizadoEn;
     private LocalDateTime finalizadoEn;
+    private LocalDateTime fiadoEn;
     private List<PedidoDetalleDTO> detalles;
     private List<PagoDTO> pagos;
 }

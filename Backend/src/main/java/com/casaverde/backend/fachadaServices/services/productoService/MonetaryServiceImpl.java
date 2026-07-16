@@ -16,8 +16,9 @@ public class MonetaryServiceImpl implements IMonetaryService {
             throw new ValidacionException("La moneda es obligatoria");
         }
         String normalizada = moneda.trim().toUpperCase();
-        if (!normalizada.equals(MonedaConstants.COP) && !normalizada.equals(MonedaConstants.USD) && !normalizada.startsWith(MonedaConstants.NEQUI)) {
-            throw new ValidacionException("Moneda invalida: " + moneda + ". Use COP, USD o NEQUI");
+        if (!normalizada.equals(MonedaConstants.COP) && !normalizada.equals(MonedaConstants.USD)
+                && !normalizada.equals(MonedaConstants.EFECTIVO) && !normalizada.startsWith(MonedaConstants.NEQUI)) {
+            throw new ValidacionException("Moneda invalida: " + moneda + ". Use COP, USD, EFECTIVO o NEQUI");
         }
         return normalizada;
     }
@@ -59,10 +60,10 @@ public class MonetaryServiceImpl implements IMonetaryService {
     private BigDecimal normalizarEscala(String moneda, BigDecimal monto) {
         if (MonedaConstants.USD.equals(moneda))
             return exigirEscalaMaxima(monto, 2, "USD admite maximo 2 decimales").setScale(2, RoundingMode.UNNECESSARY);
-        if (MonedaConstants.COP.equals(moneda) || moneda.startsWith(MonedaConstants.NEQUI))
+        if (MonedaConstants.COP.equals(moneda) || MonedaConstants.EFECTIVO.equals(moneda) || moneda.startsWith(MonedaConstants.NEQUI))
             return exigirEscalaMaxima(monto, 0, moneda + " no debe tener centavos").setScale(0,
                     RoundingMode.UNNECESSARY);
-        throw new ValidacionException("Moneda invalida: " + moneda + ". Use COP, USD o NEQUI");
+        throw new ValidacionException("Moneda invalida: " + moneda + ". Use COP, USD, EFECTIVO o NEQUI");
     }
 
     private void validarPositivo(BigDecimal valor, String mensaje) {

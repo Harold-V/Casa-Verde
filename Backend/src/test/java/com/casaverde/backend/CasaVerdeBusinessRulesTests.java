@@ -287,7 +287,9 @@ class CasaVerdeBusinessRulesTests {
                                 new RegistrarPagoRequest("COP", BigDecimal.valueOf(1000)));
                 pedidoService.finalizarPedido(pedido.getId());
 
-                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo())
+                // Cobro en COP efectivo acredita el fondo EFECTIVO (caja física), no COP
+                // directo — ver PedidoFinalizacionServiceImpl.
+                assertThat(fondoRepository.findById("EFECTIVO").orElseThrow().getSaldo())
                                 .isEqualByComparingTo(BigDecimal.valueOf(1000));
                 assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
                                 .extracting(m -> m.getTipo() + "|" + m.getReferenciaTipo() + "|" + m.getReferenciaId())
@@ -347,14 +349,16 @@ class CasaVerdeBusinessRulesTests {
 
                 CierreCajaRequest request = new CierreCajaRequest();
                 request.setFecha(LocalDate.now());
-                request.setContadoCop(BigDecimal.valueOf(1000));
+                // El pedido se pagó en COP efectivo, que ahora acredita el fondo
+                // EFECTIVO (no COP) al finalizar — ver PedidoFinalizacionServiceImpl.
+                request.setContadoEfectivo(BigDecimal.valueOf(1000));
                 request.setContadoUsd(BigDecimal.ZERO);
                 request.setContadoNequi(BigDecimal.ZERO);
 
                 CierreCajaDTO cierre = cierreCajaService.cerrar(request);
                 assertThat(cierre.getId()).isNotNull();
                 assertThat(cierre.getBackupPath()).contains("casaverde-");
-                assertThat(cierre.getDiferenciaCop()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(cierre.getDiferenciaEfectivo()).isEqualByComparingTo(BigDecimal.ZERO);
         }
 
         @Test
@@ -1243,6 +1247,128 @@ class CasaVerdeBusinessRulesTests {
                 // — lo que se prueba es que el campo se llena (trazabilidad de que ALGUIEN
                 // aplicó el descuento), nunca queda null cuando el descuento es positivo.
                 assertThat(actualizado.getDescuentoAplicadoPor()).isNotNull();
+        }
+
+        // ── Pedidos fiados ───────────────────────────────────────────────────────
+
+        @Test
+        void marcarFiadoDescuentaInventarioSinAcreditarFondo() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente fiado cuy");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+
+                BigDecimal stockAntes = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+
+                PedidoDTO fiado = pedidoService.marcarFiado(pedido.getId());
+
+                assertThat(fiado.getEstado()).isEqualTo(EstadoPedido.FIADO.name());
+                assertThat(fiado.getFiadoEn()).isNotNull();
+                BigDecimal stockDespues = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+                assertThat(stockDespues).isEqualByComparingTo(stockAntes.subtract(BigDecimal.ONE));
+
+                // Nada pagado todavía — ningún fondo debe acreditarse al fiar
+                assertThat(fondoRepository.findById("COP").orElseThrow().getSaldo()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(fondoRepository.findById("EFECTIVO").orElseThrow().getSaldo()).isEqualByComparingTo(BigDecimal.ZERO);
+                assertThat(cajaMovimientoRepository.findAllByOrderByRegistradoEnDesc())
+                                .noneMatch(m -> CajaMovimientoTipo.COBRO_PEDIDO.equals(m.getTipo()));
+        }
+
+        @Test
+        void pedidoFiadoNoPermiteEditarItemsPeroSiRegistrarPago() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente fiado congelado");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                PedidoDTO fiado = pedidoService.marcarFiado(pedido.getId());
+
+                assertThatThrownBy(() -> pedidoService.agregarDetalle(fiado.getId(), detalleProducto("Gallina", 1)))
+                                .isInstanceOf(ValidacionException.class);
+
+                // Pero sí se le puede seguir abonando — congelado no significa cerrado a pagos
+                PedidoDTO conAbono = pedidoService.registrarPago(fiado.getId(),
+                                new RegistrarPagoRequest("COP", BigDecimal.valueOf(5000)));
+                assertThat(conAbono.getTotalAbonado()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+                assertThat(conAbono.getEstado()).isEqualTo(EstadoPedido.FIADO.name());
+        }
+
+        @Test
+        void saldarFiadoAcreditaFondoSinVolverADescontarInventario() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente fiado saldado");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                PedidoDTO fiado = pedidoService.marcarFiado(pedido.getId());
+                BigDecimal stockTrasFiar = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+
+                pedidoService.registrarPago(fiado.getId(), new RegistrarPagoRequest("COP", fiado.getTotalCop()));
+                PedidoDTO finalizado = pedidoService.finalizarPedido(fiado.getId());
+
+                assertThat(finalizado.getEstado()).isEqualTo(EstadoPedido.FINALIZADO.name());
+                assertThat(fondoRepository.findById("EFECTIVO").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(fiado.getTotalCop());
+
+                BigDecimal stockTrasSaldar = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+                assertThat(stockTrasSaldar).isEqualByComparingTo(stockTrasFiar);
+
+                long salidasDeEstePedido = movimientoInventarioRepository.findAll().stream()
+                                .filter(m -> "pedido".equals(m.getReferenciaTipo())
+                                                && pedido.getId().equals(m.getReferenciaId())
+                                                && "salida".equals(m.getTipo()))
+                                .count();
+                assertThat(salidasDeEstePedido).isEqualTo(1);
+        }
+
+        @Test
+        void anularPedidoFiadoRevierteInventario() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente fiado anulado");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                BigDecimal stockAntes = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+
+                PedidoDTO fiado = pedidoService.marcarFiado(pedido.getId());
+                PedidoDTO anulado = pedidoService.anularPedido(fiado.getId());
+
+                assertThat(anulado.getEstado()).isEqualTo(EstadoPedido.ANULADO.name());
+                BigDecimal stockDespues = inventarioRepository.findByInsumo("cuy").orElseThrow().getStockActual();
+                assertThat(stockDespues).isEqualByComparingTo(stockAntes);
+        }
+
+        @Test
+        void pedidoFiadoNoBloqueaCierreDeCaja() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente fiado no bloquea cierre");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.marcarFiado(pedido.getId());
+
+                CierreCajaRequest request = new CierreCajaRequest();
+                request.setFecha(LocalDate.now());
+                request.setContadoEfectivo(BigDecimal.ZERO);
+                request.setContadoUsd(BigDecimal.ZERO);
+                request.setContadoNequi(BigDecimal.ZERO);
+
+                CierreCajaDTO cierre = cierreCajaService.cerrar(request);
+                assertThat(cierre.getId()).isNotNull();
+        }
+
+        @Test
+        void resumenCuentaConsumoDeCocinaDePedidoFiadoElMismoDia() {
+                asegurarStockAlto();
+                CrearPedidoRequest req = new CrearPedidoRequest();
+                req.setNombre("Cliente fiado resumen");
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                PedidoDTO pedido = pedidoService.crear(req);
+                pedidoService.marcarFiado(pedido.getId());
+
+                ResumenDiaDTO resumen = resumenService.obtener(hoyBogota());
+                assertThat(resumen.getCuyesVendidos()).isEqualByComparingTo(BigDecimal.ONE);
         }
 
         // ── Helpers para los casos de arriba ────────────────────────────────────────

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Ban, CheckCircle, Pencil, Plus, Trash2, Utensils, X } from "lucide-react";
+import { Ban, CheckCircle, HandCoins, Pencil, Plus, Trash2, Utensils, X } from "lucide-react";
 import { formatCOP, formatFecha } from "../../utils/format";
 import { ESTADO_BADGE } from "../../utils/constants";
 import {
-  calcularInsumosDetallado, formatInsumo, esActivo,
+  calcularInsumosDetallado, formatInsumo, esActivo, permiteCobro,
   normalizarFracciones, toTitleCase, formatReservaDisplay,
 } from "../../utils/pedidoHelpers";
 import MoneyInput from "../shared/MoneyInput";
@@ -24,7 +24,7 @@ export default function ModalDetallePedido({
   pedido, productos, salones = [], onClose,
   onActualizar,
   onAgregarDetalle, onActualizarDetalle, onQuitarDetalle,
-  onFinalizar, onAnular,
+  onFinalizar, onAnular, onFiar,
   onActualizarPago, onQuitarPago,
 }) {
   useModalKeyboard({ onEscape: onClose });
@@ -93,8 +93,20 @@ export default function ModalDetallePedido({
     return nuevo;
   });
 
+  // abierto: ítems y datos generales editables — excluye FIADO a propósito
+  // (queda congelado). puedeCobrar: más amplio, incluye FIADO — gobierna lo
+  // que sí sigue disponible en un pedido fiado (editar/quitar cobros,
+  // finalizar/saldar la cuenta una vez el saldo llega a $0).
   const abierto       = esActivo(pedido.estado);
-  const reservaFutura = !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
+  const puedeCobrar    = permiteCobro(pedido.estado);
+  // Un pedido FIADO nunca es "enCurso" (el backend excluye los no-activos de
+  // ese cálculo), pero puede conservar la fechaReserva/horaReserva original
+  // de antes de fiarlo — sin la exclusión explícita, quedaría bloqueado para
+  // finalizar/saldar para siempre. El backend ya se salta esta validación
+  // para pedidos que vienen de fiado (finalizarPedido) — el frontend debe
+  // reflejar lo mismo.
+  const reservaFutura = pedido.estado !== "FIADO"
+    && !!(pedido.fechaReserva || pedido.horaReserva) && !pedido.enCurso;
   const { totales: itotales, almuerzo: ialmuerzo } = calcularInsumosDetallado(pedido.detalles);
 
   const buildUpdateReq = (overrides) => ({
@@ -637,7 +649,7 @@ export default function ModalDetallePedido({
                         </span>
                         <span className="flex-1 font-semibold">{formatCOP(p.montoCop)}</span>
                         <span className="text-[11px] text-gray-400">{formatFecha(p.registradoEn)}</span>
-                        {abierto && (
+                        {puedeCobrar && (
                           <button className="btn-icon text-gray-400 hover:text-verde-oscuro"
                             onClick={() => { setEditandoPagoId(p.id); setEditPagoForm({ moneda: p.moneda, monto: String(p.monto) }); }}>
                             <Pencil size={12} />
@@ -652,16 +664,22 @@ export default function ModalDetallePedido({
 
             {/* Acciones */}
             <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-200 bg-white shrink-0">
-              <div>
+              <div className="flex gap-2">
                 {pedido.estado !== "ANULADO" && pedido.estado !== "FINALIZADO" && (
                   <button type="button" className="btn btn-danger"
                     onClick={() => setConfirm({ tipo: "anular" })} disabled={loading}>
                     <Ban size={15} /> Anular
                   </button>
                 )}
+                {abierto && pedido.detalles.length > 0 && (
+                  <button type="button" className="btn btn-secondary"
+                    onClick={() => setConfirm({ tipo: "fiar" })} disabled={loading}>
+                    <HandCoins size={15} /> Fiar
+                  </button>
+                )}
               </div>
               <div className="flex gap-2">
-                {abierto && pedido.saldoPendiente <= 0 && pedido.detalles.length > 0 && (
+                {puedeCobrar && pedido.saldoPendiente <= 0 && pedido.detalles.length > 0 && (
                   <button
                     type="button"
                     className="btn btn-primary bg-verde-oscuro hover:bg-[#0f2b1e] disabled:opacity-40 disabled:cursor-not-allowed"
@@ -693,6 +711,7 @@ export default function ModalDetallePedido({
           emoji={
             confirm.tipo === "anular" || confirm.tipo === "quitar-detalle" || confirm.tipo === "quitar-pago" ? "🗑️"
             : confirm.tipo === "anular-sin-items" ? "⚠️"
+            : confirm.tipo === "fiar" ? "🤝"
             : "✅"
           }
           titulo={
@@ -700,6 +719,7 @@ export default function ModalDetallePedido({
             : confirm.tipo === "anular-sin-items" ? "Pedido sin ítems"
             : confirm.tipo === "quitar-detalle"  ? `¿Quitar "${confirm.nombre}"?`
             : confirm.tipo === "quitar-pago"     ? "¿Eliminar este cobro?"
+            : confirm.tipo === "fiar"            ? "¿Marcar como fiado?"
             : "¿Finalizar el pedido?"
           }
           descripcion={
@@ -711,19 +731,24 @@ export default function ModalDetallePedido({
               ? "El ítem se eliminará del pedido."
               : confirm.tipo === "quitar-pago"
               ? `El cobro de ${formatCOP(confirm.monto)} (${confirm.moneda}) se eliminará del pedido.`
+              : confirm.tipo === "fiar"
+              ? "Se descuenta el inventario ahora (la comida ya se sirve) y el saldo pendiente queda como deuda en Cuentas por Cobrar. Los ítems quedan congelados — solo se le podrán registrar abonos."
               : "Se descontará el inventario correspondiente al cerrar el pedido."
           }
           labelOk={
             confirm.tipo === "finalizar" ? "Sí, finalizar"
             : confirm.tipo === "quitar-detalle" || confirm.tipo === "quitar-pago" ? "Sí, eliminar"
+            : confirm.tipo === "fiar" ? "Sí, fiar"
             : "Sí, anular"
           }
-          peligro={confirm.tipo !== "finalizar"}
+          peligro={confirm.tipo !== "finalizar" && confirm.tipo !== "fiar"}
           onOk={() => {
             if (confirm.tipo === "finalizar") {
               run(onFinalizar);
             } else if (confirm.tipo === "anular" || confirm.tipo === "anular-sin-items") {
               run(onAnular);
+            } else if (confirm.tipo === "fiar") {
+              run(onFiar);
             } else if (confirm.tipo === "quitar-detalle") {
               run(async () => { await onQuitarDetalle(confirm.id); setEditandoDetalleId(null); });
             } else if (confirm.tipo === "quitar-pago") {

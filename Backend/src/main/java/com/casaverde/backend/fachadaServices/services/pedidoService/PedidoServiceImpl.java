@@ -321,7 +321,10 @@ public class PedidoServiceImpl implements IPedidoService {
     public PedidoDTO finalizarPedido(Long pedidoId) {
         Pedido pedido = findOrThrow(pedidoId);
         log.info("[finalizar] pedidoId={}", pedidoId);
-        validarAbierto(pedido, "finalizar");
+        boolean veniaDeFiado = EstadoPedido.FIADO == pedido.getEstado();
+        if (!veniaDeFiado) {
+            validarAbierto(pedido, "finalizar");
+        }
 
         if (pedido.getDetalles().isEmpty())
             throw new ValidacionException("El pedido no tiene ítems");
@@ -331,37 +334,49 @@ public class PedidoServiceImpl implements IPedidoService {
         BigDecimal abonado = totalesFinalizacion.totalAbonado();
         // El invariante 0 <= descuento < subtotal ya se garantiza en cada punto de
         // escritura (crear/agregar/actualizar/quitar ítem); se re-verifica aquí
-        // porque este es el punto sin retorno: se descuenta inventario y se
-        // acredita el fondo con "total".
+        // porque este es el punto sin retorno: se descuenta inventario (o se
+        // acredita el fondo, si ya venía fiado) con "total".
         validarInvarianteDescuento(pedido, totalesFinalizacion.subtotalCop(), "finalizar el pedido");
-        recalcularEstadoPago(pedido);
-        if (EstadoPedido.PAGADO != pedido.getEstado()) {
-            throw new ValidacionException(String.format(
-                    "Saldo pendiente: $%.0f COP. Registre el pago completo antes de finalizar.",
-                    total.subtract(abonado)));
-        }
 
-        // Validar que la hora de la reserva ya haya llegado
-        if (pedido.getFechaReserva() != null || pedido.getHoraReserva() != null) {
-            java.time.ZoneId bogota = java.time.ZoneId.of("America/Bogota");
-            LocalDate hoy = LocalDate.now(bogota);
-            LocalDate fechaRes = pedido.getFechaReserva() != null ? pedido.getFechaReserva() : hoy;
-            boolean reservaFutura;
-            if (fechaRes.isAfter(hoy)) {
-                reservaFutura = true;
-            } else if (fechaRes.isBefore(hoy)) {
-                reservaFutura = false;
-            } else { // misma fecha: revisar hora
-                reservaFutura = pedido.getHoraReserva() != null &&
-                        pedido.getHoraReserva().isAfter(LocalTime.now(bogota));
+        if (veniaDeFiado) {
+            // El inventario ya se descontó al marcar el pedido como fiado — acá
+            // solo falta que la cuenta quede saldada en $0 para poder cerrarla.
+            if (abonado.compareTo(total) < 0) {
+                throw new ValidacionException(String.format(
+                        "Saldo pendiente del fiado: $%.0f COP. Registre el abono completo antes de saldar la cuenta.",
+                        total.subtract(abonado)));
             }
-            if (reservaFutura) {
-                String cuando = (pedido.getFechaReserva() != null && pedido.getHoraReserva() != null)
-                        ? pedido.getFechaReserva() + " a las " + pedido.getHoraReserva()
-                        : pedido.getFechaReserva() != null ? pedido.getFechaReserva().toString()
-                                : "las " + pedido.getHoraReserva();
-                throw new ValidacionException(
-                        "No se puede finalizar antes de la reserva (" + cuando + ")");
+        } else {
+            recalcularEstadoPago(pedido);
+            if (EstadoPedido.PAGADO != pedido.getEstado()) {
+                throw new ValidacionException(String.format(
+                        "Saldo pendiente: $%.0f COP. Registre el pago completo antes de finalizar.",
+                        total.subtract(abonado)));
+            }
+
+            // Validar que la hora de la reserva ya haya llegado. No aplica a un
+            // pedido que viene de fiado: la comida ya se sirvió en su momento.
+            if (pedido.getFechaReserva() != null || pedido.getHoraReserva() != null) {
+                java.time.ZoneId bogota = java.time.ZoneId.of("America/Bogota");
+                LocalDate hoy = LocalDate.now(bogota);
+                LocalDate fechaRes = pedido.getFechaReserva() != null ? pedido.getFechaReserva() : hoy;
+                boolean reservaFutura;
+                if (fechaRes.isAfter(hoy)) {
+                    reservaFutura = true;
+                } else if (fechaRes.isBefore(hoy)) {
+                    reservaFutura = false;
+                } else { // misma fecha: revisar hora
+                    reservaFutura = pedido.getHoraReserva() != null &&
+                            pedido.getHoraReserva().isAfter(LocalTime.now(bogota));
+                }
+                if (reservaFutura) {
+                    String cuando = (pedido.getFechaReserva() != null && pedido.getHoraReserva() != null)
+                            ? pedido.getFechaReserva() + " a las " + pedido.getHoraReserva()
+                            : pedido.getFechaReserva() != null ? pedido.getFechaReserva().toString()
+                                    : "las " + pedido.getHoraReserva();
+                    throw new ValidacionException(
+                            "No se puede finalizar antes de la reserva (" + cuando + ")");
+                }
             }
         }
 
@@ -369,11 +384,43 @@ public class PedidoServiceImpl implements IPedidoService {
         pedido.setFinalizadoEn(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota")));
         Pedido guardado = pedidoRepo.save(pedido);
 
-        finalizacionService.ejecutar(guardado, total);
+        if (veniaDeFiado) {
+            finalizacionService.ejecutarSoloCobro(guardado, total);
+        } else {
+            finalizacionService.ejecutar(guardado, total);
+        }
 
         log.info("[finalizar] pedidoId={} COMPLETADO", pedidoId);
-        auditoriaService.registrar("pedido", guardado.getId(), "FINALIZAR",
-                "Pedido finalizado con total COP " + total);
+        auditoriaService.registrar("pedido", guardado.getId(), veniaDeFiado ? "SALDAR_FIADO" : "FINALIZAR",
+                (veniaDeFiado ? "Cuenta fiada saldada con total COP " : "Pedido finalizado con total COP ") + total);
+        return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
+    }
+
+    @Transactional
+    public PedidoDTO marcarFiado(Long pedidoId) {
+        Pedido pedido = findOrThrow(pedidoId);
+        log.info("[marcarFiado] pedidoId={}", pedidoId);
+        validarAbierto(pedido, "marcar como fiado");
+
+        if (pedido.getDetalles().isEmpty())
+            throw new ValidacionException("El pedido no tiene ítems");
+
+        PedidoTotales totales = calcularTotales(pedido);
+        validarInvarianteDescuento(pedido, totales.subtotalCop(), "marcar el pedido como fiado");
+
+        pedido.setEstado(EstadoPedido.FIADO);
+        pedido.setFiadoEn(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota")));
+        Pedido guardado = pedidoRepo.save(pedido);
+
+        // La comida se sirve ahora: el inventario se descuenta de inmediato,
+        // igual que al finalizar. El fondo NO se toca — no ha entrado dinero
+        // (o solo entró parcialmente); el saldo pendiente queda como deuda,
+        // visible desde Cuentas por Cobrar hasta que se termine de pagar.
+        finalizacionService.ejecutarSoloInventario(guardado);
+
+        log.info("[marcarFiado] pedidoId={} FIADO saldo={}", pedidoId, totales.saldoPendiente());
+        auditoriaService.registrar("pedido", guardado.getId(), "MARCAR_FIADO",
+                "Pedido marcado como fiado. Saldo pendiente: $" + totales.saldoPendiente());
         return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
@@ -386,20 +433,29 @@ public class PedidoServiceImpl implements IPedidoService {
         if (EstadoPedido.FINALIZADO == pedido.getEstado())
             throw new ValidacionException("No se puede anular un pedido FINALIZADO");
 
+        boolean veniaDeFiado = EstadoPedido.FIADO == pedido.getEstado();
+
         // Los pagos previos nunca tocaron el fondo (el fondo solo se acredita al
-        // finalizar),
-        // por lo que no hay nada que revertir — solo cambiar el estado.
+        // finalizar), por lo que no hay nada que revertir ahí — solo cambiar el
+        // estado. El inventario sí se descontó si el pedido venía fiado (la
+        // comida ya se sirvió): eso se revierte antes de anular.
         pedido.setEstado(EstadoPedido.ANULADO);
         Pedido guardado = pedidoRepo.save(pedido);
+
+        if (veniaDeFiado) {
+            finalizacionService.revertirInventario(guardado);
+        }
+
         auditoriaService.registrar("pedido", guardado.getId(), "ANULAR",
-                "Pedido anulado con " + pedido.getPagos().size() + " pago(s) sin impacto en fondos");
+                "Pedido anulado con " + pedido.getPagos().size() + " pago(s) sin impacto en fondos"
+                        + (veniaDeFiado ? "; inventario revertido (venía fiado)" : ""));
         return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
     }
 
     @Transactional
     public PedidoDTO quitarPago(Long pedidoId, Long pagoId) {
         Pedido pedido = findOrThrow(pedidoId);
-        validarAbierto(pedido, "eliminar cobros");
+        validarPuedeRecibirPago(pedido, "eliminar cobros");
 
         Pago pago = pedido.getPagos().stream()
                 .filter(p -> p.getId().equals(pagoId))
@@ -418,7 +474,7 @@ public class PedidoServiceImpl implements IPedidoService {
     @Transactional
     public PedidoDTO actualizarPago(Long pedidoId, Long pagoId, ActualizarPagoRequest req) {
         Pedido pedido = findOrThrow(pedidoId);
-        validarAbierto(pedido, "editar pagos");
+        validarPuedeRecibirPago(pedido, "editar pagos");
 
         Pago pago = pedido.getPagos().stream()
                 .filter(p -> p.getId().equals(pagoId))
@@ -557,6 +613,19 @@ public class PedidoServiceImpl implements IPedidoService {
     private void validarAbierto(Pedido pedido, String accion) {
         if (!pedido.getEstado().permiteEdicion()) {
             log.warn("[validarAbierto] pedidoId={} accion='{}' estado={}", pedido.getId(), accion, pedido.getEstado());
+            throw new ValidacionException("No se puede " + accion + " en un pedido " + pedido.getEstado());
+        }
+    }
+
+    /**
+     * Igual que validarAbierto, pero permite además el estado FIADO — un
+     * pedido fiado tiene los ítems congelados (validarAbierto lo rechaza)
+     * pero debe poder seguir recibiendo/editando/quitando abonos hasta
+     * saldarse.
+     */
+    private void validarPuedeRecibirPago(Pedido pedido, String accion) {
+        if (!pedido.getEstado().permiteRegistrarPago()) {
+            log.warn("[validarPuedeRecibirPago] pedidoId={} accion='{}' estado={}", pedido.getId(), accion, pedido.getEstado());
             throw new ValidacionException("No se puede " + accion + " en un pedido " + pedido.getEstado());
         }
     }

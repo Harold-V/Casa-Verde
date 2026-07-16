@@ -13,6 +13,10 @@ const __dirname = path.dirname(__filename);
 // Propagar timezone del OS al renderer (Electron usa UTC por defecto)
 process.env.TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+// El "name" en package.json es "frontend" (paquete npm) — sin esto, Electron
+// usa ese nombre para %APPDATA%\frontend en vez de %APPDATA%\Casa Verde.
+app.setName("Casa Verde");
+
 const isDev = !app.isPackaged;
 
 // En dev apunta a Frontend/resources/; en producción a resources/ junto al asar
@@ -23,11 +27,20 @@ const resourcesPath = isDev
 let backendProcess = null;
 let splashWindow = null;
 let mainWindow = null;
+let logStream = null;
 
 function ensureDataDirs() {
   const userData = app.getPath("userData");
   fs.mkdirSync(path.join(userData, "Database"), { recursive: true });
   fs.mkdirSync(path.join(userData, "Backups"), { recursive: true });
+  fs.mkdirSync(path.join(userData, "Logs"), { recursive: true });
+  logStream = fs.createWriteStream(path.join(userData, "Logs", "main.log"), { flags: "a" });
+}
+
+function log(...args) {
+  const line = `[${new Date().toISOString()}] ${args.join(" ")}`;
+  console.log(line);
+  if (logStream) logStream.write(line + "\n");
 }
 
 function createSplashWindow() {
@@ -78,6 +91,9 @@ function startBackend() {
   const dbPath = path.join(userData, "Database", "casaverde.db");
   const backupDir = path.join(userData, "Backups");
 
+  log("[backend] javaExe=", javaExe, "existe=", fs.existsSync(javaExe));
+  log("[backend] jarPath=", jarPath, "existe=", fs.existsSync(jarPath));
+
   backendProcess = spawn(
     javaExe,
     [
@@ -89,15 +105,21 @@ function startBackend() {
     { windowsHide: true, detached: false }
   );
 
-  backendProcess.stdout.on("data", (d) =>
-    console.log("[backend]", d.toString().trim())
+  backendProcess.stdout.on("data", (d) => log("[backend]", d.toString().trim()));
+  backendProcess.stderr.on("data", (d) => log("[backend:err]", d.toString().trim()));
+  backendProcess.on("exit", (code, signal) =>
+    log(`[backend] proceso terminó con código ${code} señal ${signal}`)
   );
-  backendProcess.stderr.on("data", (d) =>
-    console.error("[backend]", d.toString().trim())
-  );
-  backendProcess.on("exit", (code) =>
-    console.log(`[backend] proceso terminó con código ${code}`)
-  );
+  // Sin este listener, un fallo de spawn (ENOENT/EACCES) lanza un error no
+  // capturado que mata el proceso principal de Electron sin ningún rastro —
+  // así queda al menos logueado y con diálogo visible para el usuario.
+  backendProcess.on("error", (err) => {
+    log("[backend:spawn-error]", err.message);
+    dialog.showErrorBox(
+      "Casa Verde — Error al iniciar el servidor",
+      `No se pudo iniciar el proceso del backend:\n${err.message}`
+    );
+  });
 }
 
 function checkHealth() {
@@ -140,7 +162,7 @@ function setupAutoUpdater() {
         process.env.GH_TOKEN = ghTokenRead;
       }
     } catch (err) {
-      console.error("[updater] error leyendo update-config.json:", err.message);
+      log("[updater] error leyendo update-config.json:", err.message);
     }
   }
 
@@ -148,18 +170,18 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on("error", (err) => {
-    console.error("[updater] error:", err.message);
+    log("[updater] error:", err.message);
   });
   autoUpdater.on("update-available", (info) => {
-    console.log("[updater] nueva versión disponible:", info.version);
+    log("[updater] nueva versión disponible:", info.version);
   });
   autoUpdater.on("update-downloaded", (info) => {
-    console.log("[updater] versión descargada:", info.version, "— se instalará al cerrar");
+    log("[updater] versión descargada:", info.version, "— se instalará al cerrar");
   });
 
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch((err) => {
-      console.error("[updater] checkForUpdates falló:", err.message);
+      log("[updater] checkForUpdates falló:", err.message);
     });
   }, 3000);
 }
@@ -180,6 +202,7 @@ app.whenReady().then(async () => {
   closeSplash();
 
   if (!ready) {
+    log("[backend] no respondió a tiempo");
     dialog.showErrorBox(
       "Casa Verde — Error de inicio",
       "El servidor no pudo iniciar en 30 segundos.\n" +

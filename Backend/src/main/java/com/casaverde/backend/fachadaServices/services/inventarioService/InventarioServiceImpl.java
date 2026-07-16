@@ -153,6 +153,34 @@ public class InventarioServiceImpl implements IInventarioService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void revertirPorPedido(Pedido pedido) {
+        log.info("[revertir] pedidoId={} detalles={}", pedido.getId(), pedido.getDetalles().size());
+        Map<String, BigDecimal> consumos = calcularConsumos(pedido);
+        for (Map.Entry<String, BigDecimal> consumo : consumos.entrySet()) {
+            registrarEntradaReversion(consumo.getKey(), consumo.getValue(), pedido.getId());
+        }
+    }
+
+    private void registrarEntradaReversion(String insumo, BigDecimal cantidad, Long pedidoId) {
+        Inventario inv = inventarioRepo.findByInsumo(insumo)
+                .orElseThrow(() -> new ValidacionException(
+                        "No existe inventario configurado para el insumo: " + insumo));
+        BigDecimal nuevo = inv.getStockActual().add(cantidad);
+        inv.setStockActual(nuevo);
+        inventarioRepo.save(inv);
+        movimientoRepo.save(MovimientoInventario.builder()
+                .insumo(insumo)
+                .tipo(TipoMovimientoInventario.ENTRADA.valor())
+                .cantidad(cantidad)
+                .stockResultante(nuevo)
+                .referenciaTipo("pedido_anulado")
+                .referenciaId(pedidoId)
+                .observacion("Anulación de pedido fiado #" + pedidoId)
+                .build());
+    }
+
+    @Override
     public Map<String, BigDecimal> calcularConsumos(Pedido pedido) {
         Map<String, BigDecimal> consumos = new LinkedHashMap<>();
         for (PedidoDetalle detalle : pedido.getDetalles()) {

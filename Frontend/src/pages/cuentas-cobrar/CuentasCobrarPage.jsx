@@ -2,10 +2,17 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { cuentaCobrarService } from "../../services/cuentaCobrarService";
+import { pedidoService } from "../../services/pedidoService";
+import { productoService } from "../../services/productoService";
+import { salonService } from "../../services/salonService";
 import { formatCOP } from "../../utils/format";
+import { usePedidoMutations } from "../../hooks/usePedidoMutations";
 import ModalCuentaCobrar from "../../components/cuentas-cobrar/ModalCuentaCobrar";
 import ModalDetalleCuentaCobrar from "../../components/cuentas-cobrar/ModalDetalleCuentaCobrar";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import OrdenCard from "../../components/pedidos/OrdenCard";
+import ModalDetallePedido from "../../components/pedidos/ModalDetallePedido";
+import ModalCobrar from "../../components/pedidos/ModalCobrar";
 
 const ESTADO_BADGE = {
   PENDIENTE:       "badge-gray",
@@ -27,6 +34,8 @@ export default function CuentasCobrarPage() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState("");
+  const [pedidoActivo, setPedidoActivo] = useState(null);
+  const [pedidoCobrar, setPedidoCobrar] = useState(null);
 
   const params = {};
   if (filtroEstado) params.estado = filtroEstado;
@@ -36,6 +45,31 @@ export default function CuentasCobrarPage() {
     queryKey: ["cuentas-cobrar", params],
     queryFn: () => cuentaCobrarService.listar(params),
   });
+
+  // Pedidos fiados: mismo queryKey que la pestaña Historial de Pedidos
+  // (["pedidos", true]) — comparte caché, no dispara fetch extra si esa
+  // pestaña ya se visitó.
+  const { data: todosPedidos = [] } = useQuery({
+    queryKey: ["pedidos", true],
+    queryFn: () => pedidoService.listar(true),
+    refetchInterval: 15_000,
+  });
+  const pedidosFiados = todosPedidos.filter((p) => p.estado === "FIADO");
+
+  const { data: productos = [] } = useQuery({
+    queryKey: ["productos-activos"],
+    queryFn: () => productoService.listar(true),
+  });
+
+  const { data: salones = [] } = useQuery({
+    queryKey: ["salones"],
+    queryFn: salonService.listar,
+  });
+
+  const {
+    agregarMut, actualizarDetalleMut, quitarDetalleMut, actualizarMut,
+    pagoMut, actualizarPagoMut, quitarPagoMut, finalizarMut, anularMut, fiarMut,
+  } = usePedidoMutations();
 
   const mutRegistrar = useMutation({
     mutationFn: cuentaCobrarService.registrar,
@@ -78,7 +112,29 @@ export default function CuentasCobrarPage() {
           <div className="kpi-label">Cobrado (período)</div>
           <div className="kpi-value text-green-700">{formatCOP(cobradoMes)}</div>
         </div>
+        <div className="kpi-card">
+          <div className="kpi-label">Pedidos fiados</div>
+          <div className="kpi-value text-amber-700">{pedidosFiados.length}</div>
+        </div>
       </div>
+
+      {pedidosFiados.length > 0 && (
+        <div className="card mb-4">
+          <div className="card-header">
+            <h2 className="card-title">Pedidos fiados · {pedidosFiados.length}</h2>
+          </div>
+          <div className="card-body">
+            <div className="grid gap-[14px]" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+              {pedidosFiados.map((p, idx) => (
+                <OrdenCard key={p.id} pedido={p} idx={idx}
+                  onEditar={setPedidoActivo}
+                  onCobrar={setPedidoCobrar}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="toolbar mb-4">
         <div className="search-wrap">
@@ -168,11 +224,41 @@ export default function CuentasCobrarPage() {
 
       {anulando && (
         <ConfirmDialog
-          title="Anular cuenta"
-          message={`¿Anular la deuda de ${anulando.clienteNombre} por ${formatCOP(anulando.monto)}? Esta acción no se puede deshacer.`}
-          confirmLabel="Anular"
-          onConfirm={() => mutAnular.mutate(anulando.id)}
-          onCancel={() => setAnulando(null)}
+          emoji="🗑️"
+          titulo="Anular cuenta"
+          descripcion={`¿Anular la deuda de ${anulando.clienteNombre} por ${formatCOP(anulando.monto)}? Esta acción no se puede deshacer.`}
+          labelOk="Anular"
+          peligro
+          onOk={() => mutAnular.mutate(anulando.id)}
+          onCancelar={() => setAnulando(null)}
+        />
+      )}
+
+      {pedidoActivo && (
+        <ModalDetallePedido
+          pedido={pedidoActivo}
+          productos={productos}
+          salones={salones}
+          onClose={() => setPedidoActivo(null)}
+          onActualizar={(req) => actualizarMut.mutateAsync({ id: pedidoActivo.id, req }).then(setPedidoActivo)}
+          onAgregarDetalle={(req) => agregarMut.mutateAsync({ id: pedidoActivo.id, req }).then(setPedidoActivo)}
+          onActualizarDetalle={(detalleId, req) => actualizarDetalleMut.mutateAsync({ id: pedidoActivo.id, detalleId, req }).then(setPedidoActivo)}
+          onQuitarDetalle={(detalleId) => quitarDetalleMut.mutateAsync({ id: pedidoActivo.id, detalleId }).then(setPedidoActivo)}
+          onFinalizar={() => finalizarMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
+          onAnular={() => anularMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
+          onFiar={() => fiarMut.mutateAsync(pedidoActivo.id).then(() => setPedidoActivo(null))}
+          onActualizarPago={(pagoId, req) => actualizarPagoMut.mutateAsync({ id: pedidoActivo.id, pagoId, req }).then(setPedidoActivo)}
+          onQuitarPago={(pagoId) => quitarPagoMut.mutateAsync({ id: pedidoActivo.id, pagoId }).then(setPedidoActivo)}
+        />
+      )}
+
+      {pedidoCobrar && (
+        <ModalCobrar
+          pedido={pedidoCobrar}
+          onClose={() => setPedidoCobrar(null)}
+          onPago={(req) => pagoMut.mutateAsync({ id: pedidoCobrar.id, req }).then(setPedidoCobrar)}
+          onFinalizar={() => finalizarMut.mutateAsync(pedidoCobrar.id).then(() => setPedidoCobrar(null))}
+          onFiar={() => fiarMut.mutateAsync(pedidoCobrar.id).then(() => setPedidoCobrar(null))}
         />
       )}
     </div>

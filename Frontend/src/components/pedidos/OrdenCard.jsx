@@ -2,13 +2,17 @@ import { useState, useEffect, memo } from "react";
 import { CheckCircle, ChevronDown, CreditCard, Pencil } from "lucide-react";
 import { formatCOP, formatCreadoEn } from "../../utils/format";
 import { ESTADO_BADGE } from "../../utils/constants";
-import { calcularInsumos, formatInsumo, esActivo, formatReservaDisplay } from "../../utils/pedidoHelpers";
+import { calcularInsumos, formatInsumo, permiteCobro, formatReservaDisplay } from "../../utils/pedidoHelpers";
 
 function OrdenCard({ pedido, onEditar, onCobrar, expandidoInicial = false, idx = 0 }) {
   const [expandido, setExpandido] = useState(expandidoInicial);
   useEffect(() => { if (expandidoInicial) setExpandido(true); }, [expandidoInicial]);
   const saldo        = Math.max(0, pedido.saldoPendiente ?? 0);
-  const abierto      = esActivo(pedido.estado);
+  // permiteCobro() en vez de esActivo(): dentro de Pedidos nunca hay un
+  // FIADO en pantalla (queda excluido de listarActivos/Historial), pero
+  // este mismo componente se reusa en Cuentas por Cobrar para mostrarlos —
+  // ahí sí necesita los botones de Editar/Cobrar habilitados.
+  const abierto      = permiteCobro(pedido.estado);
   const insumos      = calcularInsumos(pedido.detalles);
   const gallina      = insumos["gallina"];
   const cuy          = insumos["cuy"];

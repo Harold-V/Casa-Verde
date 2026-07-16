@@ -16,8 +16,8 @@ public interface CierreCajaMapper {
 
     @AfterMapping
     default void calcularParaEntregar(CierreCaja c, @MappingTarget CierreCajaDTO dto) {
-        if (c.getBaseCop() != null && c.getContadoCop() != null) {
-            dto.setParaEntregar(c.getContadoCop().subtract(c.getBaseCop()));
+        if (c.getBaseEfectivo() != null && c.getContadoEfectivo() != null) {
+            dto.setParaEntregar(c.getContadoEfectivo().subtract(c.getBaseEfectivo()));
         }
     }
 }

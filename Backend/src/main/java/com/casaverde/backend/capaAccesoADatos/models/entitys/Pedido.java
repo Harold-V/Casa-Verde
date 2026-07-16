@@ -82,6 +82,9 @@ public class Pedido {
     @Column(name = "finalizado_en")
     private LocalDateTime finalizadoEn;
 
+    @Column(name = "fiado_en")
+    private LocalDateTime fiadoEn;
+
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)
     @Builder.Default

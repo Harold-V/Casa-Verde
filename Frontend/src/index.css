@@ -77,12 +77,14 @@
   .sidebar.colapsado            { width: 60px; min-width: 60px; }
   .sidebar.colapsado .nav-label,
   .sidebar.colapsado .sidebar-title,
-  .sidebar.colapsado .sidebar-sub { @apply hidden; }
+  .sidebar.colapsado .sidebar-sub,
+  .sidebar.colapsado .sidebar-footer { @apply hidden; }
 
   .sidebar-header { @apply px-4 pt-[18px] pb-3 border-b border-white/10; }
   .sidebar-title  { @apply text-white font-bold text-[15px] leading-tight; }
   .sidebar-sub    { @apply text-white/50 text-[11px]; }
   .sidebar-nav    { @apply flex-1 py-2; }
+  .sidebar-footer { @apply px-4 py-3 border-t border-white/10 text-white/40 text-[11px] whitespace-nowrap; }
 
   .nav-item {
     @apply flex items-center gap-2.5 px-4 py-[10px] text-white/75 no-underline

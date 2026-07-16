@@ -82,14 +82,17 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                     .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado o inactivo"));
         }
 
-        BigDecimal esperadoCop = saldoFondo(MonedaConstants.COP);
+        // El arqueo físico (billetes) valida EFECTIVO, no COP — COP ya no se
+        // cuenta a mano en el cierre: solo crece por consignaciones desde
+        // Efectivo y se confía en el saldo que lleva el sistema.
+        BigDecimal esperadoEfectivo = saldoFondo(MonedaConstants.EFECTIVO);
         BigDecimal esperadoUsd = saldoFondo(MonedaConstants.USD);
         BigDecimal esperadoNequi = saldoTotalNequi();
 
         if (tieneDenominaciones(request)) {
-            request.setContadoCop(calcularContadoCopDesdeDenominaciones(request));
+            request.setContadoEfectivo(calcularContadoEfectivoDesdeDenominaciones(request));
         }
-        BigDecimal contadoCop = normalizarOCero(MonedaConstants.COP, request.getContadoCop(), esperadoCop);
+        BigDecimal contadoEfectivo = normalizarOCero(MonedaConstants.EFECTIVO, request.getContadoEfectivo(), esperadoEfectivo);
         BigDecimal contadoUsd = normalizarOCero(MonedaConstants.USD, request.getContadoUsd(), esperadoUsd);
         BigDecimal contadoNequi = normalizarOCero(MonedaConstants.NEQUI, request.getContadoNequi(), esperadoNequi);
 
@@ -100,13 +103,13 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                 .fecha(fecha)
                 .usuarioId(usuario != null ? usuario.getId() : null)
                 .usuarioNombre(usuario != null ? usuario.getNombre() : null)
-                .esperadoCop(esperadoCop)
+                .esperadoEfectivo(esperadoEfectivo)
                 .esperadoUsd(esperadoUsd)
                 .esperadoNequi(esperadoNequi)
-                .contadoCop(contadoCop)
+                .contadoEfectivo(contadoEfectivo)
                 .contadoUsd(contadoUsd)
                 .contadoNequi(contadoNequi)
-                .diferenciaCop(contadoCop.subtract(esperadoCop))
+                .diferenciaEfectivo(contadoEfectivo.subtract(esperadoEfectivo))
                 .diferenciaUsd(contadoUsd.subtract(esperadoUsd))
                 .diferenciaNequi(contadoNequi.subtract(esperadoNequi))
                 .cobradoTotalCop(resumen.getCobradoTotalCop())
@@ -114,14 +117,14 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
                 .balanceNeto(resumen.getBalanceNeto())
                 .observacion(request.getObservacion())
                 .backupPath(backup.getPath())
-                .baseCop(request.getBaseCop())
+                .baseEfectivo(request.getBaseEfectivo())
                 .billetes100k(request.getBilletes100k())
                 .billetes50k(request.getBilletes50k())
                 .billetes20k(request.getBilletes20k())
                 .billetes10k(request.getBilletes10k())
                 .billetes5k(request.getBilletes5k())
                 .billetes2k(request.getBilletes2k())
-                .monedasCop(request.getMonedasCop())
+                .monedasEfectivo(request.getMonedasEfectivo())
                 .build();
 
         CierreCaja guardado = cierreRepo.save(cierre);
@@ -154,25 +157,25 @@ public class CierreCajaServiceImpl implements ICierreCajaService {
     }
 
     private boolean tieneDenominaciones(CierreCajaRequest req) {
-        return req.getBaseCop() != null
+        return req.getBaseEfectivo() != null
             || req.getBilletes100k() != null
             || req.getBilletes50k() != null
             || req.getBilletes20k() != null
             || req.getBilletes10k() != null
             || req.getBilletes5k() != null
             || req.getBilletes2k() != null
-            || req.getMonedasCop() != null;
+            || req.getMonedasEfectivo() != null;
     }
 
-    private BigDecimal calcularContadoCopDesdeDenominaciones(CierreCajaRequest req) {
-        return safe(req.getBaseCop())
+    private BigDecimal calcularContadoEfectivoDesdeDenominaciones(CierreCajaRequest req) {
+        return safe(req.getBaseEfectivo())
             .add(denom(req.getBilletes100k(), 100_000L))
             .add(denom(req.getBilletes50k(),   50_000L))
             .add(denom(req.getBilletes20k(),   20_000L))
             .add(denom(req.getBilletes10k(),   10_000L))
             .add(denom(req.getBilletes5k(),     5_000L))
             .add(denom(req.getBilletes2k(),     2_000L))
-            .add(safe(req.getMonedasCop()));
+            .add(safe(req.getMonedasEfectivo()));
     }
 
     private BigDecimal normalizarOCero(String moneda, BigDecimal valor, BigDecimal fallback) {

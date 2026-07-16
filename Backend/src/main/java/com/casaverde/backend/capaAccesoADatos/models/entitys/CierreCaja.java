@@ -31,8 +31,8 @@ public class CierreCaja {
     @Column(name = "usuario_nombre", length = 150)
     private String usuarioNombre;
 
-    @Column(name = "esperado_cop", nullable = false, precision = 19, scale = 0)
-    private BigDecimal esperadoCop;
+    @Column(name = "esperado_efectivo", nullable = false, precision = 19, scale = 0)
+    private BigDecimal esperadoEfectivo;
 
     @Column(name = "esperado_usd", nullable = false, precision = 19, scale = 2)
     private BigDecimal esperadoUsd;
@@ -40,8 +40,8 @@ public class CierreCaja {
     @Column(name = "esperado_nequi", nullable = false, precision = 19, scale = 0)
     private BigDecimal esperadoNequi;
 
-    @Column(name = "contado_cop", nullable = false, precision = 19, scale = 0)
-    private BigDecimal contadoCop;
+    @Column(name = "contado_efectivo", nullable = false, precision = 19, scale = 0)
+    private BigDecimal contadoEfectivo;
 
     @Column(name = "contado_usd", nullable = false, precision = 19, scale = 2)
     private BigDecimal contadoUsd;
@@ -49,8 +49,8 @@ public class CierreCaja {
     @Column(name = "contado_nequi", nullable = false, precision = 19, scale = 0)
     private BigDecimal contadoNequi;
 
-    @Column(name = "diferencia_cop", nullable = false, precision = 19, scale = 0)
-    private BigDecimal diferenciaCop;
+    @Column(name = "diferencia_efectivo", nullable = false, precision = 19, scale = 0)
+    private BigDecimal diferenciaEfectivo;
 
     @Column(name = "diferencia_usd", nullable = false, precision = 19, scale = 2)
     private BigDecimal diferenciaUsd;
@@ -76,9 +76,9 @@ public class CierreCaja {
     @Column(name = "cerrado_en", nullable = false)
     private LocalDateTime cerradoEn;
 
-    // ── Denominaciones arqueo COP ──────────────────────────────────────────
-    @Column(name = "base_cop", precision = 19, scale = 0)
-    private BigDecimal baseCop;
+    // ── Denominaciones arqueo Efectivo ───────────────────────────────────────
+    @Column(name = "base_efectivo", precision = 19, scale = 0)
+    private BigDecimal baseEfectivo;
 
     @Column(name = "billetes_100k")
     private Integer billetes100k;
@@ -98,8 +98,8 @@ public class CierreCaja {
     @Column(name = "billetes_2k")
     private Integer billetes2k;
 
-    @Column(name = "monedas_cop", precision = 19, scale = 0)
-    private BigDecimal monedasCop;
+    @Column(name = "monedas_efectivo", precision = 19, scale = 0)
+    private BigDecimal monedasEfectivo;
 
     @PrePersist
     void onCreate() {
