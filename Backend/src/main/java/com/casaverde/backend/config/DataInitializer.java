@@ -32,8 +32,6 @@ import com.casaverde.backend.capaAccesoADatos.repositories.ProductoComposicionRe
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoDetalleRepository;
-import com.casaverde.backend.capaAccesoADatos.models.entitys.Salon;
-import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
 import com.casaverde.backend.capaAccesoADatos.models.enums.TipoAdelanto;
 import com.casaverde.backend.capaAccesoADatos.repositories.AdelantoRepository;
 import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioService;
@@ -49,7 +47,6 @@ public class DataInitializer implements CommandLineRunner {
     private final CategoriaProductoRepository categoriaRepo;
     private final ProductoRepository productoRepo;
     private final ProductoComposicionRepository composicionRepo;
-    private final SalonRepository salonRepo;
     private final TasaCambioRepository tasaRepo;
     private final ConfiguracionGeneralRepository configRepo;
     private final InventarioRepository inventarioRepo;
@@ -66,7 +63,6 @@ public class DataInitializer implements CommandLineRunner {
         // diseño
         initCategorias();
         initProductos();
-        initSalones();
         initTasaCambio();
         initConfiguracion();
         initInventario();
@@ -155,16 +151,6 @@ public class DataInitializer implements CommandLineRunner {
         addComp(alm1, "cuy", new BigDecimal("0.5000"));
         addComp(alm2, "gallina", new BigDecimal("0.1250"));
         addComp(alm2, "cuy", new BigDecimal("0.2500"));
-    }
-
-    private void initSalones() {
-        if (salonRepo.count() > 0)
-            return;
-        List<Salon> salones = new ArrayList<>();
-        salones.add(Salon.builder().nombre("Salón principal").aforo(30).activo(true).build());
-        salones.add(Salon.builder().nombre("Terraza").aforo(20).activo(true).build());
-        salones.add(Salon.builder().nombre("Para llevar").activo(true).build());
-        salonRepo.saveAll(salones);
     }
 
     private void initTasaCambio() {

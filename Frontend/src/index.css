@@ -85,6 +85,7 @@
   .sidebar-sub    { @apply text-white/50 text-[11px]; }
   .sidebar-nav    { @apply flex-1 py-2; }
   .sidebar-footer { @apply px-4 py-3 border-t border-white/10 text-white/40 text-[11px] whitespace-nowrap; }
+  .sidebar-footer-version { @apply text-white/25 text-[10px] mt-0.5; }
 
   .nav-item {
     @apply flex items-center gap-2.5 px-4 py-[10px] text-white/75 no-underline

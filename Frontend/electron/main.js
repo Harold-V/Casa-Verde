@@ -169,14 +169,25 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  const sendStatus = (payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("update-status", payload);
+    }
+  };
+
   autoUpdater.on("error", (err) => {
     log("[updater] error:", err.message);
   });
   autoUpdater.on("update-available", (info) => {
     log("[updater] nueva versión disponible:", info.version);
+    sendStatus({ estado: "descargando", version: info.version, porcentaje: 0 });
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    sendStatus({ estado: "descargando", porcentaje: Math.round(progress.percent) });
   });
   autoUpdater.on("update-downloaded", (info) => {
     log("[updater] versión descargada:", info.version, "— se instalará al cerrar");
+    sendStatus({ estado: "lista", version: info.version });
   });
 
   setTimeout(() => {

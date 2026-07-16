@@ -92,16 +92,10 @@ public class UsuarioServiceImpl implements IUsuarioService {
                 .passwordHash(hashPassword(defaultAdminPassword))
                 .activo(true)
                 .build();
-        Usuario operador = Usuario.builder()
-                .nombre("Operador")
-                .rol(RolUsuario.OPERADOR.name())
-                .requierePassword(false)
-                .activo(true)
-                .build();
 
-        usuarioRepo.saveAll(List.of(admin, operador));
+        usuarioRepo.save(admin);
         auditoriaService.registrar("usuario", null, "INICIALIZAR",
-                "Usuarios locales iniciales creados: Administrador y Operador");
+                "Usuario local inicial creado: Administrador");
     }
 
     @Transactional

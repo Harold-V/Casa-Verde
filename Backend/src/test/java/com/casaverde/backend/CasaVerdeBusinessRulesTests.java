@@ -1,6 +1,7 @@
 package com.casaverde.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,11 +40,14 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.AjusteCapitalRequest;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaDTO;
 import com.casaverde.backend.fachadaServices.dto.CierreCajaRequest;
+import com.casaverde.backend.fachadaServices.dto.ComposicionDTO;
+import com.casaverde.backend.fachadaServices.dto.CrearOperadorRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
 import com.casaverde.backend.fachadaServices.dto.GastoRequest;
 import com.casaverde.backend.fachadaServices.dto.LoginRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.ProductoRequest;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.dto.UsuarioDTO;
 import com.casaverde.backend.fachadaServices.services.cajaService.IFondoService;
@@ -322,8 +326,7 @@ class CasaVerdeBusinessRulesTests {
         void loginLocalSoloExigeClaveAlAdmin() {
                 List<UsuarioDTO> usuarios = usuarioService.listarActivos();
                 UsuarioDTO admin = usuarios.stream().filter(u -> "ADMIN".equals(u.getRol())).findFirst().orElseThrow();
-                UsuarioDTO operador = usuarios.stream().filter(u -> "OPERADOR".equals(u.getRol())).findFirst()
-                                .orElseThrow();
+                UsuarioDTO operador = usuarioService.crearOperador(new CrearOperadorRequest("Operador Test"));
 
                 assertThat(usuarioService.login(new LoginRequest(operador.getId(), null)).getNombre())
                                 .isEqualTo(operador.getNombre());
@@ -376,6 +379,39 @@ class CasaVerdeBusinessRulesTests {
                                         assertThat(h.getPrecioNuevo()).isEqualByComparingTo(BigDecimal.valueOf(3500));
                                         assertThat(h.getMotivo()).isEqualTo("ACTUALIZAR_PRECIO");
                                 });
+        }
+
+        @Test
+        void actualizarProductoConComposicionExistenteNoRompeUniqueConstraint() {
+                Producto cuy = productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                                .filter(p -> "Cuy".equals(p.getNombre()))
+                                .findFirst()
+                                .orElseThrow();
+                assertThat(cuy.getComposicion()).hasSize(1);
+
+                ProductoRequest req = ProductoRequest.builder()
+                                .nombre("Cuy")
+                                .precio(BigDecimal.valueOf(28000))
+                                .categoriaId(cuy.getCategoria().getId())
+                                .afectaInventario(true)
+                                // mismo insumo que ya existe en la composición — reproduce el bug de
+                                // clear()+re-add violando UNIQUE(producto_id, insumo)
+                                .composicion(List.of(ComposicionDTO.builder().insumo("cuy")
+                                                .cantidad(BigDecimal.ONE).build()))
+                                .build();
+
+                // flush explícito: el INSERT/DELETE de composicion solo se ejecuta contra la
+                // BD al hacer flush — findById() sirve desde la sesión (1st-level cache) y
+                // NO lo dispara, así que sin este flush el test pasa aunque el bug siga ahí.
+                assertThatCode(() -> {
+                        productoService.actualizar(cuy.getId(), req);
+                        productoRepository.flush();
+                }).doesNotThrowAnyException();
+
+                Producto actualizado = productoRepository.findById(cuy.getId()).orElseThrow();
+                assertThat(actualizado.getPrecio()).isEqualByComparingTo(BigDecimal.valueOf(28000));
+                assertThat(actualizado.getComposicion()).hasSize(1);
+                assertThat(actualizado.getComposicion().get(0).getInsumo()).isEqualTo("cuy");
         }
 
         // Estos tres casos ejercitan @Valid/Bean Validation sobre CompraRequest y
