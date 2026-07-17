@@ -84,6 +84,15 @@ export function usePedidoMutations() {
     onSuccess: invalidarFinalizar,
   });
 
+  /**
+   * Carga histórica: crea, cobra y finaliza un pedido retroactivo en una sola
+   * llamada — mismos efectos que finalizar (fondos + inventario reales).
+   */
+  const crearHistoricoMut = useMutation({
+    mutationFn: pedidoService.crearHistorico,
+    onSuccess: invalidarFinalizar,
+  });
+
   /** Anular pedido */
   const anularMut = useMutation({
     mutationFn: (id) => pedidoService.anular(id),
@@ -119,5 +128,6 @@ export function usePedidoMutations() {
     finalizarMut,
     anularMut,
     fiarMut,
+    crearHistoricoMut,
   };
 }

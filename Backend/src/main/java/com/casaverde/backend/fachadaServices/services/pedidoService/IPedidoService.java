@@ -11,6 +11,7 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.PedidoHistoricoRequest;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 
 public interface IPedidoService {
@@ -26,6 +27,15 @@ public interface IPedidoService {
     String comprobanteTexto(Long id);
 
     PedidoDTO crear(CrearPedidoRequest req);
+
+    /**
+     * Carga retroactiva de un pedido ya ocurrido: crea, cobra y finaliza en una
+     * sola operación, con creadoEn/finalizadoEn y los movimientos de caja e
+     * inventario resultantes fechados en req.getFecha() en vez de "ahora".
+     * Solo para uso administrativo (empalme de registros previos al uso del
+     * sistema) — la UI la restringe a rol ADMIN.
+     */
+    PedidoDTO crearHistorico(PedidoHistoricoRequest req);
 
     PedidoDTO actualizarPedido(Long pedidoId, ActualizarPedidoRequest req);
 

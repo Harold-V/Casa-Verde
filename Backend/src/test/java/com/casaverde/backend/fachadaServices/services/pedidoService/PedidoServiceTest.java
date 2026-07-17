@@ -4,6 +4,8 @@ import com.casaverde.backend.capaAccesoADatos.models.entitys.Pago;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
+import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
@@ -38,6 +40,8 @@ class PedidoServiceTest {
     @Mock private PedidoRepository pedidoRepo;
     @Mock private ProductoRepository productoRepo;
     @Mock private SalonRepository salonRepo;
+    @Mock private CajaMovimientoRepository cajaMovimientoRepo;
+    @Mock private MovimientoInventarioRepository movimientoInventarioRepo;
     @Mock private IComprobanteService comprobanteService;
     @Mock private ITasaCambioService tasaCambioService;
     @Mock private IFondoService fondoService;
@@ -60,6 +64,8 @@ class PedidoServiceTest {
                 pedidoRepo,
                 productoRepo,
                 salonRepo,
+                cajaMovimientoRepo,
+                movimientoInventarioRepo,
                 comprobanteService,
                 tasaCambioService,
                 fondoService,

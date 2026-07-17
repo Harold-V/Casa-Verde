@@ -26,4 +26,6 @@ public interface MovimientoInventarioRepository extends JpaRepository<Movimiento
 
         List<MovimientoInventario> findByTipoAndReferenciaTipoAndRegistradoEnBetween(
                         String tipo, String referenciaTipo, LocalDateTime inicio, LocalDateTime fin);
+
+        List<MovimientoInventario> findByReferenciaTipoAndReferenciaId(String referenciaTipo, Long referenciaId);
 }
