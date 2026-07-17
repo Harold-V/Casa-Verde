@@ -769,6 +769,46 @@ class CasaVerdeBusinessRulesTests {
                 assertThat(resumen.getPedidosAnulados()).isEqualTo(1);
         }
 
+        // ── Carga histórica: crear+cobrar+finalizar retroactivo ────────────────────
+
+        @Test
+        void crearHistoricoFechaElPedidoEnElDiaIndicadoNoEnHoy() {
+                asegurarStockAlto();
+                LocalDate fechaHistorica = hoyBogota().minusDays(3);
+
+                var req = new com.casaverde.backend.fachadaServices.dto.PedidoHistoricoRequest();
+                req.setNombre("Cliente histórico");
+                req.setFecha(fechaHistorica);
+                req.setDetalles(List.of(detalleProducto("Cuy", 1)));
+                req.setPagos(List.of(new RegistrarPagoRequest("COP", BigDecimal.valueOf(10000))));
+
+                PedidoDTO creado = pedidoService.crearHistorico(req);
+
+                assertThat(creado.getEstado()).isEqualTo("FINALIZADO");
+                Pedido entidad = pedidoRepository.findById(creado.getId()).orElseThrow();
+                assertThat(entidad.getCreadoEn().toLocalDate()).isEqualTo(fechaHistorica);
+                assertThat(entidad.getFinalizadoEn().toLocalDate()).isEqualTo(fechaHistorica);
+
+                // El pago en COP acredita el fondo EFECTIVO (caja física), no el fondo COP —
+                // ver PedidoFinalizacionServiceImpl.registrarCobroFinal.
+                assertThat(fondoRepository.findById("EFECTIVO").orElseThrow().getSaldo())
+                                .isEqualByComparingTo(BigDecimal.valueOf(10000));
+                var movimiento = cajaMovimientoRepository
+                                .findByReferenciaTipoAndReferenciaId("pedido", creado.getId()).get(0);
+                assertThat(movimiento.getRegistradoEn().toLocalDate()).isEqualTo(fechaHistorica);
+
+                var movInventario = movimientoInventarioRepository
+                                .findByReferenciaTipoAndReferenciaId("pedido", creado.getId()).get(0);
+                assertThat(movInventario.getRegistradoEn().toLocalDate()).isEqualTo(fechaHistorica);
+
+                // El punto entero de la carga histórica: debe aparecer en el resumen del
+                // día real, no en el de hoy.
+                assertThat(resumenService.obtener(fechaHistorica).getCuyesVendidos())
+                                .isEqualByComparingTo(BigDecimal.ONE);
+                assertThat(resumenService.obtener(hoyBogota()).getCuyesVendidos())
+                                .isEqualByComparingTo(BigDecimal.ZERO);
+        }
+
         // Criterio final: una reserva (fechaReserva != null) solo pertenece al
         // resumen/cierre de "fecha" cuando fechaReserva es EXACTAMENTE esa fecha —
         // ni antes (vencida de otro día) ni después (futura). Un pedido sin reserva
