@@ -39,6 +39,7 @@ La prioridad no es una demo visual; la prioridad es un sistema operable de verda
 | HTTP | Axios — base URL `/api/v1` (relativa; nginx la proxea al backend) |
 | Formularios | react-hook-form + zod |
 | Iconos | lucide-react |
+| Drag & drop | @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities (reordenar productos en Configuración) |
 | Fechas | date-fns |
 | Tests | Vitest + Testing Library (jsdom) |
 | Desktop | Electron ^42.x + electron-builder 26.0.12 — carpeta `electron/` existe, no integrada con el build Docker aún |
@@ -136,6 +137,7 @@ Casa-Verde/
 | PUT | `/{id}` | Actualizar producto |
 | PUT | `/{id}/precio` | Actualizar precio (registra historial automático) |
 | PUT | `/{id}/toggle` | Activar / desactivar |
+| PUT | `/reordenar` | Reordena el catálogo — body: array de ids en el nuevo orden (drag & drop en Configuración > Productos, se refleja también en el catálogo de Pedidos) |
 | DELETE | `/{id}` | Soft-delete (marca `eliminado=true`; no aparece en listados) |
 
 ### Categorías — `/api/v1/categorias`
@@ -317,6 +319,7 @@ Casa-Verde/
 ### Producto
 - `afectaInventario` (boolean): si true, al finalizar el pedido se descuenta inventario
 - `eliminado` (Boolean, default false): soft-delete — los listados filtran `eliminado=false`
+- `orden` (Integer, default 0): posición manual en el catálogo (drag & drop en Configuración > Productos); los listados usan `OrderByOrdenAsc`, no alfabético
 - `composicion`: lista de `ProductoComposicionInventario` (insumo + cantidad)
 - `@Version` para bloqueo optimista
 
@@ -540,17 +543,20 @@ src/
 │   │                                  ModalCategoria
 │   ├── fondos/                     ← ModalAjuste, ModalEntrada, ModalTransferencia
 │   ├── gastos/                     ← ModalGasto
-│   ├── inventario/                 ← ModalMovimiento, ModalCompraInsumo
+│   ├── inventario/                 ← ModalMovimiento, ModalRegistrarCompra, ModalDetalleCompra,
+│   │                                  ModalProveedor, ModalAdelantoProveedor
 │   └── resumen/                    ← CierreCajaPanel
 ├── pages/
 │   ├── dashboard/Dashboard.jsx     ← ✅ Implementado
 │   ├── pedidos/PedidosPage.jsx     ← ✅ Implementado (prioritario)
 │   ├── fondos/FondosPage.jsx       ← ✅ Implementado (fondos + salidas de caja/gastos)
-│   ├── inventario/InventarioPage.jsx ← ✅ Implementado
+│   ├── inventario/
+│   │   ├── InventarioPage.jsx      ← ✅ Tabs: Stock, Compras, Proveedores
+│   │   └── tabs/*.jsx              ← ✅ ComprasTab, ProveedoresTab
 │   ├── resumen/ResumenPage.jsx     ← ✅ Implementado (incluye CierreCajaPanel)
 │   ├── configuracion/
-│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Salones, Tasa USD, Fondos, Usuarios, Inventario, Categorías, Auditoría, Backups
-│   │   └── tabs/*.jsx              ← ✅ 9 tabs: ProductosTab, SalonesTab, TasaTab, FondosTab, UsuariosTab, InventarioTab, CategoriasTab, AuditoriaTab, BackupsTab
+│   │   ├── ConfiguracionPage.jsx   ← ✅ Tabs: Productos, Salones, Tasa USD, Fondos, Usuarios, Inventario, Categorías, Auditoría, Backups, Reportes
+│   │   └── tabs/*.jsx              ← ✅ 10 tabs: ProductosTab, SalonesTab, TasaTab, FondosTab, UsuariosTab, InventarioTab (ajuste de stock), CategoriasTab, AuditoriaTab, BackupsTab, ReportesTab
 │   └── Placeholder.jsx             ← Componente vacío para módulos pendientes
 ├── services/                       ← 15 archivos (14 servicios de dominio + api.js instancia Axios)
 │   │  api.js (instancia Axios base), pedidoService, productoService (incluye categoriaService),
@@ -575,6 +581,8 @@ src/
 ```
 
 > **Nota de diseño:** Los gastos (salidas de caja) no tienen página propia — se registran desde `/fondos`. Es una decisión intencional, no deuda técnica.
+
+> **Nota de diseño:** Compras y Proveedores viven en `/inventario`, no en Configuración. Antes había dos caminos separados para sumar stock: el botón "+Registrar entrada" (creaba un `Gasto` genérico, sin proveedor ni trazabilidad de deuda) y la tab Compras de Configuración (creaba una `Compra` formal a proveedor, con abonos). Se unificaron: `ModalCompraInsumo` se eliminó; "+Registrar compra" en Inventario ahora usa el mismo flujo real de Compra a proveedor (con abono inicial opcional y creación rápida de proveedor inline si no hay ninguno).
 
 ### Prioridad de trabajo actual
 **El módulo de Pedidos es el más crítico.** Trabajar primero cualquier mejora, corrección o feature relacionada con pedidos antes de otros módulos.
@@ -707,9 +715,9 @@ Admin panel de escritorio, no landing page.
 | Dashboard | `/` | ✅ Implementado |
 | Pedidos | `/pedidos` | ✅ Implementado — **prioridad #1** |
 | Resumen del día | `/resumen` | ✅ Implementado (incluye Cierre de Caja) |
-| Inventario | `/inventario` | ✅ Implementado |
+| Inventario (Stock, Compras, Proveedores) | `/inventario` | ✅ Implementado (3 tabs — Compras/Proveedores viven aquí, no en Configuración) |
 | Capital, fondos y salidas | `/fondos` | ✅ Implementado (los gastos son "salidas de caja" registradas desde aquí) |
-| Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Inventario, Auditoría, Backups, Reportes, Proveedores, Compras) | `/configuracion` | ✅ Implementado (12 tabs) |
+| Configuración (Productos, Categorías, Salones, Tasa USD, Fondos NEQUI, Usuarios, Ajuste de stock, Auditoría, Backups, Reportes) | `/configuracion` | ✅ Implementado (10 tabs) |
 | Exportaciones CSV | ResumenPage | ✅ Implementado — botones "Resumen CSV" y "Caja CSV" en ResumenPage |
 | Empleados | `/empleados` | ✅ Implementado |
 | Cuentas por Cobrar | `/cuentas-cobrar` | ✅ Implementado |

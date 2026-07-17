@@ -8,9 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Producto;
 
 public interface ProductoRepository extends JpaRepository<Producto, Long> {
-    List<Producto> findByEliminadoFalseOrderByNombreAsc();
+    List<Producto> findByEliminadoFalseOrderByOrdenAsc();
 
-    List<Producto> findByActivoTrueAndEliminadoFalseOrderByNombreAsc();
+    List<Producto> findByActivoTrueAndEliminadoFalseOrderByOrdenAsc();
 
     Optional<Producto> findByIdAndEliminadoFalse(Long id);
 
