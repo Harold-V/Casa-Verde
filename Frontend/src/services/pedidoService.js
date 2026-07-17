@@ -5,6 +5,7 @@ export const pedidoService = {
     api.get("/pedidos", { params: { todos } }).then((r) => r.data),
   obtener: (id) => api.get(`/pedidos/${id}`).then((r) => r.data),
   crear: (data) => api.post("/pedidos", data).then((r) => r.data),
+  crearHistorico: (data) => api.post("/pedidos/historico", data).then((r) => r.data),
   actualizar: (id, req) => api.patch(`/pedidos/${id}`, req).then((r) => r.data),
   agregarDetalle: (id, req) =>
     api.post(`/pedidos/${id}/detalles`, req).then((r) => r.data),

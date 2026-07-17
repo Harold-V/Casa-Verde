@@ -26,6 +26,8 @@ public interface CajaMovimientoRepository extends JpaRepository<CajaMovimiento, 
 
        boolean existsByReferenciaTipoAndReferenciaIdAndTipo(String referenciaTipo, Long referenciaId, String tipo);
 
+       List<CajaMovimiento> findByReferenciaTipoAndReferenciaId(String referenciaTipo, Long referenciaId);
+
        /**
         * Historial paginado con filtros opcionales — todos los parámetros son nullable.
         * Cuando un parámetro es null, ese filtro no se aplica.

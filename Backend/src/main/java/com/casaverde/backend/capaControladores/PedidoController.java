@@ -8,6 +8,7 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.PedidoHistoricoRequest;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.services.pedidoService.IPedidoService;
 
@@ -71,6 +72,16 @@ public class PedidoController {
     })
     public ResponseEntity<PedidoDTO> crear(@Valid @RequestBody CrearPedidoRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.crear(req));
+    }
+
+    @PostMapping("/historico")
+    @Operation(summary = "Cargar pedido histórico", description = "Crea, cobra y finaliza un pedido ya ocurrido en una sola operación, fechado retroactivamente — afecta fondos e inventario de verdad. Uso administrativo (empalme de registros previos al uso del sistema).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Pedido histórico registrado"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos")
+    })
+    public ResponseEntity<PedidoDTO> crearHistorico(@Valid @RequestBody PedidoHistoricoRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.crearHistorico(req));
     }
 
     @PatchMapping("/{id}")

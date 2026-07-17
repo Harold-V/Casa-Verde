@@ -2,6 +2,7 @@ package com.casaverde.backend.fachadaServices.services.pedidoService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -30,10 +31,14 @@ import com.casaverde.backend.capaAccesoADatos.repositories.ProductoRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.SalonRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import com.casaverde.backend.capaAccesoADatos.models.entitys.CajaMovimiento;
+import com.casaverde.backend.capaAccesoADatos.models.entitys.MovimientoInventario;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pago;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.Pedido;
 import com.casaverde.backend.capaAccesoADatos.models.entitys.PedidoDetalle;
 import com.casaverde.backend.capaAccesoADatos.models.enums.EstadoPedido;
+import com.casaverde.backend.capaAccesoADatos.repositories.CajaMovimientoRepository;
+import com.casaverde.backend.capaAccesoADatos.repositories.MovimientoInventarioRepository;
 import com.casaverde.backend.capaAccesoADatos.repositories.PedidoRepository;
 import com.casaverde.backend.fachadaServices.dto.ActualizarDetalleRequest;
 import com.casaverde.backend.fachadaServices.dto.ActualizarPagoRequest;
@@ -41,6 +46,7 @@ import com.casaverde.backend.fachadaServices.dto.ActualizarPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.CrearPedidoRequest;
 import com.casaverde.backend.fachadaServices.dto.DetalleItemRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoDTO;
+import com.casaverde.backend.fachadaServices.dto.PedidoHistoricoRequest;
 import com.casaverde.backend.fachadaServices.dto.PedidoTotales;
 import com.casaverde.backend.fachadaServices.dto.RegistrarPagoRequest;
 import com.casaverde.backend.fachadaServices.mapper.PedidoMapper;
@@ -55,6 +61,8 @@ public class PedidoServiceImpl implements IPedidoService {
     private final PedidoRepository pedidoRepo;
     private final ProductoRepository productoRepo;
     private final SalonRepository salonRepo;
+    private final CajaMovimientoRepository cajaMovimientoRepo;
+    private final MovimientoInventarioRepository movimientoInventarioRepo;
     private final IComprobanteService comprobanteService;
     private final ITasaCambioService tasaCambioService;
     private final IFondoService fondoService;
@@ -394,6 +402,58 @@ public class PedidoServiceImpl implements IPedidoService {
         auditoriaService.registrar("pedido", guardado.getId(), veniaDeFiado ? "SALDAR_FIADO" : "FINALIZAR",
                 (veniaDeFiado ? "Cuenta fiada saldada con total COP " : "Pedido finalizado con total COP ") + total);
         return pedidoMapper.toDTO(guardado, calcularTotales(guardado));
+    }
+
+    /**
+     * Carga retroactiva: crea, cobra y finaliza un pedido en una sola operación
+     * (afecta fondos e inventario de verdad, igual que un pedido normal), y al
+     * final retrasa creadoEn/finalizadoEn del pedido y registradoEn de los
+     * movimientos de caja/inventario/pagos generados a la fecha real indicada.
+     * Sin esto, Resumen/Historial/Libro de caja ubicarían todo en "hoy" — ver
+     * ResumenServiceImpl (usa finalizadoEn/fiadoEn, no fechaReserva) y
+     * CajaMovimiento/MovimientoInventario/Pago (registradoEn vía @PrePersist,
+     * sin forma de pasarlo por la API normal).
+     * No toca la validación de "fecha de reserva ya pasó": esta carga nunca
+     * setea fechaReserva/horaReserva, así que esa validación ni se ejecuta.
+     */
+    @Transactional
+    public PedidoDTO crearHistorico(PedidoHistoricoRequest req) {
+        log.info("[crearHistorico] nombre='{}' fecha={} detalles={}",
+                req.getNombre(), req.getFecha(), req.getDetalles().size());
+
+        CrearPedidoRequest crearReq = new CrearPedidoRequest();
+        crearReq.setNombre(req.getNombre());
+        crearReq.setDetalles(req.getDetalles());
+        crearReq.setDescuentoCop(req.getDescuentoCop());
+        String nota = "Carga histórica (" + req.getFecha() + ")";
+        crearReq.setObservacion(req.getObservacion() != null && !req.getObservacion().isBlank()
+                ? req.getObservacion() + " — " + nota
+                : nota);
+        Long pedidoId = crear(crearReq).getId();
+
+        for (RegistrarPagoRequest pagoReq : req.getPagos()) {
+            registrarPago(pedidoId, pagoReq);
+        }
+        finalizarPedido(pedidoId);
+
+        LocalDateTime fechaHistorica = req.getFecha().atTime(12, 0);
+        Pedido pedido = findOrThrow(pedidoId);
+        pedido.setCreadoEn(fechaHistorica);
+        pedido.setFinalizadoEn(fechaHistorica);
+        for (Pago p : pedido.getPagos())
+            p.setRegistradoEn(fechaHistorica);
+        pedidoRepo.save(pedido);
+
+        cajaMovimientoRepo.findByReferenciaTipoAndReferenciaId("pedido", pedidoId)
+                .forEach(m -> { m.setRegistradoEn(fechaHistorica); cajaMovimientoRepo.save(m); });
+        movimientoInventarioRepo.findByReferenciaTipoAndReferenciaId("pedido", pedidoId)
+                .forEach(m -> { m.setRegistradoEn(fechaHistorica); movimientoInventarioRepo.save(m); });
+
+        auditoriaService.registrar("pedido", pedidoId, "CARGA_HISTORICA",
+                "Pedido histórico cargado con fecha " + req.getFecha()
+                        + " — fondos e inventario afectados retroactivamente");
+        log.info("[crearHistorico] pedidoId={} fecha={} COMPLETADO", pedidoId, req.getFecha());
+        return obtener(pedidoId);
     }
 
     @Transactional

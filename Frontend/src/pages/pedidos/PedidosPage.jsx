@@ -10,10 +10,12 @@ import { inventarioService } from "../../services/inventarioService";
 import { formatCOP } from "../../utils/format";
 import { esActivo, sortByReserva, calcularInsumos, formatInsumo } from "../../utils/pedidoHelpers";
 import { usePedidoMutations } from "../../hooks/usePedidoMutations";
+import { useSessionStore } from "../../store/useSessionStore";
 import OrdenCard from "../../components/pedidos/OrdenCard";
 import ModalCrearPedido from "../../components/pedidos/ModalCrearPedido";
 import ModalDetallePedido from "../../components/pedidos/ModalDetallePedido";
 import ModalCobrar from "../../components/pedidos/ModalCobrar";
+import ModalPedidoHistorico from "../../components/pedidos/ModalPedidoHistorico";
 import Pagination from "../../components/shared/Pagination";
 
 const CARD_MIN = 280; // minmax(280px, ...) del grid
@@ -110,8 +112,10 @@ function PedidoCreado({ pedido, onVerPedido, onCerrar }) {
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function PedidosPage() {
   const location = useLocation();
+  const usuario = useSessionStore((s) => s.usuario);
   const [pendienteAbrirId, setPendienteAbrirId] = useState(() => location.state?.abrirPedidoId ?? null);
   const [showCrear, setShowCrear]                 = useState(false);
+  const [showHistorico, setShowHistorico]         = useState(false);
   const [pedidoActivo, setPedidoActivo]           = useState(null);
   const [pedidoCobrar, setPedidoCobrar]           = useState(null);
   const [pedidoCreadoExito, setPedidoCreadoExito] = useState(null);
@@ -194,7 +198,7 @@ export default function PedidosPage() {
   const {
     crearMut, agregarMut, actualizarDetalleMut, quitarDetalleMut,
     actualizarMut, pagoMut, actualizarPagoMut, quitarPagoMut,
-    finalizarMut, anularMut, fiarMut,
+    finalizarMut, anularMut, fiarMut, crearHistoricoMut,
   } = usePedidoMutations();
 
   // ── Listas derivadas ──────────────────────────────────────────────────────
@@ -343,9 +347,20 @@ export default function PedidosPage() {
             )}
           </div>
 
-          <button className="btn btn-primary shrink-0" onClick={() => setShowCrear(true)}>
-            <Plus size={15} /> Nuevo pedido
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {usuario?.rol === "ADMIN" && (
+              <button
+                className="btn btn-secondary text-amber-700 border-amber-300 hover:bg-amber-50"
+                title="Carga histórica: crea, cobra y finaliza un pedido retroactivo (fondos e inventario reales)"
+                onClick={() => setShowHistorico(true)}
+              >
+                📋 Carga histórica
+              </button>
+            )}
+            <button className="btn btn-primary" onClick={() => setShowCrear(true)}>
+              <Plus size={15} /> Nuevo pedido
+            </button>
+          </div>
         </div>
 
         {/* Fila 2: KPIs con animación de entrada/salida */}
@@ -563,6 +578,14 @@ export default function PedidosPage() {
             setShowCrear(false);
             setPedidoCreadoExito(res);
           })}
+        />
+      )}
+
+      {showHistorico && (
+        <ModalPedidoHistorico
+          productos={productos}
+          onClose={() => setShowHistorico(false)}
+          onCrear={(req) => crearHistoricoMut.mutateAsync(req)}
         />
       )}
 
