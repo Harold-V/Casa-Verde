@@ -7,13 +7,18 @@ import ConfirmDialog from "../shared/ConfirmDialog";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 
 /** Modal de cobro rápido: factura + registro de pagos (solo lectura) + finalizar. */
-export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar, onFiar }) {
+export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar, onFiar, onActualizar }) {
   const [pagoForm, setPagoForm]         = useState({ moneda: "COP", monto: "" });
   const [showPagoForm, setShowPagoForm] = useState(false);
+  const [showDescuento, setShowDescuento] = useState(false);
+  const [descuentoCop, setDescuentoCop] = useState(pedido.descuentoCop > 0 ? String(pedido.descuentoCop) : "");
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
   const [confirm, setConfirm]           = useState(false);
   const [confirmFiar, setConfirmFiar]   = useState(false);
+  // Igual que en ModalDetallePedido: el descuento solo se puede tocar antes
+  // del primer cobro — el backend lo rechaza si ya hay pagos registrados.
+  const sinPagos = (pedido.pagos?.length ?? 0) === 0;
   // abierto: puede recibir cobros/finalizarse — incluye FIADO (se abona
   // hasta saldar la deuda). puedeFiar: más angosto, solo antes de estar ya
   // fiado (fiar algo que ya está fiado no tiene sentido y el backend lo
@@ -38,6 +43,24 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar, onFi
     if (!pagoForm.monto || Number(pagoForm.monto) <= 0) throw new Error("El monto debe ser mayor a 0");
     await onPago({ moneda: pagoForm.moneda, monto: Number(pagoForm.monto) });
     setPagoForm({ moneda: "COP", monto: "" }); setShowPagoForm(false);
+  });
+
+  const handleGuardarDescuento = () => run(async () => {
+    const nuevo = parseFloat(descuentoCop) || 0;
+    if (nuevo >= (pedido.subtotalCop ?? 0) && nuevo > 0) throw new Error("El descuento debe ser menor al subtotal");
+    await onActualizar({
+      nombre:       pedido.nombre       ?? null,
+      fechaReserva: pedido.fechaReserva ?? null,
+      horaReserva:  pedido.horaReserva  ?? null,
+      mesa:         pedido.mesa         ?? null,
+      cantPersonas: pedido.cantPersonas ?? null,
+      observacion:  pedido.observacion  ?? null,
+      salonId:      pedido.salonId      ?? null,
+      paraLlevar:   pedido.paraLlevar   ?? null,
+      telefono:     pedido.telefono     ?? null,
+      descuentoCop: nuevo,
+    });
+    setShowDescuento(false);
   });
 
   // Esc cierra. Enter: si el form de pago está abierto → registrar cobro,
@@ -133,6 +156,35 @@ export default function ModalCobrar({ pedido, onClose, onPago, onFinalizar, onFi
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {abierto && sinPagos && (
+              <div className="px-6 pt-3">
+                {!showDescuento ? (
+                  <button className="btn btn-secondary btn-sm w-full justify-center text-gray-500" onClick={() => setShowDescuento(true)}>
+                    🏷️ Aplicar descuento
+                  </button>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[12px] font-semibold text-verde-oscuro">Descuento (COP)</span>
+                      <button className="btn-icon text-gray-400" onClick={() => { setShowDescuento(false); setDescuentoCop(pedido.descuentoCop > 0 ? String(pedido.descuentoCop) : ""); }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <MoneyInput
+                        className="form-control flex-1 text-sm"
+                        moneda="COP"
+                        placeholder="Monto del descuento"
+                        value={descuentoCop}
+                        onChange={setDescuentoCop}
+                      />
+                      <button type="button" className="btn btn-primary btn-sm" onClick={handleGuardarDescuento} disabled={loading}>Guardar</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

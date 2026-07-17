@@ -10,7 +10,7 @@ import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 
 /** Modal de creación de pedido: datos del cliente + catálogo + abono inicial. */
 export default function ModalCrearPedido({ salones, productos, onClose, onCrear }) {
-  const [nombre, setNombre]         = useState("");
+  const [nombre, setNombre]         = useState("Sr. ");
   const [on, setOn]                 = useState({ fecha: false, hora: false, personas: false, salon: false, telefono: false });
   const [fecha, setFecha]           = useState(new Date().toLocaleDateString("en-CA"));
   const [hora, setHora]             = useState(new Date().toTimeString().slice(0, 5));
@@ -20,7 +20,11 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
   const [paraLlevar, setParaLlevar] = useState(false);
   const [observacion, setObservacion] = useState("");
   const [cantidades, setCantidades] = useState({});
-  const [manual, setManual]         = useState({ nombre: "", precio: "" });
+  // Orden de agregado (cola): ids de productos en el orden en que el usuario
+  // los fue seleccionando, para que "Resumen del pedido" no salga en el
+  // orden alfabético/categoría del catálogo sino en el orden real de armado.
+  const [ordenIds, setOrdenIds]     = useState([]);
+  const [manual, setManual]         = useState({ nombre: "", precio: "", cantidad: 1 });
   const [manualItems, setManualItems] = useState([]);
   const [busqueda, setBusqueda]     = useState("");
   const [showAbono, setShowAbono]   = useState(false);
@@ -44,21 +48,30 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
       const updated = n <= 0
         ? (() => { const { [id]: _, ...rest } = c; return rest; })()
         : { ...c, [id]: n };
-      return normalizarFracciones(updated, productos);
+      const normalizadas = normalizarFracciones(updated, productos);
+      setOrdenIds((prev) => {
+        const presentes = new Set(Object.keys(normalizadas).map(Number).filter((pid) => normalizadas[pid] > 0));
+        const mantenidos = prev.filter((pid) => presentes.has(pid));
+        const nuevos = [...presentes].filter((pid) => !prev.includes(pid));
+        return [...mantenidos, ...nuevos];
+      });
+      return normalizadas;
     });
 
   const agregarManual = () => {
     if (!manual.nombre.trim()) return;
-    setManualItems((ms) => [...ms, { ...manual, cantidad: 1, _key: Date.now() }]);
-    setManual({ nombre: "", precio: "" });
+    const cant = Math.max(1, parseInt(manual.cantidad, 10) || 1);
+    setManualItems((ms) => [...ms, { ...manual, cantidad: cant, _key: Date.now() }]);
+    setManual({ nombre: "", precio: "", cantidad: 1 });
   };
 
   const productosFiltrados = productos.filter((p) =>
     !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
-  const seleccionados = productos
-    .filter((p) => (cantidades[p.id] ?? 0) > 0)
+  const seleccionados = ordenIds
+    .map((id) => productos.find((p) => p.id === id))
+    .filter(Boolean)
     .map((p) => ({ ...p, cantidad: cantidades[p.id] }));
 
   const totalItems = seleccionados.reduce((s, p) => s + p.cantidad, 0)
@@ -179,11 +192,20 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   <input
-                    className="form-control pl-8 text-sm"
+                    className="form-control pl-8 pr-8 text-sm"
                     placeholder="Buscar producto…"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                   />
+                  {busqueda && (
+                    <button
+                      type="button"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      onClick={() => setBusqueda("")}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -212,8 +234,14 @@ export default function ModalCrearPedido({ salones, productos, onClose, onCrear 
                       onChange={(e) => setManual((m) => ({ ...m, nombre: e.target.value }))}
                     />
                     <input
+                      className="form-control w-16 text-sm text-center"
+                      type="number" min="1" placeholder="Cant."
+                      value={manual.cantidad}
+                      onChange={(e) => setManual((m) => ({ ...m, cantidad: e.target.value }))}
+                    />
+                    <input
                       className="form-control w-28 text-sm"
-                      type="number" min="0" placeholder="Precio COP"
+                      type="number" min="0" placeholder="Precio unitario COP"
                       value={manual.precio}
                       onChange={(e) => setManual((m) => ({ ...m, precio: e.target.value }))}
                     />

@@ -6,7 +6,9 @@ import { inventarioService } from "../../services/inventarioService";
 import { formatFecha } from "../../utils/format";
 import { formatInsumo, capFirst } from "../../utils/pedidoHelpers";
 import Pagination from "../../components/shared/Pagination";
-import ModalCompraInsumo from "../../components/inventario/ModalCompraInsumo";
+import ModalRegistrarCompra from "../../components/inventario/ModalRegistrarCompra";
+import ComprasTab from "./tabs/ComprasTab";
+import ProveedoresTab from "./tabs/ProveedoresTab";
 
 const PAGE_SIZE = 8;
 
@@ -16,11 +18,16 @@ const TIPO_CONFIG = {
   ajuste:  { label: "Ajuste",   badge: "badge-warning", icono: <SlidersHorizontal size={13} /> },
 };
 
-export default function InventarioPage() {
+const TABS = [
+  { id: "stock",       label: "Stock" },
+  { id: "compras",     label: "Compras" },
+  { id: "proveedores", label: "Proveedores" },
+];
+
+function StockTab() {
   const navigate = useNavigate();
   const [filtroInsumo, setFiltroInsumo] = useState("");
   const [pagina, setPagina] = useState(0);
-  const [modalCompraAbierto, setModalCompraAbierto] = useState(false);
 
   const { data: stock = [], isLoading: loadingStock } = useQuery({
     queryKey: ["inventario-stock"],
@@ -38,16 +45,6 @@ export default function InventarioPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Inventario</h1>
-        <button
-          className="btn btn-primary"
-          onClick={() => setModalCompraAbierto(true)}
-        >
-          + Registrar entrada
-        </button>
-      </div>
-
       {/* Stock actual */}
       <div className="kpi-grid mb-6">
         {loadingStock ? (
@@ -132,12 +129,43 @@ export default function InventarioPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+export default function InventarioPage() {
+  const [tab, setTab] = useState("stock");
+  const [modalCompraAbierto, setModalCompraAbierto] = useState(false);
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1 className="page-title">Inventario</h1>
+        {tab === "stock" && (
+          <button className="btn btn-primary" onClick={() => setModalCompraAbierto(true)}>
+            + Registrar compra
+          </button>
+        )}
+      </div>
+
+      <div className="tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`tab${tab === t.id ? " activo" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "stock" && <StockTab />}
+      {tab === "compras" && <ComprasTab />}
+      {tab === "proveedores" && <ProveedoresTab />}
 
       {modalCompraAbierto && (
-        <ModalCompraInsumo
-          insumos={stock}
-          onClose={() => setModalCompraAbierto(false)}
-        />
+        <ModalRegistrarCompra onClose={() => setModalCompraAbierto(false)} />
       )}
     </div>
   );

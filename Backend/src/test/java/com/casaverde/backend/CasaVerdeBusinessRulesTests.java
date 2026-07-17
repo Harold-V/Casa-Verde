@@ -62,6 +62,7 @@ import com.casaverde.backend.fachadaServices.services.productoService.IUsuarioSe
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 // app.security.enabled=true en application.properties base (el perfil "test" no lo
@@ -144,7 +145,7 @@ class CasaVerdeBusinessRulesTests {
                 cuy.setStockActual(BigDecimal.ZERO);
                 inventarioRepository.save(cuy);
 
-                Producto productoCuy = productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                Producto productoCuy = productoRepository.findByEliminadoFalseOrderByOrdenAsc().stream()
                                 .filter(p -> "Cuy".equals(p.getNombre()))
                                 .findFirst()
                                 .orElseThrow();
@@ -366,7 +367,7 @@ class CasaVerdeBusinessRulesTests {
 
         @Test
         void cambioDePrecioQuedaEnHistorial() {
-                Producto producto = productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                Producto producto = productoRepository.findByEliminadoFalseOrderByOrdenAsc().stream()
                                 .filter(p -> "Gaseosa".equals(p.getNombre()))
                                 .findFirst()
                                 .orElseThrow();
@@ -383,7 +384,7 @@ class CasaVerdeBusinessRulesTests {
 
         @Test
         void actualizarProductoConComposicionExistenteNoRompeUniqueConstraint() {
-                Producto cuy = productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                Producto cuy = productoRepository.findByEliminadoFalseOrderByOrdenAsc().stream()
                                 .filter(p -> "Cuy".equals(p.getNombre()))
                                 .findFirst()
                                 .orElseThrow();
@@ -412,6 +413,21 @@ class CasaVerdeBusinessRulesTests {
                 assertThat(actualizado.getPrecio()).isEqualByComparingTo(BigDecimal.valueOf(28000));
                 assertThat(actualizado.getComposicion()).hasSize(1);
                 assertThat(actualizado.getComposicion().get(0).getInsumo()).isEqualTo("cuy");
+        }
+
+        @Test
+        void reordenarProductosPersisteElNuevoOrden() {
+                List<Long> idsInvertidos = productoRepository.findByEliminadoFalseOrderByOrdenAsc().stream()
+                                .map(Producto::getId)
+                                .sorted(Comparator.reverseOrder())
+                                .toList();
+
+                productoService.reordenar(idsInvertidos);
+
+                List<Long> idsResultantes = productoRepository.findByEliminadoFalseOrderByOrdenAsc().stream()
+                                .map(Producto::getId)
+                                .toList();
+                assertThat(idsResultantes).isEqualTo(idsInvertidos);
         }
 
         // Estos tres casos ejercitan @Valid/Bean Validation sobre CompraRequest y
@@ -1450,7 +1466,7 @@ class CasaVerdeBusinessRulesTests {
         }
 
         private Producto productoPorNombre(String nombre) {
-                return productoRepository.findByEliminadoFalseOrderByNombreAsc().stream()
+                return productoRepository.findByEliminadoFalseOrderByOrdenAsc().stream()
                                 .filter(p -> nombre.equals(p.getNombre()))
                                 .findFirst()
                                 .orElseThrow(() -> new AssertionError("Producto no encontrado en seed: " + nombre));
