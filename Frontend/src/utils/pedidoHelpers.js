@@ -160,8 +160,12 @@ export function normalizarFracciones(cantidades, productos) {
 }
 
 // ── Capitaliza cada palabra (title case) ─────────────────────────────────────
+// \b no sirve aquí: en JS \b se define sobre \w (solo ASCII), así que trata
+// á/é/í/ó/ú/ü/ñ como "no palabra" y genera un falso límite de palabra a cada
+// lado de esas letras (ej. "Peña" → "PeÑA"). En vez de \b, se ancla a
+// inicio-de-string o cualquier carácter que NO sea letra (espacio, guión…).
 export const toTitleCase = (s) =>
-  s.replace(/\b[a-záéíóúüñ]/gi, (c) => c.toUpperCase());
+  s.replace(/(^|[^a-záéíóúüñ])([a-záéíóúüñ])/gi, (_, sep, c) => sep + c.toUpperCase());
 
 // ── Formateo de fechas y horas de reserva ────────────────────────────────────
 

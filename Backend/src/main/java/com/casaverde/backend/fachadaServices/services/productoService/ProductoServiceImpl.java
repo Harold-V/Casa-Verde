@@ -42,13 +42,13 @@ public class ProductoServiceImpl implements IProductoService {
 
     @Transactional(readOnly = true)
     public List<ProductoDTO> listarTodos() {
-        return productoRepo.findByEliminadoFalseOrderByNombreAsc().stream()
+        return productoRepo.findByEliminadoFalseOrderByOrdenAsc().stream()
                 .map(productoMapper::toDTO).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ProductoDTO> listarActivos() {
-        return productoRepo.findByActivoTrueAndEliminadoFalseOrderByNombreAsc().stream()
+        return productoRepo.findByActivoTrueAndEliminadoFalseOrderByOrdenAsc().stream()
                 .map(productoMapper::toDTO).collect(Collectors.toList());
     }
 
@@ -169,6 +169,22 @@ public class ProductoServiceImpl implements IProductoService {
         productoRepo.save(producto);
         auditoriaService.registrar("producto", id, "ELIMINAR",
                 "Producto eliminado: " + nombreOriginal);
+    }
+
+    @Transactional
+    public List<ProductoDTO> reordenar(List<Long> idsEnOrden) {
+        if (idsEnOrden == null || idsEnOrden.isEmpty())
+            throw new ValidacionException("La lista de orden no puede estar vacía");
+        List<Producto> productos = new ArrayList<>();
+        for (int i = 0; i < idsEnOrden.size(); i++) {
+            Producto p = findOrThrow(idsEnOrden.get(i));
+            p.setOrden(i);
+            productos.add(p);
+        }
+        List<Producto> guardados = productoRepo.saveAll(productos);
+        auditoriaService.registrar("producto", null, "REORDENAR",
+                idsEnOrden.size() + " producto(s) reordenados");
+        return guardados.stream().map(productoMapper::toDTO).toList();
     }
 
     /**

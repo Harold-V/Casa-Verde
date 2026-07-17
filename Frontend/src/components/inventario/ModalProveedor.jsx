@@ -46,16 +46,18 @@ export default function ModalProveedor({ proveedor, onClose, onSave }) {
           <div className="modal-body">
             {error && <div className="alert alert-error">{error}</div>}
             <div className="form-group">
-              <label className="form-label">Nombre *</label>
+              <label className="form-label" htmlFor="proveedor-nombre">Nombre *</label>
               <input
+                id="proveedor-nombre"
                 className="form-control"
                 value={form.nombre}
                 onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Tipo *</label>
+              <label className="form-label" htmlFor="proveedor-tipo">Tipo *</label>
               <select
+                id="proveedor-tipo"
                 className="form-control"
                 value={form.tipo}
                 onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
@@ -66,8 +68,9 @@ export default function ModalProveedor({ proveedor, onClose, onSave }) {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Teléfono</label>
+              <label className="form-label" htmlFor="proveedor-telefono">Teléfono</label>
               <input
+                id="proveedor-telefono"
                 className="form-control"
                 value={form.telefono}
                 onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Eye, Trash2 } from "lucide-react";
 import { compraService } from "../../../services/compraService";
-import ModalRegistrarCompra from "../../../components/configuracion/ModalRegistrarCompra";
-import ModalDetalleCompra from "../../../components/configuracion/ModalDetalleCompra";
+import ModalRegistrarCompra from "../../../components/inventario/ModalRegistrarCompra";
+import ModalDetalleCompra from "../../../components/inventario/ModalDetalleCompra";
 import ConfirmDialog from "../../../components/shared/ConfirmDialog";
 import { formatCOP } from "../../../utils/format";
 

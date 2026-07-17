@@ -26,4 +26,7 @@ public interface IProductoService {
     ProductoDTO toggleActivo(Long id);
 
     void eliminar(Long id);
+
+    /** Reordena el catálogo: idsEnOrden es la lista completa de ids en el orden deseado. */
+    List<ProductoDTO> reordenar(List<Long> idsEnOrden);
 }

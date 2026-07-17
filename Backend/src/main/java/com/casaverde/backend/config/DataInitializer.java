@@ -103,6 +103,10 @@ public class DataInitializer implements CommandLineRunner {
         categoriaRepo.saveAll(cats);
     }
 
+    // Contador para asignar Producto.orden en secuencia de siembra (drag & drop
+    // de Configuración > Productos parte de este orden, no del alfabético).
+    private int siguienteOrden = 0;
+
     private void initProductos() {
         if (productoRepo.count() > 0)
             return;
@@ -317,7 +321,7 @@ public class DataInitializer implements CommandLineRunner {
     private Producto saveProducto(String nombre, double precio, CategoriaProducto cat, boolean afectaInventario) {
         return productoRepo.save(Producto.builder()
                 .nombre(nombre).precio(BigDecimal.valueOf(precio)).categoria(cat)
-                .afectaInventario(afectaInventario).activo(true).build());
+                .afectaInventario(afectaInventario).activo(true).orden(siguienteOrden++).build());
     }
 
     private void addComp(Producto producto, String insumo, BigDecimal cantidad) {

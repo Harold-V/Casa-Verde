@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Power, Banknote } from "lucide-react";
 import { proveedorService } from "../../../services/proveedorService";
-import ModalProveedor from "../../../components/configuracion/ModalProveedor";
-import ModalAdelantoProveedor from "../../../components/configuracion/ModalAdelantoProveedor";
+import ModalProveedor from "../../../components/inventario/ModalProveedor";
+import ModalAdelantoProveedor from "../../../components/inventario/ModalAdelantoProveedor";
 
 const TIPO_BADGE = {
   CUY:     "badge-success",

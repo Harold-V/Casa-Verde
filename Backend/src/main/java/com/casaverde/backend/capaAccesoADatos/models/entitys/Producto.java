@@ -52,6 +52,10 @@ public class Producto {
     @Builder.Default
     private Boolean eliminado = false;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer orden = 0;
+
     @Column(name = "creado_en")
     private LocalDateTime creadoEn;
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, X, CheckCircle, ChevronDown, ChevronUp, Calendar } from "lucide-react";
+import { Plus, Search, X, CheckCircle, ChevronDown, ChevronUp, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 import { pedidoService } from "../../services/pedidoService";
 import { productoService } from "../../services/productoService";
@@ -20,6 +20,40 @@ const CARD_MIN = 280; // minmax(280px, ...) del grid
 const CARD_GAP = 14;  // gap-[14px]
 const ROWS     = 2;   // filas por página
 const getHoy = () => new Date().toLocaleDateString("en-CA");
+
+// Fecha "efectiva" de un pedido para ordenar/filtrar por día: la reserva si
+// tiene, si no cuándo se creó (mismo criterio que sortByReserva).
+const fechaEfectiva = (p) => p.fechaReserva ?? (p.creadoEn ?? "").slice(0, 10);
+
+/** Ordena por fecha efectiva (reserva u hora, si no creadoEn). asc | desc. */
+function ordenarPorFecha(list, dir) {
+  const ts = (p) => p.fechaReserva
+    ? new Date(`${p.fechaReserva}T${p.horaReserva ?? "00:00"}`).getTime()
+    : new Date(p.creadoEn).getTime();
+  return [...list].sort((a, b) => (dir === "asc" ? ts(a) - ts(b) : ts(b) - ts(a)));
+}
+
+/** Botón de orden asc/desc. Para Activos incluye un tercer estado "auto"
+ * (null) que usa el orden inteligente por reserva — el explícito asc/desc
+ * lo reemplaza por orden cronológico simple. */
+function OrdenToggle({ modo, onChange, conAuto }) {
+  const ciclo = conAuto
+    ? { null: "asc", asc: "desc", desc: null }
+    : { desc: "asc", asc: "desc" };
+  const siguiente = ciclo[modo === null ? "null" : modo] ?? (conAuto ? null : "desc");
+  const label = modo === "asc" ? "Más antiguos primero" : modo === "desc" ? "Más recientes primero" : "Orden automático (reservas)";
+  const Icon = modo === "asc" ? ArrowUp : modo === "desc" ? ArrowDown : ArrowUpDown;
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm px-2"
+      title={label}
+      onClick={() => onChange(siguiente)}
+    >
+      <Icon size={13} />
+    </button>
+  );
+}
 
 // ── Overlay de éxito después de crear pedido ─────────────────────────────────
 function PedidoCreado({ pedido, onVerPedido, onCerrar }) {
@@ -86,6 +120,9 @@ export default function PedidosPage() {
   const [kpiFiltro, setKpiFiltro]                 = useState(null); // null | "en-curso" | "reservas" | "para-llevar"
   const [pagina, setPagina]                       = useState(0);
   const [fechaHistorial, setFechaHistorial]       = useState("");
+  const [fechaActivos, setFechaActivos]           = useState("");
+  const [ordenActivos, setOrdenActivos]           = useState(null); // null = automático (sortByReserva)
+  const [ordenHistorial, setOrdenHistorial]       = useState("desc");
   const [kpiVisible, setKpiVisible]               = useState(true);
   const [pageSize, setPageSize]                   = useState(CARD_MIN * ROWS); // inicial conservador
   const gridRef                                   = useRef(null);
@@ -210,12 +247,20 @@ export default function PedidosPage() {
     kpiFiltroEfectivo === "para-llevar" ? paraLlevarList :
     abiertos;
 
-  const listaBase     = tab === "historial" ? historialFiltrado : listaActivos;
+  const activosFiltradosPorFecha = useMemo(() => fechaActivos
+    ? listaActivos.filter((p) => fechaEfectiva(p) === fechaActivos)
+    : listaActivos,
+  [listaActivos, fechaActivos]);
+
+  const listaBase     = tab === "historial" ? historialFiltrado : activosFiltradosPorFecha;
   const listaFiltrada = useMemo(() => busqueda
     ? listaBase.filter((p) => (p.nombre ?? "").toLowerCase().includes(busqueda.toLowerCase()))
     : listaBase,
   [listaBase, busqueda]);
-  const pedidosMostrados = useMemo(() => tab === "activos" ? sortByReserva(listaFiltrada) : listaFiltrada, [tab, listaFiltrada]);
+  const pedidosMostrados = useMemo(() => {
+    if (tab === "activos") return ordenActivos ? ordenarPorFecha(listaFiltrada, ordenActivos) : sortByReserva(listaFiltrada);
+    return ordenarPorFecha(listaFiltrada, ordenHistorial);
+  }, [tab, listaFiltrada, ordenActivos, ordenHistorial]);
 
   // ── Paginación ────────────────────────────────────────────────────────────
   const totalPaginas = Math.max(1, Math.ceil(pedidosMostrados.length / pageSize));
@@ -412,6 +457,30 @@ export default function PedidosPage() {
                     <X size={13} />
                   </button>
                 )}
+                <OrdenToggle modo={ordenHistorial} onChange={(m) => { setOrdenHistorial(m ?? "desc"); setPagina(0); }} conAuto={false} />
+              </div>
+            )}
+            {tab === "activos" && (
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex items-center">
+                  <Calendar size={13} className="absolute left-2.5 text-gray-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    className="form-control pl-8 pr-2 text-sm w-[148px]"
+                    value={fechaActivos}
+                    onChange={(e) => { setFechaActivos(e.target.value); setPagina(0); }}
+                  />
+                </div>
+                {fechaActivos && (
+                  <button
+                    className="btn btn-secondary btn-sm px-2"
+                    title="Quitar filtro de fecha"
+                    onClick={() => { setFechaActivos(""); setPagina(0); }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+                <OrdenToggle modo={ordenActivos} onChange={(m) => { setOrdenActivos(m); setPagina(0); }} conAuto={true} />
               </div>
             )}
             <div className="relative w-48">
@@ -520,6 +589,7 @@ export default function PedidosPage() {
           pedido={pedidoCobrar}
           onClose={() => setPedidoCobrar(null)}
           onPago={(req) => pagoMut.mutateAsync({ id: pedidoCobrar.id, req }).then(setPedidoCobrar)}
+          onActualizar={(req) => actualizarMut.mutateAsync({ id: pedidoCobrar.id, req }).then(setPedidoCobrar)}
           onFinalizar={() => finalizarMut.mutateAsync(pedidoCobrar.id).then(setPedidoCobrar)}
           onFiar={() => fiarMut.mutateAsync(pedidoCobrar.id).then(() => setPedidoCobrar(null))}
         />

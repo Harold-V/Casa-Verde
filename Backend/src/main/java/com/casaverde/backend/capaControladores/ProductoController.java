@@ -47,6 +47,11 @@ public class ProductoController {
         return service.actualizar(id, req);
     }
 
+    @PutMapping("/reordenar")
+    public List<ProductoDTO> reordenar(@RequestBody List<Long> idsEnOrden) {
+        return service.reordenar(idsEnOrden);
+    }
+
     @PutMapping("/{id}/precio")
     public ProductoDTO actualizarPrecio(@PathVariable Long id, @Valid @RequestBody ActualizarPrecioRequest req) {
         return service.actualizarPrecio(id, req.getPrecio(), req.getMotivo());

@@ -12,7 +12,7 @@ import { useModalKeyboard } from "../../hooks/useModalKeyboard";
 export default function ModalAgregarItems({ productos, detalles = [], onConfirmar, onCancelar }) {
   const [cantidades, setCantidades]     = useState({});
   const [busqueda, setBusqueda]         = useState("");
-  const [manual, setManual]             = useState({ nombre: "", precio: "" });
+  const [manual, setManual]             = useState({ nombre: "", precio: "", cantidad: 1 });
   const [manualItems, setManualItems]   = useState([]);
   const [error, setError]               = useState("");
 
@@ -26,8 +26,9 @@ export default function ModalAgregarItems({ productos, detalles = [], onConfirma
 
   const agregarManual = () => {
     if (!manual.nombre.trim()) return;
-    setManualItems((ms) => [...ms, { ...manual, cantidad: 1, _key: Date.now() }]);
-    setManual({ nombre: "", precio: "" });
+    const cant = Math.max(1, parseInt(manual.cantidad, 10) || 1);
+    setManualItems((ms) => [...ms, { ...manual, cantidad: cant, _key: Date.now() }]);
+    setManual({ nombre: "", precio: "", cantidad: 1 });
   };
 
   const productosFiltrados = productos.filter((p) =>
@@ -99,11 +100,20 @@ export default function ModalAgregarItems({ productos, detalles = [], onConfirma
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
-                  className="form-control pl-8 text-sm"
+                  className="form-control pl-8 pr-8 text-sm"
                   placeholder="Buscar producto…"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                 />
+                {busqueda && (
+                  <button
+                    type="button"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setBusqueda("")}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -133,8 +143,14 @@ export default function ModalAgregarItems({ productos, detalles = [], onConfirma
                     onChange={(e) => setManual((m) => ({ ...m, nombre: e.target.value }))}
                   />
                   <input
+                    className="form-control w-16 text-sm text-center"
+                    type="number" min="1" placeholder="Cant."
+                    value={manual.cantidad}
+                    onChange={(e) => setManual((m) => ({ ...m, cantidad: e.target.value }))}
+                  />
+                  <input
                     className="form-control w-28 text-sm"
-                    type="number" min="0" placeholder="Precio COP"
+                    type="number" min="0" placeholder="Precio unitario COP"
                     value={manual.precio}
                     onChange={(e) => setManual((m) => ({ ...m, precio: e.target.value }))}
                   />
