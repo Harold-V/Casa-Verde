@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Sistema de operación Casa Verde — pedidos, inventario, caja y cuentas por cobrar",
   "author": "Harold Velasquez",
   "type": "module",
