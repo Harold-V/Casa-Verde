@@ -795,8 +795,13 @@ git branch -d hotfix/fix-critico
 # Publicar release del instalador (desde main)
 git checkout main
 $env:GH_TOKEN = "ghp_token_write"
-cd Frontend && npm run publish:electron
+cd Frontend && npm run publish:electron   # sube .exe, .blockmap y latest.yml a un release DRAFT
+gh release edit vX.Y.Z --draft=false --latest   # recién aquí se publica
 ```
+
+> El repo tiene **releases inmutables** activados: un release publicado ya no acepta assets y su tag no se puede reutilizar. Por eso `releaseType` es `draft` en `package.json` — nunca publicar antes de que los 3 assets estén subidos.
+>
+> `Frontend/resources/` (gitignoreado) debe contener antes del build: `backend.jar` (`mvn package` en Backend), `jre/` (jlink del JDK) y `update-config.json` (`{"ghTokenRead": "<token fine-grained solo lectura>"}`, UTF-8 sin BOM). Si falta alguno, electron-builder solo avisa y genera un instalador roto (~110 MB en vez de ~245 MB).
 
 ### Reglas
 - **Nunca** hacer commits directos a `main`.
