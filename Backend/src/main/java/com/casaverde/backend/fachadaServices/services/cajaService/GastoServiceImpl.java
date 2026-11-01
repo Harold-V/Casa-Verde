@@ -34,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class GastoServiceImpl implements IGastoService {
 
     private static final List<String> CATEGORIAS = List.of("insumos", "servicios", "equipos", "otros");
+    private static final String CATEGORIA_DEFAULT = "otros";
 
     private final GastoRepository gastoRepo;
     private final ITasaCambioService tasaCambioService;
@@ -60,7 +61,7 @@ public class GastoServiceImpl implements IGastoService {
 
     @Transactional
     public GastoDTO registrar(GastoRequest req) {
-        validar(req);
+        String categoria = normalizarCategoria(req.getCategoria());
         validarInventario(req);
 
         String moneda = monetaryService.normalizarMoneda(req.getMoneda());
@@ -70,7 +71,7 @@ public class GastoServiceImpl implements IGastoService {
 
         Gasto gasto = Gasto.builder()
                 .concepto(req.getConcepto().trim())
-                .categoria(req.getCategoria() != null ? req.getCategoria() : "—")
+                .categoria(categoria)
                 .moneda(moneda)
                 .monto(monto)
                 .montoCop(montoCop)
@@ -117,9 +118,19 @@ public class GastoServiceImpl implements IGastoService {
 
     // ---- helpers ----
 
-    private void validar(GastoRequest req) {
-        if (!CATEGORIAS.contains(req.getCategoria()))
+    /**
+     * La categoría es opcional: el modal de "Nueva salida" no la envía, así que
+     * un valor nulo/vacío se registra como "otros" (categoría válida para los
+     * reportes). Si viene informada, debe ser una de CATEGORIAS.
+     * Ojo: List.of(...).contains(null) lanza NPE, por eso se valida antes.
+     */
+    private String normalizarCategoria(String categoria) {
+        if (categoria == null || categoria.isBlank())
+            return CATEGORIA_DEFAULT;
+        String normalizada = categoria.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!CATEGORIAS.contains(normalizada))
             throw new ValidacionException("Categoría inválida. Use: " + CATEGORIAS);
+        return normalizada;
     }
 
     private void validarInventario(GastoRequest req) {
